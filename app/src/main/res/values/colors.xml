@@ -1,0 +1,7 @@
+<resources>
+    <!-- Launcher + splash branding (OLED-dark canvas, single teal accent). -->
+    <color name="ic_launcher_background">#0A0F0E</color>
+    <color name="spartan_splash_background">#0A0F0E</color>
+    <!-- Window background follows the app theme; overridden in values-night. -->
+    <color name="spartan_window_background">#F6F8F8</color>
+</resources>

@@ -1,0 +1,172 @@
+<resources>
+    <string name="app_name">Spartan</string>
+
+    <!-- Check-in -->
+    <string name="checkin_building_plan">Building today\'s plan...</string>
+    <string name="checkin_collapse_activity">Collapse %1$s</string>
+    <string name="checkin_completed">Completed</string>
+    <string name="checkin_connect">Connect</string>
+    <string name="checkin_connect_prompt_body_real">Connect WHOOP to personalize your plan.</string>
+    <string name="checkin_connect_prompt_body_sample">You\'re viewing sample data. Connect to personalize your plan with your real recovery, sleep, and strain.</string>
+    <string name="checkin_connect_whoop">Connect WHOOP</string>
+    <string name="checkin_empty_plan">Nothing scheduled yet. Connect WHOOP or pull the latest data to generate today\'s plan.</string>
+    <string name="checkin_expand_activity">Expand %1$s</string>
+    <string name="checkin_find_time">Find a time</string>
+    <string name="checkin_footer_disclaimer">Spartan offers wellness and fitness guidance, not medical advice. For any health concern, contact a qualified clinician.</string>
+    <string name="checkin_minutes_time_of_day">~%1$d min · %2$s</string>
+    <string name="checkin_minutes_today">~%1$d min today</string>
+    <string name="checkin_more_options">More options for %1$s</string>
+    <string name="checkin_not_completed">Not completed</string>
+    <string name="checkin_priority_optional">OPTIONAL</string>
+    <string name="checkin_priority_recommended">RECOMMENDED</string>
+    <string name="checkin_priority_required">REQUIRED</string>
+    <string name="checkin_progress_a11y">%1$d of %2$d activities done</string>
+    <string name="checkin_progress_done">%1$d of %2$d done</string>
+    <string name="checkin_readiness">Readiness</string>
+    <string name="checkin_recovery_a11y">Recovery %1$s, %2$s</string>
+    <string name="checkin_recovery_caption">recovery</string>
+    <string name="checkin_recovery_not_available">not available</string>
+    <string name="checkin_recovery_percent">%1$d percent</string>
+    <string name="checkin_rescheduled">Rescheduled</string>
+    <string name="checkin_sample_data">SAMPLE DATA</string>
+    <string name="checkin_scheduled_for">Scheduled for %1$s</string>
+    <string name="checkin_skip_today">Skip today</string>
+    <string name="checkin_skipped_today">Skipped for today</string>
+    <string name="checkin_snooze_hour">Snooze 1 hour</string>
+    <string name="checkin_snoozed">Snoozed</string>
+    <string name="checkin_snoozed_until">Snoozed until %1$s</string>
+    <string name="checkin_steps">STEPS</string>
+    <string name="checkin_sync_failed">Couldn\'t refresh WHOOP data. Showing your most recent sync.</string>
+    <string name="checkin_todays_plan">TODAY\'S PLAN</string>
+    <string name="checkin_why_this_matters">WHY THIS MATTERS</string>
+
+    <!-- Common -->
+    <string name="common_brand">SPARTAN</string>
+    <string name="common_cancel">Cancel</string>
+    <string name="common_pending">pending</string>
+    <string name="common_save">Save</string>
+    <string name="common_trend_avg">Avg %1$s</string>
+    <string name="common_trend_empty">Add more entries to see a trend.</string>
+    <string name="common_trend_latest">Latest %1$s</string>
+    <string name="common_trend_range">Range %1$s-%2$s</string>
+
+    <!-- Connections -->
+    <string name="connections_calendar_body">Reads your free/busy times only — never event titles or details — to schedule activities into open windows. Creating calendar events is a separate, optional step you confirm each time.</string>
+    <string name="connections_calendar_scope_events">calendar.events — only if you opt in to adding events</string>
+    <string name="connections_calendar_scope_freebusy">calendar.freebusy — busy/free times only</string>
+    <string name="connections_calendar_title">Google Calendar</string>
+    <string name="connections_connect_calendar">Connect Calendar</string>
+    <string name="connections_connect_whoop">Connect WHOOP</string>
+    <string name="connections_connected_chip">CONNECTED</string>
+    <string name="connections_disconnect">Disconnect</string>
+    <string name="connections_intro">Spartan treats your health, activity, and calendar data as sensitive. Data stays on your device, is used only to build your plan, and is never sold or used for ads.</string>
+    <string name="connections_phase_note">Phase note: Spartan currently runs on clearly-labeled sample data. Connecting records your consent locally and, once WHOOP/Google credentials are configured, enables the real OAuth flows. You can disconnect or delete your data anytime.</string>
+    <string name="connections_privacy_button">Privacy, export &amp; delete data</string>
+    <string name="connections_requests_label">What Spartan requests:</string>
+    <string name="connections_title">Connections</string>
+    <string name="connections_use_sample_data">Use sample data</string>
+    <string name="connections_whoop_body">Reads your recovery, sleep, strain, HRV, resting heart rate, and respiratory rate to personalize your daily plan. Read-only. No data is written back to WHOOP.</string>
+    <string name="connections_whoop_scope_cycles">read:cycles, read:workout — strain and workouts</string>
+    <string name="connections_whoop_scope_profile">read:profile — basic profile</string>
+    <string name="connections_whoop_scope_recovery">read:recovery, read:sleep — recovery and sleep</string>
+    <string name="connections_whoop_title">WHOOP</string>
+
+    <!-- Diagnostics -->
+    <string name="diagnostics_empty">No events recorded yet.</string>
+    <string name="diagnostics_subtitle">Debug builds only. Operational events, no health data.</string>
+    <string name="diagnostics_title">Diagnostics</string>
+
+    <!-- Metrics -->
+    <string name="metrics_add_entry">Add entry</string>
+    <string name="metrics_add_metric">Add metric</string>
+    <string name="metrics_edit_entry">Edit entry</string>
+    <string name="metrics_edit_metric">Edit metric</string>
+    <string name="metrics_entries">Entries</string>
+    <string name="metrics_history">History</string>
+    <string name="metrics_note_label">Note</string>
+    <string name="metrics_title">Metrics</string>
+    <string name="metrics_value_error">Enter a valid value for %1$s.</string>
+    <string name="metrics_value_error_pending">Enter a valid value or leave blank for pending.</string>
+    <string name="metrics_value_label">Value</string>
+    <string name="metrics_value_pending_label">Value; leave blank if pending</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_begin">Begin</string>
+    <string name="onboarding_disclaimer">Wellness and fitness guidance, not medical advice. You control your data and can delete it anytime.</string>
+    <string name="onboarding_height_label">Height in cm (optional)</string>
+    <string name="onboarding_intro">Connect WHOOP and get one simple, disciplined plan each day to improve recovery, sleep, and fitness — with the reasons behind every action.</string>
+    <string name="onboarding_name_label">What should we call you?</string>
+    <string name="onboarding_tagline">Your daily readiness, decided.</string>
+
+    <!-- Plan -->
+    <string name="plan_log">Log</string>
+    <string name="plan_minus_five">-5</string>
+    <string name="plan_minutes_intensity">%1$d min - %2$s</string>
+    <string name="plan_plus_five">+5</string>
+    <string name="plan_title">Weekly plan</string>
+
+    <!-- Privacy -->
+    <string name="privacy_body">Your data is stored on this device. Spartan has no cloud backend, no accounts, and no analytics, telemetry, or advertising SDKs. The only network connections are the WHOOP and Google Calendar syncs you explicitly connect — in sample-data mode, the app makes no network calls at all.</string>
+    <string name="privacy_delete">Delete</string>
+    <string name="privacy_delete_data">Delete local data</string>
+    <string name="privacy_delete_dialog_text">This deletes local health data on this device. This action cannot be undone.</string>
+    <string name="privacy_delete_dialog_title">Delete local data?</string>
+    <string name="privacy_export_preview">Local export preview</string>
+    <string name="privacy_share_export">Share local export</string>
+    <string name="privacy_share_note">Sharing is user-directed and may send health data to the app you choose.</string>
+    <string name="privacy_title">Privacy</string>
+
+    <!-- Reminders -->
+    <string name="reminders_exercise_body">Time for your planned movement.</string>
+    <string name="reminders_exercise_title">Exercise</string>
+    <string name="reminders_frequency_custom">Custom</string>
+    <string name="reminders_frequency_daily">Daily</string>
+    <string name="reminders_frequency_selected">%1$s selected</string>
+    <string name="reminders_frequency_weekdays">Weekdays</string>
+    <string name="reminders_frequency_weekends">Weekends</string>
+    <string name="reminders_hour_label">Hour</string>
+    <string name="reminders_logging_body">Log today\'s health signals.</string>
+    <string name="reminders_logging_title">Health logging</string>
+    <string name="reminders_minute_label">Minute</string>
+    <string name="reminders_notifications_denied">Notifications are currently denied in system settings.</string>
+    <string name="reminders_save">Save reminder</string>
+    <string name="reminders_title">Reminders</string>
+
+    <!-- Review -->
+    <string name="review_adherence">Adherence</string>
+    <string name="review_consistency">Consistency</string>
+    <string name="review_consistency_value">Active on %1$d of the last 7 days</string>
+    <string name="review_hrv_trend">HRV trend</string>
+    <string name="review_needs_attention">Needs attention</string>
+    <string name="review_next_week_focus">Next week focus</string>
+    <string name="review_no_entry">No entry</string>
+    <string name="review_percent_value">%1$d%%</string>
+    <string name="review_recovery_trend">Recovery trend</string>
+    <string name="review_seven_day_rhr">7-day RHR</string>
+    <string name="review_seven_day_weight">7-day weight</string>
+    <string name="review_sleep_trend">Sleep performance trend</string>
+    <string name="review_strength">Strength</string>
+    <string name="review_title">Weekly review</string>
+    <string name="review_what_improved">What improved</string>
+
+    <!-- Settings -->
+    <string name="settings_about">About Spartan</string>
+    <string name="settings_connections">Connections</string>
+    <string name="settings_connections_subtitle">Connect WHOOP and Google Calendar.</string>
+    <string name="settings_diagnostics">Diagnostics</string>
+    <string name="settings_diagnostics_subtitle">Debug builds only: operational log.</string>
+    <string name="settings_disclaimer">Spartan offers wellness and fitness guidance, not medical advice, and is not a medical device. Your data stays on this device. See Privacy for export and deletion.</string>
+    <string name="settings_privacy">Privacy</string>
+    <string name="settings_privacy_subtitle">Export or delete local data.</string>
+    <string name="settings_reminders">Reminders</string>
+    <string name="settings_reminders_subtitle">Activity and logging notifications.</string>
+    <string name="settings_title">Settings</string>
+    <string name="settings_version">Version %1$s</string>
+
+    <!-- Workout -->
+    <string name="workout_completed_minutes">Completed minutes</string>
+    <string name="workout_pain_label">Pain or concerning symptoms</string>
+    <string name="workout_rpe">RPE %1$d</string>
+    <string name="workout_save">Save workout</string>
+    <string name="workout_title">Workout completion</string>
+</resources>

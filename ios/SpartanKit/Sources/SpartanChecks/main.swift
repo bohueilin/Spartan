@@ -1,0 +1,64 @@
+// SpartanChecks — runs the full SpartanKit test suite (including the 756-plan coaching eval
+// harness) as a plain executable: `swift run SpartanChecks`. Exits non-zero on any failure.
+
+import Foundation
+
+func run(_ name: String, _ body: () throws -> Void) {
+    shimCurrentTest = name
+    do {
+        try body()
+    } catch is ShimUnwrapError {
+        // failure already recorded by XCTUnwrap
+    } catch {
+        shimFailureCount += 1
+        print("  ✗ ERROR [\(name)] threw \(error)")
+    }
+}
+
+print("SpartanKit checks — mirrored from the Android JVM suite\n")
+var testCount = 0
+
+// --- SafetyEngineTests ---
+let safety = SafetyEngineTests()
+run("safety.rejectsBlockedMedicalClaims") { safety.testRejectsBlockedMedicalClaimsInManyForms() }; testCount += 1
+run("safety.acceptsWellnessLanguage") { safety.testAcceptsLegitimateWellnessLanguage() }; testCount += 1
+run("safety.sanitizeThrowsOnlyForBlocked") { safety.testSanitizeThrowsOnlyForBlockedCopy() }; testCount += 1
+
+// --- CoachingEngineTests ---
+let engine = CoachingEngineTests()
+run("engine.bandThresholds") { engine.testBandThresholdsMatchSpec() }; testCount += 1
+run("engine.lowRecoveryRequiredNoHard") { engine.testLowRecoveryProducesRequiredRecoveryAndNoHardTraining() }; testCount += 1
+run("engine.primedGreenlight") { engine.testPrimedGreenlightsAQualityStrengthSession() }; testCount += 1
+run("engine.poorSleepHygiene") { engine.testPoorSleepAddsSleepHygiene() }; testCount += 1
+run("engine.elevatedRhrCheckIn") { engine.testElevatedRhrTrendAddsCheckIn() }; testCount += 1
+run("engine.clinicianReferral") { try engine.testConcerningRespiratoryRateAddsNonDiagnosticClinicianReferral() }; testCount += 1
+run("engine.maxActivitiesCap") { engine.testPlanRespectsMaxActivitiesButKeepsRequiredAndReferral() }; testCount += 1
+run("engine.staleFallback") { engine.testStaleDataProducesSafeFallbackPlan() }; testCount += 1
+run("engine.readinessTrends") { try engine.testReadinessSnapshotFromComputesTrendsAndBand() }; testCount += 1
+
+// --- CoachingEvalTests (the invariant harness) ---
+let eval = CoachingEvalTests()
+run("eval.fullReadinessMatrix") { eval.testEvalInvariantsHoldAcrossFullReadinessMatrix() }; testCount += 1
+run("eval.optionAndTrendVariations") { eval.testEvalInvariantsHoldWithOptionAndTrendVariations() }; testCount += 1
+run("eval.concerningVitalsNeverHard") { eval.testEvalConcerningVitalsNeverGreenlightHardTraining() }; testCount += 1
+run("eval.lowRecoveryAlwaysRequired") { eval.testEvalLowRecoveryAlwaysCarriesARequiredRecoveryAction() }; testCount += 1
+run("eval.capRespected") { eval.testEvalMaxActivitiesRespectedWhenNoRequiredOverflow() }; testCount += 1
+
+// --- WhoopAndAvailabilityTests ---
+let data = WhoopAndAvailabilityTests()
+run("data.mockLabeledSeries") { data.testMockWhoopClient_isLabeledSampleData_andReturnsSeries() }; testCount += 1
+run("data.openWindowsMerge") { data.testOpenWindows_subtractsAndMergesBusyBlocks() }; testCount += 1
+run("data.suggestSlotEarliestFit") { data.testSuggestSlot_returnsEarliestFittingGapTrimmedToLength() }; testCount += 1
+run("data.suggestSlotNilWhenNothingFits") { data.testSuggestSlot_returnsNilWhenNothingFits() }; testCount += 1
+run("data.fullyBusyDay") { data.testAvailability_fullyBusyDayHasNoOpenWindows() }; testCount += 1
+run("data.zeroLengthDay") { data.testAvailability_zeroLengthDayIsEmpty() }; testCount += 1
+run("data.exactFit") { data.testAvailability_exactFitSlotIsFound() }; testCount += 1
+run("data.adjacentMerge") { data.testAvailability_adjacentBusyBlocksMergeAndDoNotLeaveSlivers() }; testCount += 1
+run("data.minWindow") { data.testAvailability_respectsMinWindow() }; testCount += 1
+run("data.planProgressMath") { data.testDailyPlan_progressAndTotals() }; testCount += 1
+
+print("\n\(testCount) tests, \(shimAssertionCount) assertions, \(shimFailureCount) failures")
+if shimFailureCount > 0 {
+    exit(1)
+}
+print("ALL CHECKS PASSED")

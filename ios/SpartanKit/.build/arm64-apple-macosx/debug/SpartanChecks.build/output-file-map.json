@@ -1,0 +1,47 @@
+{
+  "": {
+    "swift-dependencies": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanChecks.build/primary.swiftdeps"
+  },
+  "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/Sources/SpartanChecks/CoachingEngineTests.swift": {
+    "dependencies": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanChecks.build/CoachingEngineTests.d",
+    "object": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanChecks.build/CoachingEngineTests.swift.o",
+    "swiftmodule": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanChecks.build/CoachingEngineTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanChecks.build/CoachingEngineTests.swiftdeps",
+    "diagnostics": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanChecks.build/CoachingEngineTests.dia"
+  },
+  "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/Sources/SpartanChecks/CoachingEvalTests.swift": {
+    "dependencies": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanChecks.build/CoachingEvalTests.d",
+    "object": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanChecks.build/CoachingEvalTests.swift.o",
+    "swiftmodule": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanChecks.build/CoachingEvalTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanChecks.build/CoachingEvalTests.swiftdeps",
+    "diagnostics": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanChecks.build/CoachingEvalTests.dia"
+  },
+  "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/Sources/SpartanChecks/SafetyEngineTests.swift": {
+    "dependencies": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanChecks.build/SafetyEngineTests.d",
+    "object": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanChecks.build/SafetyEngineTests.swift.o",
+    "swiftmodule": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanChecks.build/SafetyEngineTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanChecks.build/SafetyEngineTests.swiftdeps",
+    "diagnostics": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanChecks.build/SafetyEngineTests.dia"
+  },
+  "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/Sources/SpartanChecks/WhoopAndAvailabilityTests.swift": {
+    "dependencies": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanChecks.build/WhoopAndAvailabilityTests.d",
+    "object": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanChecks.build/WhoopAndAvailabilityTests.swift.o",
+    "swiftmodule": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanChecks.build/WhoopAndAvailabilityTests~partial.swiftmodule",
+    "swift-dependencies": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanChecks.build/WhoopAndAvailabilityTests.swiftdeps",
+    "diagnostics": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanChecks.build/WhoopAndAvailabilityTests.dia"
+  },
+  "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/Sources/SpartanChecks/XCTShim.swift": {
+    "dependencies": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanChecks.build/XCTShim.d",
+    "object": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanChecks.build/XCTShim.swift.o",
+    "swiftmodule": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanChecks.build/XCTShim~partial.swiftmodule",
+    "swift-dependencies": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanChecks.build/XCTShim.swiftdeps",
+    "diagnostics": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanChecks.build/XCTShim.dia"
+  },
+  "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/Sources/SpartanChecks/main.swift": {
+    "dependencies": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanChecks.build/main.d",
+    "object": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanChecks.build/main.swift.o",
+    "swiftmodule": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanChecks.build/main~partial.swiftmodule",
+    "swift-dependencies": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanChecks.build/main.swiftdeps",
+    "diagnostics": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanChecks.build/main.dia"
+  }
+}

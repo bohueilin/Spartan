@@ -2,9 +2,11 @@
     <cloud-backup disableIfNoEncryptionCapabilities="true">
         <exclude domain="database" path="." />
         <exclude domain="sharedpref" path="." />
+        <exclude domain="file" path="datastore/spartan_preferences.preferences_pb" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="database" path="." />
         <exclude domain="sharedpref" path="." />
+        <exclude domain="file" path="datastore/spartan_preferences.preferences_pb" />
     </device-transfer>
 </data-extraction-rules>

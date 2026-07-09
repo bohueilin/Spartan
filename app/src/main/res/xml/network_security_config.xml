@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Spartan network security: no cleartext traffic anywhere. All integration traffic (WHOOP,
+  Google) must use TLS. Certificate pinning for the WHOOP/Google hosts is a documented Phase 2
+  hardening step (see docs/Spartan_Architecture.md and docs/SECURITY_PRIVACY_CHECKLIST.md).
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

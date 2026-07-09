@@ -1,0 +1,69 @@
+# SpartanApp — XcodeGen project spec for the iOS app layer.
+#
+# Generate the Xcode project with:
+#   brew install xcodegen
+#   cd ios/SpartanApp && xcodegen generate && open SpartanApp.xcodeproj
+#
+# Honest status: this app layer is source-complete but awaits one xcodegen + xcodebuild
+# pass on a machine with Xcode + the iOS SDK (this repo was authored on a machine with
+# Command Line Tools only). SpartanKit (../SpartanKit) builds and tests on macOS.
+#
+# Info.plist notes (item: "Info.plist additions"):
+# - Mock mode needs NO NS*UsageDescription keys: the WHOOP source is the sample-data
+#   MockWhoopClient and the calendar is StubCalendarClient — no HealthKit, no EventKit,
+#   no network. Local notifications use UNUserNotificationCenter, which prompts at
+#   runtime and requires no Info.plist key.
+# - Later, when real integrations land, add under `info.properties` below:
+#     NSHealthShareUsageDescription:  "Spartan reads recovery, sleep, and heart data to personalize your daily plan."
+#     NSHealthUpdateUsageDescription: "Spartan writes workouts you log back to Health."  (only if we ever write)
+#     NSCalendarsFullAccessUsageDescription:      "Spartan reads free/busy times to find open windows for activities."
+#     NSCalendarsWriteOnlyAccessUsageDescription: "Spartan adds activities you schedule to your calendar."
+#   (WHOOP OAuth is plain HTTPS + ASWebAuthenticationSession: no plist key, but register
+#   the redirect URL scheme under CFBundleURLTypes when that ships.)
+
+name: SpartanApp
+
+options:
+  bundleIdPrefix: com.spartan
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+
+packages:
+  SpartanKit:
+    path: ../SpartanKit
+
+settings:
+  base:
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+    SWIFT_VERSION: "5.9"
+
+targets:
+  SpartanApp:
+    type: application
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - Sources
+    dependencies:
+      - package: SpartanKit
+    info:
+      path: Sources/Info.plist
+      properties:
+        CFBundleDisplayName: Spartan
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        # System-generated launch screen (also set via INFOPLIST_KEY below).
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        ITSAppUsesNonExemptEncryption: false
+        # NS*UsageDescription keys intentionally absent in mock mode — see header note.
+    settings:
+      base:
+        # Placeholder bundle id — replace with the real App Store id at signing time.
+        PRODUCT_BUNDLE_IDENTIFIER: com.spartan.app
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        TARGETED_DEVICE_FAMILY: "1"
+        ENABLE_USER_SCRIPT_SANDBOXING: YES

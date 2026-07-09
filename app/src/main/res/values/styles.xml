@@ -1,7 +1,15 @@
 <resources>
-    <style name="Theme.VitalCompass" parent="android:style/Theme.Material.Light.NoActionBar">
-        <item name="android:windowLightStatusBar">true</item>
-        <item name="android:statusBarColor">@android:color/transparent</item>
-        <item name="android:navigationBarColor">@android:color/white</item>
+    <!-- Base window theme. Compose paints everything; the window background just prevents a
+         white flash before the first frame (day/night variants in values[-night]/colors.xml).
+         System-bar styling is handled by enableEdgeToEdge() in MainActivity. -->
+    <style name="Theme.Spartan" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/spartan_window_background</item>
+    </style>
+
+    <!-- Launch theme: Android 12+ splash with the Spartan ring mark on the brand canvas. -->
+    <style name="Theme.Spartan.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/spartan_splash_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.Spartan</item>
     </style>
 </resources>

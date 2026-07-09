@@ -1,21 +1,73 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Phase 2: authenticated, consented WHOOP / Google Calendar syncs over TLS only. -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <application
-        android:name=".VitalCompassApp"
+        android:name=".SpartanApp"
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
+        android:enableOnBackInvokedCallback="true"
         android:fullBackupContent="false"
-        android:label="Vital Compass"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.VitalCompass">
+        android:theme="@style/Theme.Spartan"
+        android:usesCleartextTraffic="false">
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:theme="@style/Theme.VitalCompass">
+            android:launchMode="singleTop"
+            android:theme="@style/Theme.Spartan.Starting">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Route-level deep links (reminders, widgets). Note: AppAuth's
+                 RedirectUriReceiverActivity registers a scheme-wide spartan:// filter; these
+                 host-specific filters win resolution for today/connections, and OAuth redirect
+                 interception is mitigated by PKCE. Reminder/widget intents are package-scoped. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="spartan" android:host="today" />
+                <data android:scheme="spartan" android:host="connections" />
+            </intent-filter>
         </activity>
+
+        <!-- Re-arm scheduling after app updates (WorkManager self-restores after reboot). -->
+        <receiver
+            android:name=".data.reminder.PackageReplacedReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Home-screen "next activity" widget. -->
+        <receiver
+            android:name=".ui.widget.NextActivityWidgetReceiver"
+            android:exported="true"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/next_activity_widget_info" />
+        </receiver>
+
+        <!-- On-demand WorkManager init: SpartanApp provides a HiltWorkerFactory configuration. -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                tools:node="remove" />
+        </provider>
     </application>
 </manifest>

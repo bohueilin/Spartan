@@ -1,0 +1,14 @@
+.gradle/
+.kotlin/
+build/
+app/build/
+local.properties
+*.iml
+.idea/
+
+# Secrets — never commit. Only .env.example (the template) is tracked.
+.env
+.env.local
+*.keystore
+*.jks
+.DS_Store
