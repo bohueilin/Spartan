@@ -61,6 +61,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.spartan.R
+import com.spartan.domain.model.ActivityCategory
 import com.spartan.domain.model.ActivityPriority
 import com.spartan.domain.model.ActivityStatus
 import com.spartan.domain.model.DailyActivity
@@ -87,7 +88,20 @@ fun CheckInScreen(
     onSkip: (String) -> Unit,
     onSchedule: (String) -> Unit,
     onManageConnections: () -> Unit,
+    onLogExercise: (DailyActivity, Int, Int, Boolean) -> Unit = { _, _, _, _ -> },
+    onOpenRecoveryExplainer: () -> Unit = {},
 ) {
+    // Checking off a training activity opens a 5-second debrief (minutes/effort/pain) that feeds
+    // the adaptive rules — dismissible with one tap, never required.
+    var debriefFor by remember { mutableStateOf<DailyActivity?>(null) }
+    val exerciseCategories = remember {
+        setOf(ActivityCategory.ZONE2, ActivityCategory.STRENGTH, ActivityCategory.MOBILITY, ActivityCategory.MOVEMENT)
+    }
+    val completeWithDebrief: (String) -> Unit = { id ->
+        onComplete(id)
+        state.todayActivities.firstOrNull { it.id == id && it.category in exerciseCategories }
+            ?.let { debriefFor = it }
+    }
     // Skeleton only while a first sync is genuinely in flight — a failed sync falls through to
     // the empty state + banner instead of looping the skeleton forever.
     val loading = state.planHeadline.isBlank() && state.todayActivities.isEmpty() &&
@@ -97,7 +111,7 @@ fun CheckInScreen(
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         item { Spacer(Modifier.height(Spacing.lg)) }
-        item { ReadinessHeader(state) }
+        item { ReadinessHeader(state, onOpenRecoveryExplainer) }
 
         if (loading) {
             item { LoadingPlan() }
@@ -119,16 +133,27 @@ fun CheckInScreen(
                     compareBy({ it.priority.ordinal }, { it.bestTimeOfDay.ordinal }),
                 )
                 items(ordered, key = { it.id }) { activity ->
-                    ActivityCard(activity, onComplete, onUncomplete, onSnooze, onSkip, onSchedule)
+                    ActivityCard(activity, completeWithDebrief, onUncomplete, onSnooze, onSkip, onSchedule)
                 }
             }
         }
         item { Footer() }
     }
+
+    debriefFor?.let { activity ->
+        ExerciseDebriefSheet(
+            activity = activity,
+            onSave = { minutes, rpe, pain ->
+                onLogExercise(activity, minutes, rpe, pain)
+                debriefFor = null
+            },
+            onSkip = { debriefFor = null },
+        )
+    }
 }
 
 @Composable
-private fun ReadinessHeader(state: MainUiState) {
+private fun ReadinessHeader(state: MainUiState, onOpenRecoveryExplainer: () -> Unit = {}) {
     Column {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
@@ -142,8 +167,9 @@ private fun ReadinessHeader(state: MainUiState) {
             if (state.whoopIsMock) SampleDataChip()
         }
         Spacer(Modifier.height(Spacing.lg))
+        // Tapping the readiness card opens the recovery explainer — "what is this number?"
         Surface(
-            Modifier.fillMaxWidth(),
+            Modifier.fillMaxWidth().clickable(onClick = onOpenRecoveryExplainer),
             shape = RoundedCornerShape(Radius.card),
             color = MaterialTheme.colorScheme.surface,
             border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),

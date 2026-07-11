@@ -104,6 +104,8 @@ fun SpartanRoot(
                     onSkip = viewModel::skipActivity,
                     onSchedule = viewModel::scheduleActivity,
                     onManageConnections = { navController.navigate("connections") },
+                    onLogExercise = viewModel::logExerciseDebrief,
+                    onOpenRecoveryExplainer = { navController.navigate("detail/RECOVERY_SCORE") },
                 )
             }
             composable("metrics") {

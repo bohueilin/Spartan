@@ -17,6 +17,7 @@ class PackageReplacedReceiver : BroadcastReceiver() {
         DebugLog.log("receiver", "package replaced — re-arming refresh")
         val workManager = WorkManager.getInstance(context)
         DailyPlanRefreshWorker.schedule(workManager)
+        EveningNudgeWorker.schedule(workManager)
         DailyPlanRefreshWorker.refreshNow(workManager)
     }
 }

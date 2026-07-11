@@ -76,6 +76,15 @@ class ReminderScheduler @Inject constructor(
         workManager.enqueueUniqueWork(uniqueName, ExistingWorkPolicy.REPLACE, work)
     }
 
+    /**
+     * Post a notification immediately (permission-checked). Used by workers that have already
+     * decided timing themselves (e.g. the evening nudge, which checks quiet hours first).
+     */
+    fun notifyNow(id: String, title: String, body: String) {
+        if (!hasNotificationPermission()) return
+        ReminderWorker.postNotification(context, id, title, body)
+    }
+
     fun cancel(id: String) {
         workManager.cancelUniqueWork(id)
     }

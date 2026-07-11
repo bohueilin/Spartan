@@ -57,6 +57,22 @@ run("data.adjacentMerge") { data.testAvailability_adjacentBusyBlocksMergeAndDoNo
 run("data.minWindow") { data.testAvailability_respectsMinWindow() }; testCount += 1
 run("data.planProgressMath") { data.testDailyPlan_progressAndTotals() }; testCount += 1
 
+// --- ProjectionAndExplainerChecks (expected-improvement + metric education) ---
+let proj = ProjectionAndExplainerChecks()
+run("proj.week0EqualsCurrent") { proj.testWeekZeroMatchesCurrentValueForEveryMetricAndTier() }; testCount += 1
+run("proj.weeksZeroToEight") { proj.testWeeksRunZeroToEightInTwoWeekSteps() }; testCount += 1
+run("proj.lowNeverExceedsHigh") { proj.testLowNeverExceedsHighAcrossAllTiersAndWeeks() }; testCount += 1
+run("proj.rhrFloor") { proj.testRhrProjectionNeverGoesBelowFloor() }; testCount += 1
+run("proj.hrvCap") { proj.testHrvProjectionNeverExceedsCap() }; testCount += 1
+run("proj.recoveryCap90") { proj.testRecoveryProjectionCapsAtNinety() }; testCount += 1
+run("proj.zeroConsistencyFlat") { proj.testZeroConsistencyHoldsFlat() }; testCount += 1
+run("proj.consistencyMonotone") { proj.testMoreConsistencyMeansAtLeastAsMuchProjectedChange() }; testCount += 1
+run("proj.deterministic") { proj.testProjectionIsDeterministic() }; testCount += 1
+run("proj.onlyProvidedMetrics") { proj.testOnlyProvidedMetricsAreProjected() }; testCount += 1
+run("explainers.coverAllNine") { proj.testExplainersCoverAllNineMetrics() }; testCount += 1
+run("explainers.respClinicianNote") { try proj.testRespiratoryRateExplainerCarriesClinicianNote() }; testCount += 1
+run("explainers.allCopySafe") { proj.testEveryUserFacingStringPassesSafetyCheck() }; testCount += 1
+
 print("\n\(testCount) tests, \(shimAssertionCount) assertions, \(shimFailureCount) failures")
 if shimFailureCount > 0 {
     exit(1)

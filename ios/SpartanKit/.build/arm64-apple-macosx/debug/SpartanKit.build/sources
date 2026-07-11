@@ -1,7 +1,9 @@
 /Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/Sources/SpartanKit/AvailabilityService.swift
 /Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/Sources/SpartanKit/CoachingEngine.swift
+/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/Sources/SpartanKit/MetricExplainers.swift
 /Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/Sources/SpartanKit/MockWhoopClient.swift
 /Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/Sources/SpartanKit/Models.swift
+/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/Sources/SpartanKit/ProjectionEngine.swift
 /Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/Sources/SpartanKit/SafetyEngine.swift
 /Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/Sources/SpartanKit/Seed.swift
 /Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/Sources/SpartanKit/StubCalendarClient.swift

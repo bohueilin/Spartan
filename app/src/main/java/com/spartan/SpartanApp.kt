@@ -6,6 +6,7 @@ import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import androidx.work.WorkManager
 import com.spartan.data.reminder.DailyPlanRefreshWorker
+import com.spartan.data.reminder.EveningNudgeWorker
 import com.spartan.data.reminder.ReminderWorker
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
@@ -24,8 +25,11 @@ class SpartanApp : Application(), Configuration.Provider {
         super.onCreate()
         if (BuildConfig.DEBUG) enableStrictMode()
         ReminderWorker.ensureChannel(this)
-        // Keep the ~04:00 daily plan refresh armed (KEEP policy — harmless if already enqueued).
-        DailyPlanRefreshWorker.schedule(WorkManager.getInstance(this))
+        // Keep the ~04:00 daily plan refresh and the ~19:00 evening nudge armed
+        // (KEEP policy — harmless if already enqueued).
+        val workManager = WorkManager.getInstance(this)
+        DailyPlanRefreshWorker.schedule(workManager)
+        EveningNudgeWorker.schedule(workManager)
     }
 
     /** Debug-only: surface accidental main-thread I/O and leaked closables early. Never in release. */

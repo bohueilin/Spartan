@@ -16,6 +16,13 @@
     "swift-dependencies": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanKit.build/CoachingEngine.swiftdeps",
     "diagnostics": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanKit.build/CoachingEngine.dia"
   },
+  "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/Sources/SpartanKit/MetricExplainers.swift": {
+    "dependencies": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanKit.build/MetricExplainers.d",
+    "object": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanKit.build/MetricExplainers.swift.o",
+    "swiftmodule": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanKit.build/MetricExplainers~partial.swiftmodule",
+    "swift-dependencies": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanKit.build/MetricExplainers.swiftdeps",
+    "diagnostics": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanKit.build/MetricExplainers.dia"
+  },
   "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/Sources/SpartanKit/MockWhoopClient.swift": {
     "dependencies": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanKit.build/MockWhoopClient.d",
     "object": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanKit.build/MockWhoopClient.swift.o",
@@ -29,6 +36,13 @@
     "swiftmodule": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanKit.build/Models~partial.swiftmodule",
     "swift-dependencies": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanKit.build/Models.swiftdeps",
     "diagnostics": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanKit.build/Models.dia"
+  },
+  "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/Sources/SpartanKit/ProjectionEngine.swift": {
+    "dependencies": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanKit.build/ProjectionEngine.d",
+    "object": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanKit.build/ProjectionEngine.swift.o",
+    "swiftmodule": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanKit.build/ProjectionEngine~partial.swiftmodule",
+    "swift-dependencies": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanKit.build/ProjectionEngine.swiftdeps",
+    "diagnostics": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanKit.build/ProjectionEngine.dia"
   },
   "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/Sources/SpartanKit/SafetyEngine.swift": {
     "dependencies": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanKit.build/SafetyEngine.d",

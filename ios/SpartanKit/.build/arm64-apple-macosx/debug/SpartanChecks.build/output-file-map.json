@@ -16,6 +16,13 @@
     "swift-dependencies": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanChecks.build/CoachingEvalTests.swiftdeps",
     "diagnostics": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanChecks.build/CoachingEvalTests.dia"
   },
+  "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/Sources/SpartanChecks/ProjectionAndExplainerChecks.swift": {
+    "dependencies": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanChecks.build/ProjectionAndExplainerChecks.d",
+    "object": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanChecks.build/ProjectionAndExplainerChecks.swift.o",
+    "swiftmodule": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanChecks.build/ProjectionAndExplainerChecks~partial.swiftmodule",
+    "swift-dependencies": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanChecks.build/ProjectionAndExplainerChecks.swiftdeps",
+    "diagnostics": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanChecks.build/ProjectionAndExplainerChecks.dia"
+  },
   "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/Sources/SpartanChecks/SafetyEngineTests.swift": {
     "dependencies": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanChecks.build/SafetyEngineTests.d",
     "object": "/Users/bohueilin/Documents/GitHub/Spartan/ios/SpartanKit/.build/arm64-apple-macosx/debug/SpartanChecks.build/SafetyEngineTests.swift.o",

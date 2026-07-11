@@ -19,6 +19,7 @@ import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
+import java.time.ZoneId
 import java.util.concurrent.TimeUnit
 
 /**
@@ -32,6 +33,7 @@ class DailyPlanRefreshWorker @AssistedInject constructor(
     @Assisted appContext: Context,
     @Assisted params: WorkerParameters,
     private val dailyPlanSync: DailyPlanSync,
+    private val reminderScheduler: ReminderScheduler,
 ) : CoroutineWorker(appContext, params) {
 
     override suspend fun doWork(): Result {
@@ -39,6 +41,19 @@ class DailyPlanRefreshWorker @AssistedInject constructor(
         DebugLog.log("worker", "daily refresh ${if (outcome.failed) "failed" else "ok"}")
         // Keep the home-screen widget showing the fresh plan.
         runCatching { NextActivityWidget().updateAll(applicationContext) }
+        // Proactive morning digest at 07:15 (just after default quiet hours end): the plan headline
+        // plus size, so the day starts with a glance, not an app launch. Skipped automatically if
+        // the worker ran late (past trigger) or notifications are off.
+        outcome.plan?.let { plan ->
+            val digestAt = LocalDate.now().atTime(LocalTime.of(7, 15))
+                .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+            reminderScheduler.scheduleActivityReminder(
+                activityId = "morning-digest",
+                title = "Today: ${plan.headline}",
+                body = "${plan.activities.size} activities, about ${plan.totalEstimatedMinutes} min. Tap to see your plan.",
+                triggerAtMillis = digestAt,
+            )
+        }
         // Mock/local data can't transiently fail; a real-network failure is worth one retry cycle.
         return if (outcome.failed && runAttemptCount < 2) Result.retry() else Result.success()
     }

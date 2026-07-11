@@ -18,37 +18,12 @@ class ReminderWorker(
     workerParams: WorkerParameters,
 ) : CoroutineWorker(appContext, workerParams) {
     override suspend fun doWork(): Result {
-        ensureChannel(applicationContext)
         val daysOfWeekMask = inputData.getInt(KEY_DAYS_OF_WEEK_MASK, 127)
         if (!isTodayEnabled(daysOfWeekMask)) return Result.success()
         val reminderId = inputData.getString(KEY_REMINDER_ID) ?: inputData.getString(KEY_TITLE) ?: "spartan"
         val title = inputData.getString(KEY_TITLE) ?: "Spartan"
         val body = inputData.getString(KEY_BODY) ?: "Take a minute to log your health data."
-        // Tapping the reminder deep-links straight to the daily check-in (spartan://today).
-        val deepLink = Intent(Intent.ACTION_VIEW, Uri.parse("spartan://today")).apply {
-            setPackage(applicationContext.packageName)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-        }
-        val contentIntent = PendingIntent.getActivity(
-            applicationContext,
-            reminderId.hashCode(),
-            deepLink,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-        val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle(title)
-            .setContentText(body)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            .setContentIntent(contentIntent)
-            .setAutoCancel(true)
-            .build()
-        try {
-            NotificationManagerCompat.from(applicationContext).notify(reminderId.hashCode(), notification)
-        } catch (_: SecurityException) {
-            return Result.success()
-        }
+        postNotification(applicationContext, reminderId, title, body)
         return Result.success()
     }
 
@@ -58,6 +33,38 @@ class ReminderWorker(
         const val KEY_TITLE = "title"
         const val KEY_BODY = "body"
         const val KEY_DAYS_OF_WEEK_MASK = "days_of_week_mask"
+
+        /**
+         * Post a Spartan notification. Tapping deep-links to the daily check-in (spartan://today).
+         * Swallows SecurityException (permission revoked mid-flight) — reminders must never crash.
+         */
+        fun postNotification(context: Context, id: String, title: String, body: String) {
+            ensureChannel(context)
+            val deepLink = Intent(Intent.ACTION_VIEW, Uri.parse("spartan://today")).apply {
+                setPackage(context.packageName)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            }
+            val contentIntent = PendingIntent.getActivity(
+                context,
+                id.hashCode(),
+                deepLink,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+            val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_notification)
+                .setContentTitle(title)
+                .setContentText(body)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .setContentIntent(contentIntent)
+                .setAutoCancel(true)
+                .build()
+            try {
+                NotificationManagerCompat.from(context).notify(id.hashCode(), notification)
+            } catch (_: SecurityException) {
+                // Permission revoked between check and notify — stay silent.
+            }
+        }
 
         fun ensureChannel(context: Context) {
             val channel = NotificationChannel(

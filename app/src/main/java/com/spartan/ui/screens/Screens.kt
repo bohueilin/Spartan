@@ -163,6 +163,8 @@ fun MetricDetailScreen(state: MainUiState, type: MetricType, onAdd: () -> Unit, 
             Text(it.targetMessage, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 8.dp))
         }
         TrendCard(stringResource(R.string.metrics_history), history.mapNotNull { it.value })
+        // Plain-language education for WHOOP metrics (renders nothing for lab metrics).
+        MetricExplainerSection(type)
         Text(stringResource(R.string.metrics_entries), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         history.forEach {
             OutlinedCard(Modifier.fillMaxWidth()) {
@@ -308,6 +310,8 @@ fun ReviewScreen(state: MainUiState) {
         }
         // Calm consistency — descriptive, no streak-loss anxiety.
         SummaryCard(stringResource(R.string.review_consistency), stringResource(R.string.review_consistency_value, state.consistencyDays7), Modifier.fillMaxWidth())
+        // Expected-improvement ranges at the current consistency (honest ranges, not promises).
+        TrajectoryCard(state.projections)
         // Longitudinal readiness trends from the WHOOP-normalized metric history.
         TrendCard(stringResource(R.string.review_recovery_trend), recentValues(state, MetricType.RECOVERY_SCORE))
         TrendCard(stringResource(R.string.review_hrv_trend), recentValues(state, MetricType.HRV_RMSSD))

@@ -37,6 +37,9 @@ import com.spartan.domain.model.PlannedWorkout
 import com.spartan.domain.model.ReadinessBand
 import com.spartan.domain.model.ReadinessSnapshot
 import com.spartan.domain.model.TargetValue
+import com.spartan.domain.engine.MetricProjection
+import com.spartan.domain.engine.ProjectionEngine
+import com.spartan.domain.model.ActivityCategory
 import com.spartan.domain.model.WeeklyPlan
 import com.spartan.domain.model.WeeklyReviewSummary
 import com.spartan.domain.model.WhoopSnapshot
@@ -82,6 +85,8 @@ data class MainUiState(
     val consistencyDays7: Int = 0,
     /** True when the in-app review prompt should be shown (rate-limited; positive moments only). */
     val requestReview: Boolean = false,
+    /** Expected-improvement ranges at the current consistency (typical ranges, never guarantees). */
+    val projections: List<MetricProjection> = emptyList(),
 )
 
 private data class HealthBundle(
@@ -123,6 +128,7 @@ class MainViewModel @Inject constructor(
     private val calendarAuthManager: CalendarAuthManager,
 ) : ViewModel() {
     private val today = LocalDate.now().toEpochDay()
+    private val projectionEngine = ProjectionEngine()
     private val generatedPlan = MutableStateFlow<DailyPlan?>(null)
     private val readinessState = MutableStateFlow<ReadinessSnapshot?>(null)
     private val latestSnapshot = MutableStateFlow<WhoopSnapshot?>(null)
@@ -252,8 +258,19 @@ class MainViewModel @Inject constructor(
             syncFailed = syncDidFail,
             consistencyDays7 = checkIn.consistencyDays7,
             requestReview = reviewWanted,
+            projections = projectionEngine.project(
+                restingHeartRate = checkIn.readiness?.restingHeartRate
+                    ?: latestValue(health.readings, MetricType.RESTING_HEART_RATE),
+                hrvMs = checkIn.readiness?.hrvMs ?: latestValue(health.readings, MetricType.HRV_RMSSD),
+                recoveryScore = checkIn.readiness?.recoveryScore
+                    ?: latestValue(health.readings, MetricType.RECOVERY_SCORE)?.toInt(),
+                consistencyDays7 = checkIn.consistencyDays7,
+            ),
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MainUiState())
+
+    private fun latestValue(readings: List<MetricReading>, type: MetricType): Double? =
+        readings.filter { it.type == type && it.value != null }.maxByOrNull { it.recordedAt }?.value
 
     init {
         loadToday()
@@ -315,6 +332,28 @@ class MainViewModel @Inject constructor(
 
     fun completeWorkout(type: WorkoutType, planned: Int, completed: Int, rpe: Int, pain: Boolean) {
         viewModelScope.launch { repository.addWorkout(type, planned, completed, rpe, pain) }
+    }
+
+    /**
+     * Exercise-tracking debrief after checking off a training activity: logs a workout session
+     * (actual minutes, RPE, pain flag) that the adaptive rules already consume — pain or high RPE
+     * deloads next week's plan, closing the coach→do→adapt loop.
+     */
+    fun logExerciseDebrief(activity: DailyActivity, actualMinutes: Int, rpe: Int, pain: Boolean) {
+        val type = when (activity.category) {
+            ActivityCategory.STRENGTH -> WorkoutType.STRENGTH
+            ActivityCategory.MOBILITY, ActivityCategory.RECOVERY -> WorkoutType.MOBILITY
+            else -> WorkoutType.ZONE_2 // ZONE2 / MOVEMENT map to easy aerobic work
+        }
+        viewModelScope.launch {
+            repository.addWorkout(
+                type = type,
+                planned = activity.estimatedMinutes,
+                completed = actualMinutes.coerceIn(1, 300),
+                rpe = rpe.coerceIn(1, 10),
+                pain = pain,
+            )
+        }
     }
 
     fun savePlanMinutes(slotKey: String, minutes: Int) {
