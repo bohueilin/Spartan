@@ -1,5 +1,7 @@
 package com.spartan.data.repository
 
+import androidx.room.withTransaction
+import com.spartan.data.local.AppDatabase
 import com.spartan.data.local.AuditEventEntity
 import com.spartan.data.local.ConnectionStatus
 import com.spartan.data.local.DailyActivityEntity
@@ -33,6 +35,7 @@ import javax.inject.Singleton
 @Singleton
 class HealthRepository @Inject constructor(
     private val dao: HealthDao,
+    private val database: AppDatabase,
 ) {
     val profile: Flow<UserProfileEntity?> = dao.observeProfile()
     val metrics: Flow<List<MetricEntryEntity>> = dao.observeMetrics()
@@ -139,10 +142,21 @@ class HealthRepository @Inject constructor(
         dao.daysWithCompletedActivity(todayEpochDay - (days - 1), todayEpochDay)
 
     // --- WHOOP sync (normalize snapshots into metric_entries; idempotent per day) ---
-    suspend fun persistWhoopReadings(snapshots: List<WhoopSnapshot>) {
-        snapshots.forEach { snapshot ->
-            dao.deleteWhoopMetricsForDay(snapshot.dateEpochDay)
-            WhoopMapper.toReadings(snapshot).forEach { reading ->
+    /**
+     * [extraReadings] lets the CSV import add per-day exercise minutes (tagged 'WHOOP workouts',
+     * distinct from the snapshot tag so a later snapshot-only sync can never wipe them). Each
+     * source clears only its own tag for its own days, all inside one transaction so a background
+     * daily sync can never observe (or interleave with) a half-applied import.
+     */
+    suspend fun persistWhoopReadings(
+        snapshots: List<WhoopSnapshot>,
+        extraReadings: List<MetricReading> = emptyList(),
+    ) {
+        database.withTransaction {
+            snapshots.map { it.dateEpochDay }.toSet().forEach { dao.deleteWhoopMetricsForDay(it) }
+            extraReadings.map { it.recordedAt.toEpochDay() }.toSet()
+                .forEach { dao.deleteWhoopWorkoutMetricsForDay(it) }
+            (WhoopMapper.toReadings(snapshots) + extraReadings).forEach { reading ->
                 dao.insertMetric(
                     MetricEntryEntity(
                         type = reading.type,
@@ -155,6 +169,36 @@ class HealthRepository @Inject constructor(
             }
         }
         logAudit("SYNC", "WHOOP_READINGS_PERSISTED", "days=${snapshots.size}")
+    }
+
+    /**
+     * Removes every sample WHOOP reading. Called when real data arrives so a leftover sample row
+     * on a day the export doesn't cover (e.g. today, synced before the import) can never be shown
+     * as if it were the user's real data.
+     */
+    suspend fun clearSampleWhoopReadings() {
+        dao.deleteSampleWhoopMetrics()
+    }
+
+    /**
+     * Regenerates a day's plan after the data source changed (e.g. real CSV data replacing
+     * sample data): not-yet-completed activities are replaced, completed ones stay as history.
+     */
+    suspend fun reseedDailyPlan(plan: DailyPlan) {
+        dao.deleteNonCompletedActivitiesForDay(plan.dateEpochDay)
+        plan.activities.forEach { dao.insertActivityIfAbsent(it.toEntity(plan.dateEpochDay)) }
+        logAudit("PLAN", "PLAN_REGENERATED", "activities=${plan.activities.size}")
+    }
+
+    /**
+     * Disconnect = stop using the imported source: the raw cycle/workout tables are removed so
+     * syncs fall back to labeled sample data. Already-normalized readings remain the user's
+     * history (disconnecting never silently destroys data — deletion lives in Privacy).
+     */
+    suspend fun clearImportedWhoopSource() {
+        dao.deleteWhoopCycles()
+        dao.deleteWhoopWorkouts()
+        logAudit("DATA", "WHOOP_IMPORT_SOURCE_CLEARED")
     }
 
     // --- Daily plan / check-in ---
@@ -224,6 +268,8 @@ class HealthRepository @Inject constructor(
         dao.deleteReviews()
         dao.deleteActivities()
         dao.deleteConnections()
+        dao.deleteWhoopCycles()
+        dao.deleteWhoopWorkouts()
         // The user's right to erase includes the audit trail itself; leave a single fresh marker.
         dao.deleteAuditEvents()
         logAudit("DATA", "ALL_DATA_DELETED")

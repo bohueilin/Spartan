@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
@@ -27,6 +28,7 @@ import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material.icons.outlined.PrivacyTip
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.AlertDialog
@@ -58,15 +60,18 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.spartan.R
-import com.spartan.domain.model.ClinicalStatus
 import com.spartan.data.local.ReminderFrequency
+import com.spartan.domain.engine.VideoLibrary
+import com.spartan.domain.model.ClinicalStatus
 import com.spartan.domain.model.InsightCard
+import com.spartan.domain.model.Intensity
 import com.spartan.domain.model.MetricAssessment
 import com.spartan.domain.model.MetricReading
 import com.spartan.domain.model.MetricType
@@ -165,6 +170,7 @@ fun MetricDetailScreen(state: MainUiState, type: MetricType, onAdd: () -> Unit, 
         TrendCard(stringResource(R.string.metrics_history), history.mapNotNull { it.value })
         // Plain-language education for WHOOP metrics (renders nothing for lab metrics).
         MetricExplainerSection(type)
+        TrainThisMetricSection(type, assessment)
         Text(stringResource(R.string.metrics_entries), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         history.forEach {
             OutlinedCard(Modifier.fillMaxWidth()) {
@@ -177,6 +183,76 @@ fun MetricDetailScreen(state: MainUiState, type: MetricType, onAdd: () -> Unit, 
             }
         }
     }
+}
+
+/**
+ * Concrete follow-along training videos for metrics exercise can move. When the latest reading is
+ * outside its clinical range or personal target, the section says so explicitly — this is the
+ * "here is what to actually do about it" answer, one tap from the number itself.
+ */
+@Composable
+private fun TrainThisMetricSection(type: MetricType, assessment: MetricAssessment?) {
+    val training = VideoLibrary.trainingFor(type) ?: return
+    val offTarget = assessment != null && (
+        assessment.clinicalStatus == ClinicalStatus.ABOVE_RANGE ||
+            assessment.clinicalStatus == ClinicalStatus.BELOW_RANGE ||
+            assessment.targetStatus == TargetStatus.ABOVE_PERSONAL_TARGET ||
+            assessment.targetStatus == TargetStatus.BELOW_PERSONAL_TARGET
+        )
+    Text(stringResource(R.string.metrics_train_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+    if (offTarget) {
+        Text(
+            stringResource(R.string.metrics_train_off_target),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.Medium,
+        )
+    }
+    Text(training.intro, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    val uriHandler = LocalUriHandler.current
+    training.guides.forEach { guide ->
+        OutlinedCard(
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClickLabel = stringResource(R.string.metrics_train_open_video, guide.title)) {
+                    uriHandler.openUri(guide.url)
+                },
+        ) {
+            Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Outlined.PlayCircle,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(30.dp),
+                )
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(guide.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        stringResource(
+                            R.string.metrics_train_video_meta,
+                            guide.channel, guide.minutes, intensityLabel(guide.intensity),
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+    }
+    Text(
+        stringResource(R.string.metrics_train_disclaimer),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+@Composable
+private fun intensityLabel(intensity: Intensity): String = when (intensity) {
+    Intensity.REST -> stringResource(R.string.intensity_rest)
+    Intensity.EASY -> stringResource(R.string.intensity_easy)
+    Intensity.MODERATE -> stringResource(R.string.intensity_moderate)
+    Intensity.HARD -> stringResource(R.string.intensity_hard)
 }
 
 @Composable

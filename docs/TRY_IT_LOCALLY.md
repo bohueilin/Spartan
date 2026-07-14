@@ -18,10 +18,26 @@ sample WHOOP client, so the numbers are deterministic and safe to poke at.
 | Daily check-in | Home tab | Readiness ring (42, "Take it easy"), activity cards, debrief sheet after checking off a training activity, snooze / skip / find-a-time overflow menu |
 | Metrics + detail | Metrics tab → tap a metric | Trend chart, "what is this / why it matters" explainer sections |
 | Review | Review tab | Weekly trends, consistency, "Where this can take you" projection card |
-| Connections | Settings → Connections | Consent UX, "Sample data" labels on WHOOP/Calendar |
+| Connections | Settings → Connections | Consent UX, "Sample data" labels on WHOOP/Calendar, **Import WHOOP export (.csv)** |
 | Settings | Settings tab | About, privacy/export/delete sheet, debug-only Diagnostics |
 | Widget | Long-press home screen → Widgets → Spartan | "Next activity" glanceable card |
 | Notifications | Wait or fake the clock | 07:15 morning digest, 19:00 evening nudge, snooze wake-up |
+
+### Use your REAL WHOOP data (no credentials needed)
+
+WHOOP lets every member export their data as CSV: **WHOOP app → App Settings → Data Export**, and
+a zip arrives by email. Unzip it, then:
+
+```bash
+# push the CSVs to the emulator/device Downloads folder
+adb push my_whoop_data_*/physiological_cycles.csv my_whoop_data_*/sleeps.csv \
+        my_whoop_data_*/workouts.csv my_whoop_data_*/journal_entries.csv /sdcard/Download/
+```
+
+In the app: **Settings → Connections → Import WHOOP export (.csv)**, multi-select the four files
+(long-press the first one in the picker). Today's plan regenerates from your real recovery/sleep/
+strain history, the Metrics tab fills with your actual trends, and the "Sample data" labels
+disappear. Disconnecting WHOOP deletes the imported data and returns the app to sample mode.
 
 ## Path A (recommended): Android Studio
 

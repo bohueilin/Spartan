@@ -1,6 +1,7 @@
 package com.spartan.domain
 
 import com.spartan.domain.engine.MetricEngine
+import com.spartan.domain.model.MetricReading
 import com.spartan.domain.model.MetricType
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -39,6 +40,19 @@ class MetricEngineWhoopTest {
     fun sleepDebt_range() {
         assertTrue(engine.validate(MetricType.SLEEP_DEBT, 1.5))
         assertFalse(engine.validate(MetricType.SLEEP_DEBT, 25.0))
+    }
+
+    @Test
+    fun zeroReadings_fromRealWhoopExports_areValidWhereTheRangeAllowsZero() {
+        // Regression: a real export contains "Sleep debt (min) = 0" (fully paid off). The old
+        // blanket value<=0 rejection made assess() throw and crash-loop the UI after import.
+        assertTrue(engine.validate(MetricType.SLEEP_DEBT, 0.0))
+        assertTrue(engine.validate(MetricType.DAY_STRAIN, 0.0))
+        engine.assess(MetricReading(type = MetricType.SLEEP_DEBT, value = 0.0)) // must not throw
+        // Zero stays invalid where the range floor excludes it; negatives never pass.
+        assertFalse(engine.validate(MetricType.WEIGHT, 0.0))
+        assertFalse(engine.validate(MetricType.RESTING_HEART_RATE, 0.0))
+        assertFalse(engine.validate(MetricType.SLEEP_DEBT, -0.1))
     }
 
     @Test

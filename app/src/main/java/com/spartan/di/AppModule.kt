@@ -14,9 +14,11 @@ import com.spartan.data.healthconnect.HealthConnectSource
 import com.spartan.data.local.AppDatabase
 import com.spartan.data.local.HealthDao
 import com.spartan.data.local.PreferencesStore
+import com.spartan.data.local.WhoopCycleDao
 import com.spartan.data.security.EncryptedTokenStore
 import com.spartan.data.security.InMemoryTokenStore
 import com.spartan.data.security.SecureTokenStore
+import com.spartan.data.whoop.LocalFirstWhoopClient
 import com.spartan.data.whoop.MockWhoopClient
 import com.spartan.data.whoop.RealWhoopClient
 import com.spartan.data.whoop.WhoopApi
@@ -50,11 +52,15 @@ object AppModule {
                 AppDatabase.MIGRATION_2_3,
                 AppDatabase.MIGRATION_3_4,
                 AppDatabase.MIGRATION_4_5,
+                AppDatabase.MIGRATION_5_6,
             )
             .build()
 
     @Provides
     fun provideHealthDao(database: AppDatabase): HealthDao = database.healthDao()
+
+    @Provides
+    fun provideWhoopCycleDao(database: AppDatabase): WhoopCycleDao = database.whoopCycleDao()
 
     @Provides
     @Singleton
@@ -123,11 +129,16 @@ object AppModule {
         mock: dagger.Lazy<MockWhoopClient>,
         api: dagger.Lazy<WhoopApi>,
         healthConnect: dagger.Lazy<HealthConnectSource>,
-    ): WhoopClient = when {
-        // Health Connect alternative (flag-gated; see HealthConnectSource for enable steps).
-        BuildConfig.USE_HEALTH_CONNECT -> healthConnect.get()
-        BuildConfig.USE_MOCK_WHOOP || !config.isConfigured -> mock.get()
-        else -> RealWhoopClient(api.get())
+        cycleDao: WhoopCycleDao,
+    ): WhoopClient {
+        val configured = when {
+            // Health Connect alternative (flag-gated; see HealthConnectSource for enable steps).
+            BuildConfig.USE_HEALTH_CONNECT -> healthConnect.get()
+            BuildConfig.USE_MOCK_WHOOP || !config.isConfigured -> mock.get()
+            else -> RealWhoopClient(api.get())
+        }
+        // Imported CSV data (the user's real export) always beats mock/API when present.
+        return LocalFirstWhoopClient(configured, cycleDao)
     }
 
     // --- Google Calendar integration (stub by default; real client is a Phase 2 stub) ---

@@ -1,5 +1,7 @@
 package com.spartan.ui.navigation
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.EventNote
@@ -165,10 +167,27 @@ fun SpartanRoot(
                 "connections",
                 deepLinks = listOf(navDeepLink { uriPattern = "spartan://connections" }),
             ) {
+                // WHOOP data export CSVs, picked via the Storage Access Framework (no storage
+                // permission needed; read access is granted per-pick by the system picker).
+                val csvPicker = rememberLauncherForActivityResult(
+                    ActivityResultContracts.OpenMultipleDocuments(),
+                ) { uris -> viewModel.importWhoopCsv(uris) }
                 ConnectionsScreen(
                     state = state,
                     onConnectWhoop = viewModel::connectWhoop,
                     onDisconnectWhoop = viewModel::disconnectWhoop,
+                    onImportWhoopCsv = {
+                        csvPicker.launch(
+                            arrayOf(
+                                "text/csv",
+                                "text/comma-separated-values",
+                                "text/plain",
+                                "application/csv",
+                                "application/octet-stream",
+                            ),
+                        )
+                    },
+                    onDismissImportResult = viewModel::dismissWhoopImportResult,
                     onConnectCalendar = viewModel::connectCalendar,
                     onDisconnectCalendar = viewModel::disconnectCalendar,
                     onManagePrivacy = { navController.navigate("privacy") },

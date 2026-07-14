@@ -18,13 +18,17 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         DailyActivityEntity::class,
         IntegrationConnectionEntity::class,
         AuditEventEntity::class,
+        WhoopCycleEntity::class,
+        WhoopWorkoutEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun healthDao(): HealthDao
+
+    abstract fun whoopCycleDao(): WhoopCycleDao
 
     companion object {
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -107,6 +111,59 @@ abstract class AppDatabase : RoomDatabase() {
                         detail TEXT NOT NULL
                     )
                     """.trimIndent(),
+                )
+            }
+        }
+
+        // WHOOP CSV import: the user's real exported data, stored locally. Additive, no data loss.
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS whoop_cycles (
+                        dateEpochDay INTEGER NOT NULL PRIMARY KEY,
+                        recoveryScore INTEGER,
+                        hrvMs REAL,
+                        restingHeartRate REAL,
+                        sleepPerformance INTEGER,
+                        sleepDurationHours REAL,
+                        sleepDebtHours REAL,
+                        respiratoryRate REAL,
+                        dayStrain REAL,
+                        energyKcal REAL,
+                        bedMinuteOfDay INTEGER,
+                        wakeMinuteOfDay INTEGER,
+                        journalCaffeine INTEGER,
+                        journalAlcohol INTEGER,
+                        journalLateMeal INTEGER,
+                        source TEXT NOT NULL,
+                        importedAtMillis INTEGER NOT NULL
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS whoop_workouts (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        dateEpochDay INTEGER NOT NULL,
+                        startMinuteOfDay INTEGER,
+                        durationMinutes INTEGER NOT NULL,
+                        activityName TEXT NOT NULL,
+                        strain REAL,
+                        energyKcal REAL,
+                        maxHr INTEGER,
+                        averageHr INTEGER,
+                        hrZone1Pct REAL,
+                        hrZone2Pct REAL,
+                        hrZone3Pct REAL,
+                        hrZone4Pct REAL,
+                        hrZone5Pct REAL,
+                        importedAtMillis INTEGER NOT NULL
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_whoop_workouts_dateEpochDay ON whoop_workouts(dateEpochDay)",
                 )
             }
         }

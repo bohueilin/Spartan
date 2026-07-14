@@ -46,7 +46,9 @@ class MetricEngine(
 
     fun validate(type: MetricType, value: Double?): Boolean {
         if (value == null) return type in pendingCapableMetrics
-        if (value <= 0.0 && type != MetricType.CAC) return false
+        // Negative readings are never valid; zero is decided per metric by the ranges below —
+        // real WHOOP data legitimately reports 0 (sleep debt fully paid, a zero-strain day).
+        if (value < 0.0) return false
         return when (type) {
             MetricType.FASTING_GLUCOSE -> value in 40.0..400.0
             MetricType.TRIGLYCERIDES -> value in 20.0..1500.0
