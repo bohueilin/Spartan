@@ -54,6 +54,7 @@ never make a medical claim. Details: [privacy policy](docs/PRIVACY_POLICY.md) ·
 | Android app (Kotlin · Compose · Hilt · Room) | **96 unit/Robolectric tests, 0 failures · 0 lint errors · 3.2 MB R8 release build** |
 | iOS core (`ios/SpartanKit`, same rules & copy) | **40 tests · 30,000+ assertions, 0 failures** via `swift run SpartanChecks` |
 | Coaching quality | An **eval harness generates 750+ plans** per run and asserts safety/correctness invariants on every one — identical on both platforms |
+| Domain metrics & rewards | A **[CoachingGym](docs/COACH_GYM.md)** grades every plan on readiness alignment, hard-gated safety, and coaching quality (0.35/0.25/0.40 weighted reward) across 600+ gold scenarios — the eval/RL seam any future AI recommendation source is measured against |
 | CI | GitHub Actions: tests + coverage, lint, debug/release assembly, emulator instrumentation job — zero secrets needed |
 
 The iOS SwiftUI shell is source-complete and awaits its first Xcode build

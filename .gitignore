@@ -12,3 +12,4 @@ local.properties
 *.keystore
 *.jks
 .DS_Store
+ios/SpartanKit/.build/
