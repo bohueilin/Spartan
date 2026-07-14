@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -50,6 +51,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -58,9 +60,11 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.spartan.R
+import com.spartan.domain.engine.VideoLibrary
 import com.spartan.domain.model.ActivityCategory
 import com.spartan.domain.model.ActivityPriority
 import com.spartan.domain.model.ActivityStatus
@@ -329,7 +333,19 @@ private fun ActivityCard(
                     Spacer(Modifier.height(Spacing.sm))
                     Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary)
                 }
-                TextButton(onClick = { onSchedule(activity.id) }, modifier = Modifier.padding(top = Spacing.xs)) {
+                VideoLibrary.guideForActivity(activity.id)?.let { guide ->
+                    val uriHandler = LocalUriHandler.current
+                    TextButton(onClick = { uriHandler.openUri(guide.url) }, modifier = Modifier.padding(top = Spacing.xs)) {
+                        Icon(Icons.Outlined.PlayCircle, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(Spacing.sm))
+                        Text(
+                            stringResource(R.string.checkin_follow_along_video, guide.title, guide.minutes),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                TextButton(onClick = { onSchedule(activity.id) }) {
                     Icon(Icons.Outlined.CalendarMonth, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(Spacing.sm))
                     Text(stringResource(R.string.checkin_find_time))

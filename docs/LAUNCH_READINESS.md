@@ -1,7 +1,26 @@
-# Spartan — Launch Readiness Report (2026-07-09)
+# Spartan — Launch Readiness Report (2026-07-09; re-verified 2026-07-13 for 1.1.0)
 
 Verdict from a 4-dimension multi-agent audit (security/privacy, store policy, code correctness,
 docs truthfulness) plus fresh build evidence, covering both platforms.
+
+## 1.1.0 delta (2026-07-13)
+
+Two features landed after the original audit, both re-verified with the same gauntlet
+(unit tests · lint · debug + androidTest + R8 release builds all green):
+
+1. **WHOOP CSV import** — the user's real data with zero credentials (Connections → Import WHOOP
+   export). Fully local; adversarially reviewed (25-agent pass, 2 major + 11 minor findings fixed);
+   e2e-verified on an emulator with a real 45-day export. Privacy policy updated for the new data
+   categories (incl. journal flags). This resolves the old "sample-data-only 1.0" listing caveat:
+   the listing can now truthfully say real WHOOP data works via CSV import.
+2. **Guided training videos** — every generated training activity links a specific follow-along
+   YouTube video (large channels only; every URL verified live via oEmbed), and each trainable
+   metric has a "Train this metric" section that flags out-of-range readings and hands the user
+   the sessions that target that number. Opening a video is an explicit user tap that leaves the
+   app; Spartan itself still makes no network calls. Clinician-first metrics (ApoB, Lp(a), CAC)
+   and pain/clinician activities deliberately get no video.
+
+Version bumped to 1.1.0 (versionCode 2).
 
 ## Verdict
 

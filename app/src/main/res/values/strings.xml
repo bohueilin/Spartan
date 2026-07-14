@@ -12,6 +12,7 @@
     <string name="checkin_empty_plan">Nothing scheduled yet. Connect WHOOP or pull the latest data to generate today\'s plan.</string>
     <string name="checkin_expand_activity">Expand %1$s</string>
     <string name="checkin_find_time">Find a time</string>
+    <string name="checkin_follow_along_video">Follow along: %1$s (%2$d min)</string>
     <string name="checkin_footer_disclaimer">Spartan offers wellness and fitness guidance, not medical advice. For any health concern, contact a qualified clinician.</string>
     <string name="checkin_minutes_time_of_day">~%1$d min · %2$s</string>
     <string name="checkin_minutes_today">~%1$d min today</string>
@@ -92,6 +93,15 @@
     <string name="metrics_edit_entry">Edit entry</string>
     <string name="metrics_edit_metric">Edit metric</string>
     <string name="metrics_entries">Entries</string>
+    <string name="metrics_train_title">Train this metric</string>
+    <string name="metrics_train_off_target">This reading is outside your range — these guided sessions are chosen to help move exactly this number.</string>
+    <string name="metrics_train_open_video">Open video: %1$s</string>
+    <string name="metrics_train_video_meta">%1$s · %2$d min · %3$s</string>
+    <string name="metrics_train_disclaimer">Videos open on YouTube and are made by independent creators. Ease in, keep good form, and stop if anything hurts.</string>
+    <string name="intensity_rest">Restful</string>
+    <string name="intensity_easy">Easy</string>
+    <string name="intensity_moderate">Moderate</string>
+    <string name="intensity_hard">Challenging</string>
     <string name="metrics_history">History</string>
     <string name="metrics_note_label">Note</string>
     <string name="metrics_title">Metrics</string>
