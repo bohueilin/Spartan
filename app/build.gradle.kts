@@ -70,6 +70,10 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            // An OAuth client secret must never ship inside a public APK: release builds always
+            // compile it out, and WhoopAuthManager falls back to PKCE-only public-client auth.
+            // A secret set in local.properties therefore only ever reaches debug builds.
+            buildConfigField("String", "WHOOP_CLIENT_SECRET", "\"\"")
         }
     }
 

@@ -52,7 +52,8 @@ class DailyPlanSync @Inject constructor(
         )
         val plan = coachingEngine.buildPlan(readiness)
         if (forceReseed) repository.reseedDailyPlan(plan) else repository.seedDailyPlanIfNeeded(plan)
-        DebugLog.log("sync", "ok: band=${readiness.band} activities=${plan.activities.size} stale=${readiness.isStale}")
+        // Operational counts only — the readiness band is health-derived and stays out of logs.
+        DebugLog.log("sync", "ok: activities=${plan.activities.size} stale=${readiness.isStale}")
         return Outcome(readiness, plan, snapshots.last(), failed = false)
     }
 

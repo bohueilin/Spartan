@@ -50,6 +50,15 @@ class ReminderWorker(
                 deepLink,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
+            // Lock-screen privacy: full content only after unlock; a generic public version
+            // otherwise, so activity names never sit on a locked screen.
+            val publicVersion = NotificationCompat.Builder(context, CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_notification)
+                .setContentTitle(context.getString(R.string.app_name))
+                .setContentText(context.getString(R.string.notification_public_body))
+                .setContentIntent(contentIntent)
+                .setAutoCancel(true)
+                .build()
             val notification = NotificationCompat.Builder(context, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_notification)
                 .setContentTitle(title)
@@ -58,6 +67,8 @@ class ReminderWorker(
                 .setPriority(NotificationCompat.PRIORITY_DEFAULT)
                 .setContentIntent(contentIntent)
                 .setAutoCancel(true)
+                .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+                .setPublicVersion(publicVersion)
                 .build()
             try {
                 NotificationManagerCompat.from(context).notify(id.hashCode(), notification)

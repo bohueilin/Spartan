@@ -19,12 +19,24 @@ class EncryptedTokenStore @Inject constructor(
 ) : SecureTokenStore {
 
     private val prefs by lazy {
+        // Keyset corruption (backup restore to a new device, cleared Keystore, OS bug) would
+        // otherwise crash-loop every token access. Recovery is safe here BECAUSE this store holds
+        // only re-obtainable OAuth tokens: drop the unreadable file and let the user re-connect.
+        try {
+            createPrefs()
+        } catch (_: Exception) {
+            context.deleteSharedPreferences(PREFS_FILE)
+            createPrefs()
+        }
+    }
+
+    private fun createPrefs() = run {
         val masterKey = MasterKey.Builder(context)
             .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
             .build()
         EncryptedSharedPreferences.create(
             context,
-            "spartan_secure_tokens",
+            PREFS_FILE,
             masterKey,
             EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
             EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
@@ -43,5 +55,9 @@ class EncryptedTokenStore @Inject constructor(
 
     override fun clearAll() {
         prefs.edit().clear().apply()
+    }
+
+    private companion object {
+        const val PREFS_FILE = "spartan_secure_tokens"
     }
 }

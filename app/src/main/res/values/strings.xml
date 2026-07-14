@@ -43,6 +43,7 @@
 
     <!-- Common -->
     <string name="common_brand">SPARTAN</string>
+    <string name="notification_public_body">You have a reminder. Unlock to see it.</string>
     <string name="common_cancel">Cancel</string>
     <string name="common_pending">pending</string>
     <string name="common_save">Save</string>
@@ -69,7 +70,7 @@
     <string name="connections_import_success_body">Imported %1$d days of your real WHOOP data (%2$s) with %3$d workouts and %4$d journal days. Today\'s plan and your WHOOP metrics now run on your data instead of the sample series.</string>
     <string name="connections_import_success_title">Your WHOOP data is in</string>
     <string name="connections_import_whoop_csv">Import WHOOP export (.csv)</string>
-    <string name="connections_import_whoop_hint">No developer credentials needed: in the WHOOP app go to App Settings → Data Export, then pick the exported CSV files here. Your data stays on this device.</string>
+    <string name="connections_import_whoop_hint">No developer credentials needed: in the WHOOP app go to App Settings → Data Export, then pick the exported CSV files here. The import reads your recovery, sleep and wake times, strain, workouts, and journal answers (caffeine, alcohol, late meals) from those files. Your data stays on this device.</string>
     <string name="connections_intro">Spartan treats your health, activity, and calendar data as sensitive. Data stays on your device, is used only to build your plan, and is never sold or used for ads.</string>
     <string name="connections_phase_note">Phase note: without a connection Spartan runs on clearly-labeled sample data. Import your WHOOP CSV export for real data with no credentials, or connect the OAuth flows once WHOOP/Google credentials are configured. You can disconnect or delete your data anytime.</string>
     <string name="connections_privacy_button">Privacy, export &amp; delete data</string>

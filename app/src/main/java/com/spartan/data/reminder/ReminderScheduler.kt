@@ -3,8 +3,10 @@ package com.spartan.data.reminder
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.work.Data
+import androidx.work.await
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
@@ -96,6 +98,20 @@ class ReminderScheduler @Inject constructor(
 
     fun cancelAll() {
         workManager.cancelAllWorkByTag(REMINDER_TAG)
+    }
+
+    /**
+     * Erasure-grade teardown for "Delete all local data": disarms every scheduled job (reminders
+     * AND the plan-refresh/nudge workers, which would otherwise repopulate the emptied database),
+     * awaits cancellation, prunes WorkManager's own database (reminder title/body live in work
+     * input Data for up to ~7 days otherwise), and dismisses any already-shown notifications.
+     */
+    suspend fun purgeAllForErasure() {
+        workManager.cancelAllWorkByTag(REMINDER_TAG).await()
+        DailyPlanRefreshWorker.cancel(workManager)
+        EveningNudgeWorker.cancel(workManager)
+        workManager.pruneWork().await()
+        NotificationManagerCompat.from(context).cancelAll()
     }
 
     fun hasNotificationPermission(): Boolean {

@@ -81,5 +81,11 @@ class DailyPlanRefreshWorker @AssistedInject constructor(
                 OneTimeWorkRequestBuilder<DailyPlanRefreshWorker>().build(),
             )
         }
+
+        /** Disarm both refresh jobs — part of full data erasure, or the DB would repopulate. */
+        fun cancel(workManager: WorkManager) {
+            workManager.cancelUniqueWork(UNIQUE_PERIODIC)
+            workManager.cancelUniqueWork(UNIQUE_ONE_SHOT)
+        }
     }
 }

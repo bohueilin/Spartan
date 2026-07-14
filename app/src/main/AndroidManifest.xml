@@ -26,8 +26,9 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
             <!-- Route-level deep links (reminders, widgets). Note: AppAuth's
-                 RedirectUriReceiverActivity registers a scheme-wide spartan:// filter; these
-                 host-specific filters win resolution for today/connections, and OAuth redirect
+                 RedirectUriReceiverActivity filters on the dedicated com.spartan.oauth scheme
+                 (appAuthRedirectScheme in app/build.gradle.kts), deliberately DISTINCT from this
+                 spartan:// scheme so OAuth redirects and app links never collide; redirect
                  interception is mitigated by PKCE. Reminder/widget intents are package-scoped. -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
@@ -68,6 +69,18 @@
             <meta-data
                 android:name="androidx.work.WorkManagerInitializer"
                 tools:node="remove" />
+        </provider>
+
+        <!-- User-initiated export sharing only: scoped to the cleared-per-export cache subdir
+             (res/xml/file_paths.xml). Receivers get a one-shot read grant, never a text dump. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
         </provider>
     </application>
 </manifest>

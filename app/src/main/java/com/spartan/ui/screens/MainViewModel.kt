@@ -1,8 +1,12 @@
 package com.spartan.ui.screens
 
+import android.content.Context
 import android.net.Uri
+import androidx.glance.appwidget.updateAll
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.spartan.ui.widget.NextActivityWidget
+import dagger.hilt.android.qualifiers.ApplicationContext
 import com.spartan.data.calendar.AvailabilityService
 import com.spartan.data.calendar.CalendarAuthManager
 import com.spartan.data.calendar.CalendarClient
@@ -140,6 +144,7 @@ class MainViewModel @Inject constructor(
     private val whoopAuthManager: WhoopAuthManager,
     private val calendarAuthManager: CalendarAuthManager,
     private val whoopCsvImporter: WhoopCsvImporter,
+    @param:ApplicationContext private val appContext: Context,
 ) : ViewModel() {
     private val today = LocalDate.now().toEpochDay()
     private val projectionEngine = ProjectionEngine()
@@ -593,13 +598,18 @@ class MainViewModel @Inject constructor(
 
     fun deleteAllLocalData() {
         viewModelScope.launch {
-            reminderScheduler.cancelAll()
+            // Erasure-grade: disarm every scheduled job (or the plan-refresh worker would
+            // repopulate the emptied DB), purge WorkManager's own DB, dismiss shown notifications.
+            reminderScheduler.purgeAllForErasure()
             // Full deletion includes any OAuth tokens, per the privacy policy.
             whoopAuthManager.disconnect()
             calendarAuthManager.disconnect()
             repository.deleteAllLocalData()
             preferencesStore.clear()
             preferencesStore.setDemoSeedCompleted(true)
+            // The home-screen widget must not keep rendering the deleted plan; with the DB empty
+            // it falls back to its neutral state. Glance failure must never break erasure.
+            runCatching { NextActivityWidget().updateAll(appContext) }
         }
     }
 

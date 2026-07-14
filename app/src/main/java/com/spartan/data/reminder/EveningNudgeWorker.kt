@@ -69,5 +69,10 @@ class EveningNudgeWorker @AssistedInject constructor(
                 .build()
             workManager.enqueueUniquePeriodicWork(UNIQUE_NAME, ExistingPeriodicWorkPolicy.KEEP, request)
         }
+
+        /** Disarm the nudge — part of full data erasure. */
+        fun cancel(workManager: WorkManager) {
+            workManager.cancelUniqueWork(UNIQUE_NAME)
+        }
     }
 }
