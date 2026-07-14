@@ -134,6 +134,53 @@ data class IntegrationConnectionEntity(
 )
 
 /**
+ * One imported day of WHOOP data (from the user's CSV data export). This is the user's REAL
+ * wearable data — stored locally only, replayed through the same WhoopClient seam as the API
+ * path, and deleted on disconnect or full data deletion. Journal flags come from
+ * journal_entries.csv and are nullable because not every export includes the journal.
+ */
+@Entity(tableName = "whoop_cycles")
+data class WhoopCycleEntity(
+    @PrimaryKey val dateEpochDay: Long,
+    val recoveryScore: Int? = null,
+    val hrvMs: Double? = null,
+    val restingHeartRate: Double? = null,
+    val sleepPerformance: Int? = null,
+    val sleepDurationHours: Double? = null,
+    val sleepDebtHours: Double? = null,
+    val respiratoryRate: Double? = null,
+    val dayStrain: Double? = null,
+    val energyKcal: Double? = null,
+    val bedMinuteOfDay: Int? = null,
+    val wakeMinuteOfDay: Int? = null,
+    val journalCaffeine: Boolean? = null,
+    val journalAlcohol: Boolean? = null,
+    val journalLateMeal: Boolean? = null,
+    val source: String = "CSV_IMPORT",
+    val importedAtMillis: Long = 0,
+)
+
+/** One recorded workout from the WHOOP export (workouts.csv). Local-only, like all health data. */
+@Entity(tableName = "whoop_workouts", indices = [Index(value = ["dateEpochDay"])])
+data class WhoopWorkoutEntity(
+    @PrimaryKey val id: String, // "<dateEpochDay>:<startMinuteOfDay>:<activityName>"
+    val dateEpochDay: Long,
+    val startMinuteOfDay: Int? = null,
+    val durationMinutes: Int,
+    val activityName: String,
+    val strain: Double? = null,
+    val energyKcal: Double? = null,
+    val maxHr: Int? = null,
+    val averageHr: Int? = null,
+    val hrZone1Pct: Double? = null,
+    val hrZone2Pct: Double? = null,
+    val hrZone3Pct: Double? = null,
+    val hrZone4Pct: Double? = null,
+    val hrZone5Pct: Double? = null,
+    val importedAtMillis: Long = 0,
+)
+
+/**
  * Append-only audit trail of privacy-relevant actions (consent granted/revoked, sync runs, data
  * deletion). Carries actions and timestamps ONLY — never metric values, plan text, or any PHI.
  * Local-only today; the seam future coach/HIPAA deployments audit against.

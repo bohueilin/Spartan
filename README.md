@@ -30,7 +30,7 @@ calendar. That's the whole app — deliberately.
 
 | | |
 |---|---|
-| **Reads your body** | WHOOP recovery, sleep, strain, HRV, resting HR, respiratory rate — read-only, with your consent. Ships with clearly labeled sample data so you can try everything before connecting anything. |
+| **Reads your body** | WHOOP recovery, sleep, strain, HRV, resting HR, respiratory rate — read-only, with your consent. **Import your WHOOP CSV export** (Settings → Connections) to run on your real data with zero credentials, or ship with clearly labeled sample data until you do. |
 | **Decides the day** | A transparent rules engine (not a black box) maps readiness to a plan: recovery days protect you, primed days green-light quality training, concerning vitals always suppress intensity and suggest a clinician — never a diagnosis. |
 | **Explains the numbers** | Tap any metric for plain-language education: what it is, what moves it, what a good pattern looks like. |
 | **Tracks the work** | Checking off a session takes a 5-second debrief (minutes, effort, pain) that *adapts next week's plan* — pain automatically deloads you. |
@@ -79,8 +79,9 @@ Full walkthrough — emulator or device, CLI or Studio, plus a tour of what to i
 ## Status
 
 **1.0.0 — submission-ready on Android; iOS one Xcode pass away.** Runs on labeled sample data by
-default; live WHOOP and Google Calendar integrations are built and flag-gated behind production
-OAuth registration.
+default; **WHOOP CSV import brings your real data in with no credentials** (WHOOP app →
+App Settings → Data Export, then Settings → Connections → *Import WHOOP export*); live WHOOP and
+Google Calendar OAuth integrations are built and flag-gated behind production registration.
 
 > Spartan offers wellness and fitness guidance, not medical advice, and is not a medical device.
 > For any health concern, talk with a qualified clinician.

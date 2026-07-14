@@ -29,7 +29,12 @@ class DailyPlanSync @Inject constructor(
         val failed: Boolean,
     )
 
-    suspend fun sync(dateEpochDay: Long): Outcome {
+    /**
+     * [forceReseed] regenerates the day's not-yet-completed activities instead of keeping the
+     * existing plan — used right after a data-source change (CSV import, disconnect) so the plan
+     * reflects the data the user just switched to.
+     */
+    suspend fun sync(dateEpochDay: Long, forceReseed: Boolean = false): Outcome {
         repository.reactivateExpiredSnoozes()
         val snapshots = runCatching { whoopClient.fetchRecentDays(7) }
             .getOrElse {
@@ -41,10 +46,24 @@ class DailyPlanSync @Inject constructor(
             return Outcome(null, null, null, failed = true)
         }
         repository.persistWhoopReadings(snapshots)
-        val readiness = ReadinessSnapshot.from(snapshots.last(), snapshots.dropLast(1))
+        val readiness = carryForward(
+            ReadinessSnapshot.from(snapshots.last(), snapshots.dropLast(1)),
+            dateEpochDay,
+        )
         val plan = coachingEngine.buildPlan(readiness)
-        repository.seedDailyPlanIfNeeded(plan)
-        DebugLog.log("sync", "ok: band=${readiness.band} activities=${plan.activities.size}")
+        if (forceReseed) repository.reseedDailyPlan(plan) else repository.seedDailyPlanIfNeeded(plan)
+        DebugLog.log("sync", "ok: band=${readiness.band} activities=${plan.activities.size} stale=${readiness.isStale}")
         return Outcome(readiness, plan, snapshots.last(), failed = false)
+    }
+
+    companion object {
+        /**
+         * Imported (or lagging) wearable data may end before [targetEpochDay]. The plan still has
+         * to land on the day being planned, so the newest readiness is carried forward and marked
+         * stale — the coaching engine then eases intensity and says why.
+         */
+        fun carryForward(readiness: ReadinessSnapshot, targetEpochDay: Long): ReadinessSnapshot =
+            if (readiness.dateEpochDay >= targetEpochDay) readiness
+            else readiness.copy(dateEpochDay = targetEpochDay, isStale = true)
     }
 }

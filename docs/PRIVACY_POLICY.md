@@ -13,6 +13,7 @@ Spartan is local-first. Your health data stays on your device, protected by Andr
 Spartan processes the following data, all of it to generate and manage your daily plan:
 
 - **WHOOP-derived health metrics.** Recovery score, sleep performance and duration, day strain, heart rate variability (HRV), resting heart rate, and respiratory rate. Read from the WHOOP API with read-only scopes, only after you connect your WHOOP account.
+- **WHOOP CSV export (optional import).** Instead of connecting the API, you can import the CSV files WHOOP's own Data Export feature gives you. The import is read entirely on your device with **no network access at all** and stores: the daily metrics above, per-sleep bed/wake times, recorded workouts (duration, strain, heart-rate zones), and your yes/no journal answers as three flags — caffeine, alcohol, and eating close to bedtime. These flags exist only to explain sleep/recovery patterns to you; they are never transmitted anywhere and are removed by the in-app full deletion.
 - **Profile details (optional).** A name and height if you choose to enter them. Both are optional and stay on your device.
 - **Activity check-ins.** Which planned activities you marked done, snoozed, skipped, or rescheduled, and when. Stored as statuses and timestamps, not free-form health narratives.
 - **Calendar free/busy intervals only.** To find open time for activities, Spartan reads which time blocks are busy — never event titles, descriptions, attendees, or any other event content. Only the slot you choose for an activity is kept; the surrounding calendar data is not persisted.
@@ -40,7 +41,7 @@ There are no other third parties. Spartan contains no analytics SDK, no telemetr
 
 ## 5. Your controls
 
-- **Disconnect anytime.** You can disconnect WHOOP or Google Calendar independently at any time from the app's connections screen. Disconnecting stops data access immediately and clears the stored sign-in tokens; previously synced readings remain on your device until you delete them (per-source purge is planned).
+- **Disconnect anytime.** You can disconnect WHOOP or Google Calendar independently at any time from the app's connections screen. Disconnecting stops data access immediately and clears the stored sign-in tokens; for a CSV import it also removes the imported raw cycle and workout tables so plans return to labeled sample data. Previously normalized readings remain on your device as your history until you delete them (per-source purge is planned).
 - **Delete everything.** The app includes a full data deletion option that clears every table, all preferences, and all scheduled reminders, returning the app to its first-run state.
 - **Export first.** Before deleting, you can produce a local, human-readable summary of your data. Export is user-directed — the app never sends it anywhere on its own.
 

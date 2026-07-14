@@ -89,6 +89,11 @@ class ReminderScheduler @Inject constructor(
         workManager.cancelUniqueWork(id)
     }
 
+    /** Cancels the one-shot reminder for an activity (safe if none was scheduled). */
+    fun cancelActivityReminder(activityId: String) {
+        workManager.cancelUniqueWork("activity-$activityId")
+    }
+
     fun cancelAll() {
         workManager.cancelAllWorkByTag(REMINDER_TAG)
     }

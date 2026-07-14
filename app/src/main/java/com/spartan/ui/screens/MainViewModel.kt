@@ -1,5 +1,6 @@
 package com.spartan.ui.screens
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.spartan.data.calendar.AvailabilityService
@@ -22,6 +23,7 @@ import com.spartan.data.reminder.ReminderScheduler
 import com.spartan.data.repository.HealthRepository
 import com.spartan.data.whoop.WhoopAuthManager
 import com.spartan.data.whoop.WhoopClient
+import com.spartan.data.whoop.csv.WhoopCsvImporter
 import com.spartan.domain.engine.InsightEngine
 import com.spartan.domain.engine.MetricEngine
 import com.spartan.domain.engine.PlanEngine
@@ -87,6 +89,17 @@ data class MainUiState(
     val requestReview: Boolean = false,
     /** Expected-improvement ranges at the current consistency (typical ranges, never guarantees). */
     val projections: List<MetricProjection> = emptyList(),
+    /** State of an in-flight or finished WHOOP CSV import (null when none this session). */
+    val whoopImport: WhoopImportUiState? = null,
+)
+
+/** Progress + outcome of a WHOOP CSV import, rendered on the Connections screen. */
+data class WhoopImportUiState(
+    val inProgress: Boolean = false,
+    val summary: WhoopCsvImporter.Summary? = null,
+    val failed: Boolean = false,
+    /** Files that WERE recognized when the import still failed (e.g. journal-only pick). */
+    val failedButRecognized: List<String> = emptyList(),
 )
 
 private data class HealthBundle(
@@ -126,6 +139,7 @@ class MainViewModel @Inject constructor(
     private val availabilityService: AvailabilityService,
     private val whoopAuthManager: WhoopAuthManager,
     private val calendarAuthManager: CalendarAuthManager,
+    private val whoopCsvImporter: WhoopCsvImporter,
 ) : ViewModel() {
     private val today = LocalDate.now().toEpochDay()
     private val projectionEngine = ProjectionEngine()
@@ -134,9 +148,12 @@ class MainViewModel @Inject constructor(
     private val latestSnapshot = MutableStateFlow<WhoopSnapshot?>(null)
     private val syncFailed = MutableStateFlow(false)
     private val reviewRequested = MutableStateFlow(false)
+    private val whoopImportState = MutableStateFlow<WhoopImportUiState?>(null)
 
-    /** syncFailed + reviewRequested folded into one flow (combine caps at five inputs). */
-    private val transientFlags = combine(syncFailed, reviewRequested) { s, r -> s to r }
+    /** Transient signals folded into one flow (combine caps at five inputs). */
+    private val transientFlags = combine(syncFailed, reviewRequested, whoopImportState) { s, r, i ->
+        Triple(s, r, i)
+    }
 
     private val healthBundle = combine(
         repository.profile,
@@ -229,10 +246,14 @@ class MainViewModel @Inject constructor(
         healthBundle,
         checkInBundle,
         transientFlags,
-    ) { onboardingComplete, notificationDenied, health, checkIn, (syncDidFail, reviewWanted) ->
+    ) { onboardingComplete, notificationDenied, health, checkIn, (syncDidFail, reviewWanted, whoopImport) ->
         val latest = latestReadings(health.readings)
         val targetMap = health.targets.associateBy(TargetValue::metricType)
-        val assessments = latest.map { metricEngine.assess(it, targetMap[it.type]) }
+        // Assess only values the engine considers valid: one out-of-range persisted row
+        // (e.g. from an imported export) must never be able to crash the whole UI state.
+        val assessments = latest
+            .filter { metricEngine.validate(it.type, it.value) }
+            .map { metricEngine.assess(it, targetMap[it.type]) }
         val plan = applyPlanOverrides(planEngine.defaultPlan(health.logs), health.planOverrides)
         val review = reviewEngine.summarize(health.readings, health.logs)
         MainUiState(
@@ -258,6 +279,7 @@ class MainViewModel @Inject constructor(
             syncFailed = syncDidFail,
             consistencyDays7 = checkIn.consistencyDays7,
             requestReview = reviewWanted,
+            whoopImport = whoopImport,
             projections = projectionEngine.project(
                 restingHeartRate = checkIn.readiness?.restingHeartRate
                     ?: latestValue(health.readings, MetricType.RESTING_HEART_RATE),
@@ -284,16 +306,59 @@ class MainViewModel @Inject constructor(
     fun loadToday() {
         viewModelScope.launch {
             preferencesStore.recordFirstOpenIfNeeded(System.currentTimeMillis())
-            val outcome = dailyPlanSync.sync(today)
-            if (outcome.failed) {
-                syncFailed.value = true
-                return@launch
-            }
-            syncFailed.value = false
-            readinessState.value = outcome.readiness
-            generatedPlan.value = outcome.plan
-            latestSnapshot.value = outcome.latestSnapshot
+            refreshPlan(forceReseed = false)
         }
+    }
+
+    private suspend fun refreshPlan(forceReseed: Boolean) {
+        val outcome = dailyPlanSync.sync(today, forceReseed = forceReseed)
+        if (outcome.failed) {
+            syncFailed.value = true
+            return
+        }
+        syncFailed.value = false
+        readinessState.value = outcome.readiness
+        generatedPlan.value = outcome.plan
+        latestSnapshot.value = outcome.latestSnapshot
+    }
+
+    /**
+     * Imports a WHOOP CSV export picked by the user, then rebuilds today's plan from the real
+     * data (completed check-ins are kept; pending sample-driven items are replaced).
+     */
+    fun importWhoopCsv(uris: List<Uri>) {
+        if (uris.isEmpty()) return
+        if (whoopImportState.value?.inProgress == true) return // one import at a time
+        viewModelScope.launch {
+            whoopImportState.value = WhoopImportUiState(inProgress = true)
+            whoopCsvImporter.import(uris)
+                .onSuccess { summary ->
+                    cancelPendingActivityReminders()
+                    refreshPlan(forceReseed = true)
+                    whoopImportState.value = WhoopImportUiState(summary = summary)
+                }
+                .onFailure { failure ->
+                    whoopImportState.value = WhoopImportUiState(
+                        failed = true,
+                        failedButRecognized = (failure as? WhoopCsvImporter.ImportError.NoUsableData)
+                            ?.recognized ?: emptyList(),
+                    )
+                }
+        }
+    }
+
+    fun dismissWhoopImportResult() {
+        whoopImportState.value = null
+    }
+
+    /**
+     * A force-reseed replaces today's pending activities; any one-shot reminders armed for their
+     * snoozed/rescheduled times must die with them or they'd fire for items that no longer exist.
+     */
+    private suspend fun cancelPendingActivityReminders() {
+        repository.dailyActivities(today).first()
+            .filter { it.status == ActivityStatus.SNOOZED || it.status == ActivityStatus.RESCHEDULED }
+            .forEach { reminderScheduler.cancelActivityReminder(it.id) }
     }
 
     fun seed() {
@@ -470,7 +535,13 @@ class MainViewModel @Inject constructor(
     fun disconnectWhoop() {
         viewModelScope.launch {
             whoopAuthManager.disconnect() // clears stored tokens, matching the privacy policy
+            // Disconnect stops the source: imported cycles/workouts are removed so syncs fall
+            // back to labeled sample data. Normalized readings stay as the user's history —
+            // disconnect never silently destroys data; deletion lives in Privacy.
+            repository.clearImportedWhoopSource()
             repository.setConnection(IntegrationProvider.WHOOP, ConnectionStatus.NOT_CONNECTED)
+            cancelPendingActivityReminders()
+            refreshPlan(forceReseed = true)
         }
     }
 

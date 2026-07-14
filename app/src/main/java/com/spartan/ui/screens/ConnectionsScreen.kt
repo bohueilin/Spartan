@@ -18,12 +18,15 @@ import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.spartan.R
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 /**
  * Consent + integration management. Explains exactly what Spartan reads and why, in plain language,
@@ -35,6 +38,8 @@ fun ConnectionsScreen(
     state: MainUiState,
     onConnectWhoop: () -> Unit,
     onDisconnectWhoop: () -> Unit,
+    onImportWhoopCsv: () -> Unit,
+    onDismissImportResult: () -> Unit,
     onConnectCalendar: () -> Unit,
     onDisconnectCalendar: () -> Unit,
     onManagePrivacy: () -> Unit,
@@ -63,7 +68,14 @@ fun ConnectionsScreen(
             connectLabel = if (state.whoopIsMock) stringResource(R.string.connections_use_sample_data) else stringResource(R.string.connections_connect_whoop),
             onConnect = onConnectWhoop,
             onDisconnect = onDisconnectWhoop,
+            secondaryActionLabel = stringResource(R.string.connections_import_whoop_csv),
+            onSecondaryAction = onImportWhoopCsv,
+            secondaryActionHint = stringResource(R.string.connections_import_whoop_hint),
         )
+
+        state.whoopImport?.let { import ->
+            WhoopImportResultCard(import = import, onDismiss = onDismissImportResult)
+        }
 
         IntegrationCard(
             title = stringResource(R.string.connections_calendar_title),
@@ -101,6 +113,9 @@ private fun IntegrationCard(
     connectLabel: String,
     onConnect: () -> Unit,
     onDisconnect: () -> Unit,
+    secondaryActionLabel: String? = null,
+    onSecondaryAction: (() -> Unit)? = null,
+    secondaryActionHint: String? = null,
 ) {
     OutlinedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -123,6 +138,83 @@ private fun IntegrationCard(
                 OutlinedButton(onClick = onDisconnect, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.connections_disconnect)) }
             } else {
                 Button(onClick = onConnect, modifier = Modifier.fillMaxWidth()) { Text(connectLabel) }
+            }
+            if (secondaryActionLabel != null && onSecondaryAction != null) {
+                OutlinedButton(onClick = onSecondaryAction, modifier = Modifier.fillMaxWidth()) { Text(secondaryActionLabel) }
+                secondaryActionHint?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+    }
+}
+
+/** Outcome of a WHOOP CSV import: progress, a summary of what landed, or a gentle failure. */
+@Composable
+private fun WhoopImportResultCard(import: WhoopImportUiState, onDismiss: () -> Unit) {
+    OutlinedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            when {
+                import.inProgress -> {
+                    Text(
+                        stringResource(R.string.connections_import_in_progress),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+                import.failed -> {
+                    Text(
+                        stringResource(R.string.connections_import_failed_title),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        if (import.failedButRecognized.isEmpty()) {
+                            stringResource(R.string.connections_import_failed_body)
+                        } else {
+                            stringResource(
+                                R.string.connections_import_needs_cycles_body,
+                                import.failedButRecognized.joinToString(),
+                            )
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    OutlinedButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.connections_import_dismiss))
+                    }
+                }
+                import.summary != null -> {
+                    val summary = import.summary
+                    val formatter = remember { DateTimeFormatter.ofPattern("MMM d") }
+                    val range = "${formatter.format(LocalDate.ofEpochDay(summary.firstDayEpoch))} – " +
+                        formatter.format(LocalDate.ofEpochDay(summary.lastDayEpoch))
+                    Text(
+                        stringResource(R.string.connections_import_success_title),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        stringResource(
+                            R.string.connections_import_success_body,
+                            summary.days, range, summary.workouts, summary.journalDays,
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (summary.skippedFiles.isNotEmpty()) {
+                        Text(
+                            stringResource(
+                                R.string.connections_import_skipped,
+                                summary.skippedFiles.joinToString(),
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    OutlinedButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.connections_import_dismiss))
+                    }
+                }
             }
         }
     }
