@@ -76,7 +76,7 @@ Full walkthrough — emulator or device, CLI or Studio, plus a tour of what to i
 |---|---|
 | Product & design | [PRD](docs/Spartan_PRD.md) · [Architecture](docs/Spartan_Architecture.md) · [Decisions](docs/Spartan_Decisions.md) · [UX roadmap prompts](docs/UX_ROADMAP_PROMPTS.md) |
 | Launch | [Launch readiness](docs/LAUNCH_READINESS.md) · [Play checklist](docs/RELEASE_CHECKLIST.md) · [App Store checklist](ios/docs/IOS_RELEASE_CHECKLIST.md) · [Store listing](docs/PLAY_STORE_LISTING.md) |
-| Quality & trust | [Accessibility](docs/ACCESSIBILITY.md) · [Cert-pinning runbook](docs/CERT_PINNING_RUNBOOK.md) · [Enhancement backlog (with statuses)](docs/Spartan_Enhancements.md) · [ADA runway](docs/APPLE_DESIGN_AWARD_RUNWAY.md) |
+| Quality & trust | [Compliance pack (PII/PHI · HIPAA · GDPR)](docs/COMPLIANCE.md) · [Accessibility](docs/ACCESSIBILITY.md) · [Cert-pinning runbook](docs/CERT_PINNING_RUNBOOK.md) · [Enhancement backlog (with statuses)](docs/Spartan_Enhancements.md) · [ADA runway](docs/APPLE_DESIGN_AWARD_RUNWAY.md) |
 
 ## Status
 
