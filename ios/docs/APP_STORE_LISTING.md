@@ -71,9 +71,10 @@ Ships with clearly labeled sample data, so you can explore the full experience b
 
 ## 4. Description
 
-> Max 4,000 characters. The copy below is ~2,290 characters. Adapted from the Play full
-> description: identical claims and voice; the token-protection sentence now names the iOS
-> Keychain instead of Android Keystore. Paste verbatim.
+> Max 4,000 characters. The copy below is ~2,270 characters. Adapted from the Play full
+> description with iOS-accurate claims: no Trends bullet (iOS renders no trends surface yet),
+> the real-data path is the on-device WHOOP CSV import, and Keychain token protection is
+> stated future-tense (no OAuth in the 1.x binary). Paste verbatim.
 
 ```
 Spartan reads your WHOOP recovery and turns it into a short daily plan you can actually complete.
@@ -82,9 +83,9 @@ Every morning you get 2–4 concrete activities — mobility, zone 2 cardio, bre
 
 If you connect Google Calendar, Spartan looks only at your free/busy times — never event titles or contents — and suggests open gaps that fit each activity. Local reminders nudge at the right moment and respect your quiet hours.
 
-What Spartan reads from WHOOP (read-only, with your consent): recovery, sleep, strain, HRV, resting heart rate, and respiratory rate — through WHOOP's official sign-in.
+What Spartan reads from WHOOP (read-only, with your consent): recovery, sleep, strain, HRV, resting heart rate, and respiratory rate.
 
-A note on this version: Spartan ships with clearly labeled sample data, so you can explore the full experience before connecting anything. Live WHOOP and Google Calendar connections require your explicit consent through their official sign-in flows.
+A note on this version: Spartan ships with clearly labeled sample data, and you can import your own WHOOP CSV export — no account or sign-in needed. Live WHOOP and Google Calendar connections will arrive in an update and will require your explicit consent through their official sign-in flows.
 
 Features
 • Recovery-adjusted daily plan (2–4 activities), rebuilt each morning
@@ -92,9 +93,8 @@ Features
 • One-tap done, snooze, skip, or reschedule — your progress is saved
 • Calendar-aware scheduling using free/busy gaps only
 • Local reminders with quiet hours — nudges, never nagging
-• Trends for recovery, sleep, HRV, and resting heart rate over time
 
-Private by design. Your data stays on your device: no cloud backend, no account, no analytics, no ads, no trackers. Sign-in tokens are protected in the iOS Keychain and never leave your device. You can disconnect any integration or delete all app data at any time, from inside the app.
+Private by design. Your data stays on your device: no cloud backend, no account, no analytics, no ads, no trackers. When live connections ship, sign-in tokens will be protected in the iOS Keychain and will never leave your device. You can disconnect any integration or delete all app data at any time, from inside the app.
 
 Spartan provides wellness and fitness guidance only. It is not a medical device, does not provide medical advice, and does not diagnose, treat, or prevent any condition. If a reading looks concerning, Spartan suggests speaking with a qualified clinician. Always consult a clinician for health concerns.
 
@@ -194,7 +194,7 @@ but shipping both sets keeps text crisp. Capture from the iOS Simulator at exact
 | # | Screen | Caption (overlay, one line, sentence case) |
 |---|---|---|
 | 1 | Check-in hero — Today screen with 2–4 activity cards, per-day total time, progress indicator | A short daily plan, matched to your recovery |
-| 2 | Readiness ring — recovery band with sleep, HRV, and resting heart rate summary | Your recovery, read at a glance |
+| 2 | Readiness ring — recovery percentage and readiness band | Your recovery, read at a glance |
 | 3 | Expanded activity card — why it matters, steps, duration, priority, snooze/skip/reschedule | Every activity explains why it matters |
 | 4 | Connections/consent screen — WHOOP and Google Calendar with plain-language scope explanations | You decide exactly what Spartan can read |
 | 5 | Privacy screen — on-device storage, disconnect, delete all data | Your data stays on your device |

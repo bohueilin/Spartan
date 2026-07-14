@@ -27,18 +27,29 @@ struct SpartanIOSApp: App {
 }
 
 /// Onboarding-gated root: onboarding first, then the tabbed app (Today / Connections / Settings).
+/// The selection binding lets the check-in's connect prompt route to the Connections tab —
+/// the screen whose labels are honest about sample data vs. CSV import — mirroring Android's
+/// onManageConnections navigation (CheckInScreen.kt ConnectPrompt).
 struct RootView: View {
     @EnvironmentObject private var viewModel: CheckInViewModel
+    @State private var selectedTab: SpartanTab = .today
+
+    enum SpartanTab: Hashable {
+        case today, connections, settings
+    }
 
     var body: some View {
         if viewModel.onboardingComplete {
-            TabView {
-                CheckInView()
+            TabView(selection: $selectedTab) {
+                CheckInView(onManageConnections: { selectedTab = .connections })
                     .tabItem { Label("Today", systemImage: "heart") }
+                    .tag(SpartanTab.today)
                 ConnectionsView()
                     .tabItem { Label("Connections", systemImage: "link") }
+                    .tag(SpartanTab.connections)
                 SettingsAboutView()
                     .tabItem { Label("Settings", systemImage: "gearshape") }
+                    .tag(SpartanTab.settings)
             }
         } else {
             OnboardingView()

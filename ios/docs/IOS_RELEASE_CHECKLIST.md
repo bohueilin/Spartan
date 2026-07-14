@@ -70,10 +70,14 @@ mailbox before submission.**
   open SpartanApp.xcodeproj
   ```
   Build for a simulator, then for "Any iOS Device (arm64)".
-- [ ] **Sample-data mode confirmed.** 1.0 ships on the labeled mock WHOOP source and stub
-      calendar — the same honest decision as Android 1.0. The UI must label sample data plainly,
-      the app must make **zero network requests** (verify with Xcode's network instrument or a
-      proxy), and the listing already says so. Do not enable live integrations until §6 completes.
+- [ ] **Data sources confirmed.** 1.0 ships on the labeled mock WHOOP source and stub
+      calendar — the same honest decision as Android 1.0 — plus the on-device WHOOP CSV import
+      (Connections → "Import WHOOP export (.csv)"), which replaces the sample series with the
+      user's own exported data, parsed and stored entirely on-device. The UI must label sample
+      data plainly (and drop the label once real data is imported), and the app must make
+      **zero network requests** (verify with Xcode's network instrument or a proxy, and include
+      one CSV import in that airplane-mode/zero-network verification). Do not enable live OAuth
+      integrations until §6 completes.
 - [ ] **No secrets tracked.** Same rule as the repo root: only `.env.example` placeholders may be
       committed. `git ls-files | grep -iE '\.env$|\.env\.local|\.p8|\.p12|\.mobileprovision'`
       must come back empty.
@@ -174,11 +178,15 @@ Skip for the 1.0 sample-data release, but start the clocks now; both lead times 
 
   • No login, no demo account needed. The app ships in a clearly labeled SAMPLE DATA mode:
     a built-in mock data source provides realistic recovery/sleep/HRV values so every screen
-    and flow (daily plan, check-off, snooze, reschedule, trends, privacy controls) can be
-    exercised with zero credentials and zero network access.
-  • Live WHOOP and Google Calendar connections are opt-in, user-initiated OAuth flows planned
-    for a later release; in this build the connections screen demonstrates the consent UX
-    against the sample source.
+    and flow (daily plan, check-off, snooze, reschedule, privacy controls) can be exercised
+    with zero credentials and zero network access.
+  • Optionally, the user can import their own WHOOP data using WHOOP's official CSV Data
+    Export (Connections → "Import WHOOP export (.csv)"). The import is parsed entirely
+    on-device, stored with iOS complete file protection, excluded from iCloud backup,
+    deletable in-app, and never transmitted anywhere — the app still makes zero network
+    requests, so App Privacy remains "Data Not Collected" (nothing leaves the device).
+    Live WHOOP and Google Calendar OAuth connections remain disabled in this build; the
+    connections screen demonstrates the consent UX.
   • Health posture (Guideline 5.1.3): Spartan is a consumer wellness app. It provides
     fitness/wellness guidance only — no medical advice, no diagnosis, no treatment claims;
     a rules-based safety filter over all generated coaching copy enforces this. Concerning

@@ -2,14 +2,20 @@
 //
 // Faithful port of the Android MainViewModel daily check-in slice
 // (app/src/main/java/com/spartan/ui/screens/MainViewModel.kt) + DailyPlanSync:
-//   MockWhoopClient -> ReadinessSnapshot.from -> CoachingEngine.buildPlan,
-//   seed-once persistence (user state is never overwritten by a regenerate),
+//   LocalFirstWhoopClient (imported CSV data first, sample data fallback) ->
+//   ReadinessSnapshot.from -> CoachingEngine.buildPlan,
+//   seed-once persistence (user state is never overwritten by a regenerate; a WHOOP CSV
+//   import force-reseeds pending items while keeping completed ones),
 //   complete / uncomplete / snooze(60m) / skip / schedule actions, and
 //   quiet-hours-aware local notifications (22:00–07:00, mirroring ReminderEngine.isQuietHours).
 //
+// Privacy: both JSON stores hold health-derived data, so writes use complete file
+// protection and the store directory is excluded from iCloud backup (guideline 5.1.3)
+// via SpartanSecureFile — see WhoopImportStore.swift.
+//
 // Honest status: source-complete; awaits an Xcode compile pass (no iOS SDK on the
-// authoring machine). SpartanKit value types are assumed to mirror the Kotlin domain
-// 1:1 (Int64 for Kotlin Long, var properties on structs).
+// authoring machine). Epoch days, epoch minutes, and epoch millis are `Int` throughout,
+// matching SpartanKit's actual value types (Int is 64-bit on all supported devices).
 
 import Foundation
 import UserNotifications
@@ -33,6 +39,7 @@ public final class PlanStore {
     public init(directory: URL? = nil) {
         let dir = directory ?? PlanStore.defaultDirectory()
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        SpartanSecureFile.excludeFromBackup(dir)
         fileURL = dir.appendingPathComponent("plan-store.json")
         if let data = try? Data(contentsOf: fileURL),
            let loaded = try? JSONDecoder().decode(State.self, from: data) {
@@ -40,19 +47,29 @@ public final class PlanStore {
         }
     }
 
-    public func activities(forDay day: Int64) -> [DailyActivity] {
+    public func activities(forDay day: Int) -> [DailyActivity] {
         state.days[String(day)] ?? []
     }
 
     /// Seed-once: only writes when the day has no activities yet.
-    public func seedIfNeeded(day: Int64, activities: [DailyActivity]) {
+    public func seedIfNeeded(day: Int, activities: [DailyActivity]) {
         guard (state.days[String(day)] ?? []).isEmpty else { return }
         state.days[String(day)] = activities
         persist()
     }
 
+    /// Force-reseed after the data source changed (CSV import, disconnect): completed
+    /// activities are kept, everything pending is replaced by the fresh plan
+    /// (HealthRepository.reseedDailyPlan — delete non-completed + insert-if-absent).
+    public func reseed(day: Int, activities: [DailyActivity]) {
+        let kept = (state.days[String(day)] ?? []).filter { $0.status == .done }
+        let keptIds = Set(kept.map { $0.id })
+        state.days[String(day)] = kept + activities.filter { !keptIds.contains($0.id) }
+        persist()
+    }
+
     /// Replaces the stored list for a day (used after a status update).
-    public func replace(day: Int64, activities: [DailyActivity]) {
+    public func replace(day: Int, activities: [DailyActivity]) {
         state.days[String(day)] = activities
         persist()
     }
@@ -66,7 +83,7 @@ public final class PlanStore {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         if let data = try? encoder.encode(state) {
-            try? data.write(to: fileURL, options: .atomic)
+            SpartanSecureFile.writeProtected(data, to: fileURL)
         }
     }
 
@@ -98,6 +115,7 @@ public final class SettingsStore {
     public init(directory: URL? = nil) {
         let dir = directory ?? PlanStore.defaultDirectory()
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        SpartanSecureFile.excludeFromBackup(dir)
         fileURL = dir.appendingPathComponent("settings.json")
         if let data = try? Data(contentsOf: fileURL),
            let loaded = try? JSONDecoder().decode(SpartanSettings.self, from: data) {
@@ -108,7 +126,7 @@ public final class SettingsStore {
     public func update(_ mutate: (inout SpartanSettings) -> Void) {
         mutate(&settings)
         if let data = try? JSONEncoder().encode(settings) {
-            try? data.write(to: fileURL, options: .atomic)
+            SpartanSecureFile.writeProtected(data, to: fileURL)
         }
     }
 
@@ -116,6 +134,28 @@ public final class SettingsStore {
         settings = SpartanSettings()
         try? FileManager.default.removeItem(at: fileURL)
     }
+}
+
+// MARK: - WHOOP CSV import state (Android WhoopImportUiState / WhoopCsvImporter.Summary)
+
+/// What one WHOOP CSV import produced, rendered on the Connections screen.
+public struct WhoopImportSummary: Equatable {
+    public let days: Int
+    public let firstDayEpoch: Int
+    public let lastDayEpoch: Int
+    public let workouts: Int
+    public let journalDays: Int
+    public let recognizedFiles: [String]
+    public let skippedFiles: [String]
+}
+
+/// Progress + outcome of a WHOOP CSV import (nil when none this session).
+public struct WhoopImportUiState: Equatable {
+    public var inProgress: Bool = false
+    public var summary: WhoopImportSummary? = nil
+    public var failed: Bool = false
+    /// Files that WERE recognized when the import still failed (e.g. journal-only pick).
+    public var failedButRecognized: [String] = []
 }
 
 // MARK: - CheckInViewModel
@@ -136,20 +176,33 @@ public final class CheckInViewModel: ObservableObject {
     @Published public private(set) var calendarConnected: Bool = false
     @Published public private(set) var onboardingComplete: Bool = false
 
+    // WHOOP CSV import state (Connections screen result card).
+    @Published public private(set) var whoopImport: WhoopImportUiState?
+
     private let planStore: PlanStore
     private let settingsStore: SettingsStore
-    private let whoopClient = MockWhoopClient()
+    private let whoopImportStore: WhoopImportStore
+    /// Imported CSV data first, labeled sample data as the fallback — the same seam
+    /// DailyPlanSync uses on Android, so a CSV import changes the data without
+    /// touching the sync path.
+    private let whoopClient: WhoopClient
     private let coachingEngine = CoachingEngine()
     private let calendarClient = StubCalendarClient()
     private let availabilityService = AvailabilityService()
 
     /// Latest WHOOP snapshot, kept for the sleep-anchored scheduling window.
     private var latestSnapshot: WhoopSnapshot?
-    private var today: Int64 = CheckInViewModel.localEpochDay()
+    private var today: Int = CheckInViewModel.localEpochDay()
 
-    public init(planStore: PlanStore = PlanStore(), settingsStore: SettingsStore = SettingsStore()) {
+    public init(
+        planStore: PlanStore = PlanStore(),
+        settingsStore: SettingsStore = SettingsStore(),
+        whoopImportStore: WhoopImportStore = WhoopImportStore()
+    ) {
         self.planStore = planStore
         self.settingsStore = settingsStore
+        self.whoopImportStore = whoopImportStore
+        self.whoopClient = LocalFirstWhoopClient(delegate: MockWhoopClient(), store: whoopImportStore)
         let s = settingsStore.settings
         onboardingComplete = s.onboardingComplete
         whoopConnected = s.whoopConnected
@@ -158,25 +211,27 @@ public final class CheckInViewModel: ObservableObject {
     }
 
     /// LocalDate.now().toEpochDay() equivalent: calendar days since 1970-01-01 in local time.
-    static func localEpochDay(_ date: Date = Date(), calendar: Calendar = .current) -> Int64 {
+    static func localEpochDay(_ date: Date = Date(), calendar: Calendar = .current) -> Int {
         let offset = TimeInterval(calendar.timeZone.secondsFromGMT(for: date))
-        return Int64(((date.timeIntervalSince1970 + offset) / 86_400).rounded(.down))
+        return Int(((date.timeIntervalSince1970 + offset) / 86_400).rounded(.down))
     }
 
-    private static func nowMillis() -> Int64 {
-        Int64(Date().timeIntervalSince1970 * 1000)
+    private static func nowMillis() -> Int {
+        Int(Date().timeIntervalSince1970 * 1000)
     }
 
     // MARK: Daily sync (DailyPlanSync.sync equivalent)
 
-    /// Pull sample WHOOP data, build today's plan, and seed the store — never overwriting
-    /// user state on regenerate. A failed/empty fetch just sets `syncFailed`; it never
-    /// wipes the last-known plan.
-    public func loadToday() {
+    /// Pull WHOOP data (imported CSV data when any exists, sample data otherwise), build
+    /// today's plan, and seed the store — never overwriting user state on a regenerate.
+    /// `forceReseed` (after an import or disconnect) replaces the day's not-yet-completed
+    /// activities instead of keeping them, so the plan reflects the new data source.
+    /// A failed/empty fetch just sets `syncFailed`; it never wipes the last-known plan.
+    public func loadToday(forceReseed: Bool = false) {
         today = Self.localEpochDay()
         reactivateExpiredSnoozes()
 
-        let snapshots = (try? whoopClient.fetchRecentDays(days: 7)) ?? []
+        let snapshots = whoopClient.fetchRecentDays(days: 7)
         guard let todaySnapshot = snapshots.last else {
             syncFailed = true
             activities = planStore.activities(forDay: today)
@@ -188,7 +243,11 @@ public final class CheckInViewModel: ObservableObject {
         let readiness = ReadinessSnapshot.from(today: todaySnapshot, history: Array(snapshots.dropLast()))
         let plan = coachingEngine.buildPlan(readiness: readiness, options: CoachingOptions())
 
-        planStore.seedIfNeeded(day: today, activities: plan.activities)
+        if forceReseed {
+            planStore.reseed(day: today, activities: plan.activities)
+        } else {
+            planStore.seedIfNeeded(day: today, activities: plan.activities)
+        }
 
         activities = planStore.activities(forDay: today)
         planHeadline = plan.headline
@@ -228,12 +287,12 @@ public final class CheckInViewModel: ObservableObject {
     /// Snooze means "remind me later", so schedule the later (quiet hours permitting).
     public func snooze(_ id: String, minutes: Int = 60) {
         guard let activity = activities.first(where: { $0.id == id }) else { return }
-        let wakeAtMillis = Self.nowMillis() + Int64(minutes) * 60_000
+        let wakeAtMillis = Self.nowMillis() + minutes * 60_000
         updateActivityStatus(id: id, status: .snoozed, snoozedUntilMillis: wakeAtMillis)
         scheduleActivityReminder(
             activityId: id,
             title: "Back on: \(activity.title)",
-            body: "~\(activity.estimatedMinutes) min. \(activity.whyItMatters)",
+            body: "~\(activity.estimatedMinutes) min. Open Spartan for why this helps today.",
             triggerAtMillis: wakeAtMillis
         )
     }
@@ -253,15 +312,15 @@ public final class CheckInViewModel: ObservableObject {
         let rawEnd = (snap?.bedMinuteOfDay ?? (22 * 60)) - 60
         let endMinuteOfDay = min(max(rawEnd, startMinuteOfDay + 30), 23 * 60)
 
-        let dayStartEpochMinute = Int64(Calendar.current.startOfDay(for: Date()).timeIntervalSince1970) / 60
-        let start = dayStartEpochMinute + Int64(startMinuteOfDay)
-        let end = dayStartEpochMinute + Int64(endMinuteOfDay)
+        let dayStartEpochMinute = Int(Calendar.current.startOfDay(for: Date()).timeIntervalSince1970) / 60
+        let start = dayStartEpochMinute + startMinuteOfDay
+        let end = dayStartEpochMinute + endMinuteOfDay
 
-        let busy = (try? calendarClient.freeBusy(startEpochMinute: start, endEpochMinute: end)) ?? []
+        let busy = calendarClient.freeBusy(startEpochMinute: start, endEpochMinute: end)
         guard let slot = availabilityService.suggestSlot(
             activityMinutes: activity.estimatedMinutes,
-            dayStartEpochMinute: start,
-            dayEndEpochMinute: end,
+            dayStart: start,
+            dayEnd: end,
             busy: busy
         ) else { return }
 
@@ -269,11 +328,11 @@ public final class CheckInViewModel: ObservableObject {
         scheduleActivityReminder(
             activityId: id,
             title: "Time for: \(activity.title)",
-            body: "~\(activity.estimatedMinutes) min. \(activity.whyItMatters)",
+            body: "~\(activity.estimatedMinutes) min. Open Spartan for why this helps today.",
             triggerAtMillis: slot.startEpochMinute * 60_000
         )
         if calendarConnected {
-            _ = try? calendarClient.createEvent(
+            _ = calendarClient.createEvent(
                 title: activity.title,
                 startEpochMinute: slot.startEpochMinute,
                 durationMinutes: activity.estimatedMinutes
@@ -286,9 +345,9 @@ public final class CheckInViewModel: ObservableObject {
     private func updateActivityStatus(
         id: String,
         status: ActivityStatus,
-        completedAtMillis: Int64? = nil,
-        snoozedUntilMillis: Int64? = nil,
-        scheduledEpochMinute: Int64? = nil
+        completedAtMillis: Int? = nil,
+        snoozedUntilMillis: Int? = nil,
+        scheduledEpochMinute: Int? = nil
     ) {
         var updated = activities
         guard let index = updated.firstIndex(where: { $0.id == id }) else { return }
@@ -300,6 +359,66 @@ public final class CheckInViewModel: ObservableObject {
         planStore.replace(day: today, activities: updated)
     }
 
+    // MARK: WHOOP CSV import (MainViewModel.importWhoopCsv + WhoopCsvImporter.import)
+
+    /// Applies one WHOOP CSV import: persist the merged records, then rebuild today's plan
+    /// from the real data (completed check-ins are kept; pending sample-driven items are
+    /// replaced). The Connections screen does the file reading/parsing (security-scoped
+    /// URLs are a UI-layer concern) and hands the merged `WhoopImportData` here.
+    public func applyWhoopImport(_ data: WhoopImportData, recognizedFiles: [String], skippedFiles: [String]) {
+        if whoopImport?.inProgress == true { return } // one import at a time
+        whoopImport = WhoopImportUiState(inProgress: true)
+
+        // Nothing a plan can run on: journal-only picks are "recognized but unusable",
+        // everything else is "not a WHOOP export" (WhoopCsvImporter.ImportError).
+        guard !(data.cycles.isEmpty && data.workouts.isEmpty) else {
+            whoopImport = WhoopImportUiState(failed: true, failedButRecognized: recognizedFiles)
+            return
+        }
+
+        whoopImportStore.upsert(cycles: data.cycles, workouts: data.workouts)
+
+        // A force-reseed replaces today's pending activities; any one-shot reminders armed
+        // for their snoozed/rescheduled times must die with them.
+        cancelPendingActivityReminders()
+        loadToday(forceReseed: true)
+
+        // Consent records only what actually arrived; a workouts-only import doesn't flip
+        // the connection to CONNECTED because plans would still run on sample data.
+        if !data.cycles.isEmpty {
+            settingsStore.update { $0.whoopConnected = true }
+            whoopConnected = true
+        }
+
+        let days = data.cycles.map { $0.dateEpochDay } + data.workouts.map { $0.dateEpochDay }
+        whoopImport = WhoopImportUiState(summary: WhoopImportSummary(
+            days: data.cycles.count,
+            firstDayEpoch: days.min() ?? 0,
+            lastDayEpoch: days.max() ?? 0,
+            workouts: data.workouts.count,
+            journalDays: data.cycles.filter {
+                $0.journalCaffeine != nil || $0.journalAlcohol != nil || $0.journalLateMeal != nil
+            }.count,
+            recognizedFiles: recognizedFiles,
+            skippedFiles: skippedFiles
+        ))
+    }
+
+    public func dismissWhoopImportResult() {
+        whoopImport = nil
+    }
+
+    /// One-shot reminders armed for snoozed/rescheduled activities are removed before a
+    /// force-reseed, or they'd fire for items that no longer exist
+    /// (MainViewModel.cancelPendingActivityReminders).
+    private func cancelPendingActivityReminders() {
+        let identifiers = planStore.activities(forDay: today)
+            .filter { $0.status == .snoozed || $0.status == .rescheduled }
+            .map { "activity-\($0.id)" }
+        guard !identifiers.isEmpty else { return }
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: identifiers)
+    }
+
     // MARK: Consent (Connections screen)
 
     public func connectWhoop() {
@@ -307,9 +426,16 @@ public final class CheckInViewModel: ObservableObject {
         whoopConnected = true
     }
 
+    /// Disconnect stops the source: imported cycles/workouts are removed so the next sync
+    /// falls back to labeled sample data (LocalFirstWhoopClient reverts to its delegate),
+    /// and today's pending plan is rebuilt from that source. Mirrors
+    /// MainViewModel.disconnectWhoop + HealthRepository.clearImportedWhoopSource.
     public func disconnectWhoop() {
         settingsStore.update { $0.whoopConnected = false }
         whoopConnected = false
+        whoopImportStore.eraseAll()
+        cancelPendingActivityReminders()
+        loadToday(forceReseed: true)
     }
 
     public func connectCalendar() {
@@ -333,12 +459,17 @@ public final class CheckInViewModel: ObservableObject {
         onboardingComplete = true
     }
 
-    /// Deletes all locally stored data (plan history + settings) and cancels pending
-    /// notifications. Mirrors MainViewModel.deleteAllLocalData.
+    /// Deletes all locally stored data (plan history + settings + imported WHOOP data)
+    /// and clears notifications — pending AND already delivered, so no health-plan
+    /// reminder lingers in Notification Center after a delete-everything request.
+    /// Mirrors MainViewModel.deleteAllLocalData.
     public func deleteAllData() {
         UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
+        UNUserNotificationCenter.current().removeAllDeliveredNotifications()
         planStore.eraseAll()
         settingsStore.eraseAll()
+        whoopImportStore.eraseAll()
+        whoopImport = nil
         whoopConnected = false
         calendarConnected = false
         loadToday()
@@ -363,23 +494,43 @@ public final class CheckInViewModel: ObservableObject {
         return minuteOfDay >= quietStartMinuteOfDay || minuteOfDay < quietEndMinuteOfDay
     }
 
+    /// Notification category whose `hiddenPreviewsBodyPlaceholder` keeps redacted
+    /// lock-screen previews (Show Previews = When Unlocked/Never) to a neutral
+    /// "You have a reminder" instead of just the app name. Bodies themselves carry no
+    /// health-state text either, so Show Previews = Always is equally safe.
+    private static let reminderCategoryId = "spartan.reminder"
+    private static let registerReminderCategory: Void = {
+        let category = UNNotificationCategory(
+            identifier: reminderCategoryId,
+            actions: [],
+            intentIdentifiers: [],
+            hiddenPreviewsBodyPlaceholder: "You have a reminder",
+            options: []
+        )
+        UNUserNotificationCenter.current().setNotificationCategories([category])
+    }()
+
     /// One-shot local notification for an activity at `triggerAtMillis`. Skipped if the
     /// time has passed or falls in quiet hours; authorization is requested lazily on
     /// first use. Replaces any prior reminder for the same activity so re-scheduling
-    /// never spams (ReminderScheduler.scheduleActivityReminder).
-    private func scheduleActivityReminder(activityId: String, title: String, body: String, triggerAtMillis: Int64) {
+    /// never spams (ReminderScheduler.scheduleActivityReminder). The body is
+    /// deliberately generic — the whyItMatters rationale stays inside the app, one tap
+    /// away, and never on a lock screen.
+    private func scheduleActivityReminder(activityId: String, title: String, body: String, triggerAtMillis: Int) {
         guard triggerAtMillis > Self.nowMillis() else { return }
         let triggerDate = Date(timeIntervalSince1970: TimeInterval(triggerAtMillis) / 1000)
         let components = Calendar.current.dateComponents([.hour, .minute], from: triggerDate)
         let minuteOfDay = (components.hour ?? 0) * 60 + (components.minute ?? 0)
         guard !Self.isQuietHours(minuteOfDay: minuteOfDay) else { return }
 
+        _ = Self.registerReminderCategory
         let center = UNUserNotificationCenter.current()
         center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
             guard granted else { return }
             let content = UNMutableNotificationContent()
             content.title = title
             content.body = body
+            content.categoryIdentifier = Self.reminderCategoryId
             content.sound = .default
             let interval = max(1, triggerDate.timeIntervalSinceNow)
             let trigger = UNTimeIntervalNotificationTrigger(timeInterval: interval, repeats: false)

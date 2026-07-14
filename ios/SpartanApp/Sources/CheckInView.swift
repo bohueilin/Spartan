@@ -16,6 +16,11 @@ import SpartanKit
 struct CheckInView: View {
     @EnvironmentObject private var viewModel: CheckInViewModel
 
+    /// Switches the root TabView to the Connections tab (Android's onManageConnections):
+    /// the connect prompt routes there instead of flipping any state itself, so
+    /// connecting/importing always happens on the screen with the full consent copy.
+    let onManageConnections: () -> Void
+
     // Skeleton only while a first sync is genuinely in flight — a failed sync falls
     // through to the empty state + banner instead of looping the skeleton forever.
     private var loading: Bool {
@@ -40,7 +45,7 @@ struct CheckInView: View {
                         SafetyBanner(text: banner)
                     }
                     if !viewModel.whoopConnected {
-                        ConnectPrompt(isMock: viewModel.whoopIsMock)
+                        ConnectPrompt(isMock: viewModel.whoopIsMock, onManageConnections: onManageConnections)
                     }
                     SectionLabel(text: "TODAY'S PLAN")
                     if viewModel.activities.isEmpty {
@@ -340,6 +345,25 @@ private struct ActivityCard: View {
                     .foregroundColor(.spartanTertiary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            // Follow-along video for this activity, when the library has one. Opening is
+            // always user-initiated and leaves the app (checkin_follow_along_video copy:
+            // "Follow along: %1$s (%2$d min)").
+            if let guide = VideoLibrary.guideForActivity(activityId: activity.id),
+               let guideURL = URL(string: guide.url) {
+                Link(destination: guideURL) {
+                    HStack(spacing: SpartanSpacing.sm) {
+                        Image(systemName: "play.circle")
+                        Text("Follow along: \(guide.title) (\(guide.minutes) min)")
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
+                    .frame(minHeight: 48)
+                }
+                .font(.subheadline)
+                .foregroundColor(.spartanAccent)
+                .padding(.top, SpartanSpacing.xs)
+                .accessibilityLabel("Follow along: \(guide.title), \(guide.minutes) minutes")
+            }
             Button {
                 onSchedule(activity.id)
             } label: {
@@ -443,9 +467,12 @@ private struct SafetyBanner: View {
     }
 }
 
+/// Routes to the Connections tab rather than acting itself (Android CheckInScreen
+/// ConnectPrompt parity): no real-data promise is made here — the copy points at the
+/// CSV import, the honest real-data path this build actually ships.
 private struct ConnectPrompt: View {
-    @EnvironmentObject private var viewModel: CheckInViewModel
     let isMock: Bool
+    let onManageConnections: () -> Void
 
     var body: some View {
         HStack(alignment: .center) {
@@ -454,17 +481,18 @@ private struct ConnectPrompt: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundColor(.spartanOnSurface)
                 Text(isMock
-                    ? "You're viewing sample data. Connect to personalize your plan with your real recovery, sleep, and strain."
+                    ? "You're viewing sample data. Import your WHOOP export (.csv) in Connections to run on your real recovery, sleep, and strain."
                     : "Connect WHOOP to personalize your plan.")
                     .font(.caption)
                     .foregroundColor(.spartanOnSurfaceVariant)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
-            Button("Connect") { viewModel.connectWhoop() }
+            Button("Connect") { onManageConnections() }
                 .font(.subheadline.weight(.semibold))
                 .foregroundColor(.spartanAccent)
                 .frame(minHeight: 48)
+                .accessibilityHint("Opens the Connections tab")
         }
         .padding(SpartanSpacing.lg)
         .background(
@@ -560,6 +588,6 @@ private let spartanClockFormatter: DateFormatter = {
     return formatter
 }()
 
-private func clockTime(fromMillis millis: Int64) -> String {
+private func clockTime(fromMillis millis: Int) -> String {
     spartanClockFormatter.string(from: Date(timeIntervalSince1970: TimeInterval(millis) / 1000))
 }
