@@ -52,6 +52,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -148,8 +149,49 @@ fun MetricsScreen(state: MainUiState, onAdd: () -> Unit, onMetricClick: (MetricT
                 IconButton(onClick = onAdd) { Icon(Icons.Outlined.Add, contentDescription = stringResource(R.string.metrics_add_metric)) }
             }
         }
+        state.whoopImportInfo?.let { info -> item { WhoopImportBanner(info) } }
         items(state.insights.take(2)) { InsightCardView(it) }
         items(state.assessments) { MetricRow(it, onMetricClick) }
+    }
+}
+
+/**
+ * Persistent "your real WHOOP data is in" banner at the top of the Metrics tab — the same message
+ * the Connections import success card shows, kept visible so the numbers below always carry their
+ * provenance and date span. Accent-tinted so it reads as a positive state, not a warning.
+ */
+@Composable
+private fun WhoopImportBanner(info: WhoopImportInfo) {
+    val fmt = remember { java.time.format.DateTimeFormatter.ofPattern("MMM d") }
+    val range = "${fmt.format(java.time.LocalDate.ofEpochDay(info.firstDayEpoch))} – " +
+        fmt.format(java.time.LocalDate.ofEpochDay(info.lastDayEpoch))
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                Icons.Outlined.Download,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(26.dp),
+            )
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    stringResource(R.string.metrics_import_banner_title),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Text(
+                    stringResource(R.string.metrics_import_banner_body, info.days, range),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
 }
 

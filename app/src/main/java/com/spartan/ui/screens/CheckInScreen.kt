@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.TrendingUp
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.PlayCircle
@@ -42,8 +43,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -64,17 +67,23 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.spartan.R
+import com.spartan.domain.engine.MetricBenefits
+import com.spartan.domain.engine.PlanClock
+import com.spartan.domain.engine.PlanUrgency
 import com.spartan.domain.engine.VideoLibrary
 import com.spartan.domain.model.ActivityCategory
 import com.spartan.domain.model.ActivityPriority
 import com.spartan.domain.model.ActivityStatus
 import com.spartan.domain.model.DailyActivity
+import com.spartan.domain.model.MetricType
 import com.spartan.ui.theme.Motion
 import com.spartan.ui.theme.Radius
 import com.spartan.ui.theme.Spacing
 import com.spartan.ui.theme.bandColor
 import com.spartan.ui.theme.bandLabel
+import com.spartan.ui.theme.planUrgencyColor
 import java.time.Instant
+import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
@@ -94,7 +103,16 @@ fun CheckInScreen(
     onManageConnections: () -> Unit,
     onLogExercise: (DailyActivity, Int, Int, Boolean) -> Unit = { _, _, _, _ -> },
     onOpenRecoveryExplainer: () -> Unit = {},
+    onOpenMetric: (MetricType) -> Unit = {},
 ) {
+    // Device-local minute of day, re-read each minute so an untouched plan escalates to amber at
+    // noon and red after 6pm live, without the user having to reopen the screen.
+    val nowMinuteOfDay by produceState(initialValue = LocalTime.now().let { it.hour * 60 + it.minute }) {
+        while (true) {
+            LocalTime.now().let { value = it.hour * 60 + it.minute }
+            delay(60_000)
+        }
+    }
     // Checking off a training activity opens a 5-second debrief (minutes/effort/pain) that feeds
     // the adaptive rules — dismissible with one tap, never required.
     var debriefFor by remember { mutableStateOf<DailyActivity?>(null) }
@@ -137,7 +155,7 @@ fun CheckInScreen(
                     compareBy({ it.priority.ordinal }, { it.bestTimeOfDay.ordinal }),
                 )
                 items(ordered, key = { it.id }) { activity ->
-                    ActivityCard(activity, completeWithDebrief, onUncomplete, onSnooze, onSkip, onSchedule)
+                    ActivityCard(activity, nowMinuteOfDay, completeWithDebrief, onUncomplete, onSnooze, onSkip, onSchedule, onOpenMetric)
                 }
             }
         }
@@ -252,23 +270,32 @@ private fun PlanProgress(state: MainUiState) {
 @Composable
 private fun ActivityCard(
     activity: DailyActivity,
+    nowMinuteOfDay: Int,
     onComplete: (String) -> Unit,
     onUncomplete: (String) -> Unit,
     onSnooze: (String) -> Unit,
     onSkip: (String) -> Unit,
     onSchedule: (String) -> Unit,
+    onOpenMetric: (MetricType) -> Unit,
 ) {
     var expanded by remember(activity.id) { mutableStateOf(false) }
     var menuOpen by remember(activity.id) { mutableStateOf(false) }
     val done = activity.status == ActivityStatus.DONE
     val dimmed = done || activity.status == ActivityStatus.SKIPPED
-    val borderColor = if (activity.priority == ActivityPriority.REQUIRED)
-        MaterialTheme.colorScheme.primary.copy(alpha = 0.28f) else MaterialTheme.colorScheme.outline
+    val urgency = PlanClock.urgencyFor(activity.priority, activity.status, nowMinuteOfDay)
+    val urgencyColor = planUrgencyColor(urgency)
+    val borderColor = when {
+        // An incomplete plan item escalates its border as the day passes (amber, then red).
+        urgencyColor != null -> urgencyColor.copy(alpha = if (urgency == PlanUrgency.OVERDUE) 0.9f else 0.6f)
+        activity.priority == ActivityPriority.REQUIRED -> MaterialTheme.colorScheme.primary.copy(alpha = 0.28f)
+        else -> MaterialTheme.colorScheme.outline
+    }
+    val borderWidth = if (urgency == PlanUrgency.OVERDUE) 2.dp else 1.dp
 
     OutlinedCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(Radius.card),
-        border = androidx.compose.foundation.BorderStroke(1.dp, borderColor),
+        border = androidx.compose.foundation.BorderStroke(borderWidth, borderColor),
     ) {
         Column(
             Modifier
@@ -296,11 +323,17 @@ private fun ActivityCard(
                     Spacer(Modifier.height(Spacing.xs))
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                         PriorityChip(activity.priority)
+                        if (urgencyColor != null) UrgencyChip(urgency, urgencyColor)
                         Text(
                             stringResource(R.string.checkin_minutes_time_of_day, activity.estimatedMinutes, timeOfDayLabel(activity)),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                    }
+                    // What this activity improves — names the metric so "why am I doing this?" has
+                    // an answer at a glance, and taps through to that metric's detail + training.
+                    activity.relatedMetric?.let { metric ->
+                        ImprovesChip(metric, dimmed) { onOpenMetric(metric) }
                     }
                     StatusLine(activity)
                 }
@@ -319,6 +352,20 @@ private fun ActivityCard(
                 Spacer(Modifier.height(Spacing.md))
                 Label(stringResource(R.string.checkin_why_this_matters))
                 Text(activity.whyItMatters, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 2.dp))
+                activity.relatedMetric?.let { metric ->
+                    MetricBenefits.forMetric(metric)?.let { benefit ->
+                        Spacer(Modifier.height(Spacing.sm))
+                        Label(stringResource(R.string.checkin_what_improves))
+                        Text(
+                            stringResource(R.string.checkin_improves_detail, metric.label, benefit),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier
+                                .padding(top = 2.dp)
+                                .clickable(onClickLabel = stringResource(R.string.checkin_open_metric, metric.label)) { onOpenMetric(metric) },
+                        )
+                    }
+                }
                 if (activity.instructions.isNotEmpty()) {
                     Spacer(Modifier.height(Spacing.md))
                     Label(stringResource(R.string.checkin_steps))
@@ -400,6 +447,47 @@ private fun PriorityChip(priority: ActivityPriority) {
     }
     Surface(shape = RoundedCornerShape(Radius.chip), color = color.copy(alpha = 0.14f)) {
         Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = color, modifier = Modifier.padding(horizontal = Spacing.sm, vertical = 3.dp))
+    }
+}
+
+@Composable
+private fun UrgencyChip(urgency: PlanUrgency, color: Color) {
+    val label = when (urgency) {
+        PlanUrgency.OVERDUE -> stringResource(R.string.checkin_urgency_overdue)
+        PlanUrgency.DUE -> stringResource(R.string.checkin_urgency_due)
+        PlanUrgency.NONE -> return
+    }
+    Surface(shape = RoundedCornerShape(Radius.chip), color = color.copy(alpha = 0.18f)) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = color,
+            modifier = Modifier.padding(horizontal = Spacing.sm, vertical = 3.dp),
+        )
+    }
+}
+
+/** "IMPROVES RECOVERY" — a tappable pill that routes to the metric's detail + training. */
+@Composable
+private fun ImprovesChip(metric: MetricType, dimmed: Boolean, onClick: () -> Unit) {
+    val tint = if (dimmed) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary
+    val label = stringResource(R.string.checkin_improves_chip, metric.label)
+    Surface(
+        shape = RoundedCornerShape(Radius.chip),
+        color = tint.copy(alpha = 0.12f),
+        modifier = Modifier
+            .padding(top = Spacing.xs)
+            .clickable(onClickLabel = stringResource(R.string.checkin_open_metric, metric.label), onClick = onClick),
+    ) {
+        Row(
+            Modifier.padding(horizontal = Spacing.sm, vertical = 3.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.AutoMirrored.Outlined.TrendingUp, contentDescription = null, tint = tint, modifier = Modifier.size(14.dp))
+            Spacer(Modifier.width(Spacing.xs))
+            Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = tint)
+        }
     }
 }
 

@@ -271,14 +271,14 @@ class RuleBasedRecommendationSource(
 
     private fun hydration(day: Long): DailyActivity = activity(day, "hydration",
         "Hydration reminder", ActivityCategory.HYDRATION, ActivityPriority.OPTIONAL,
-        RuleIds.HYDRATION_BASELINE, null,
+        RuleIds.HYDRATION_BASELINE, MetricType.RECOVERY_SCORE,
         why = "Steady hydration supports recovery, HRV, and how you feel through the day.",
         steps = listOf("Drink a glass of water now.", "Keep water nearby and sip through the day."),
         minutes = 1, intensity = Intensity.REST, time = TimeOfDay.ANYTIME, note = null)
 
     private fun staleFallback(day: Long): DailyActivity = activity(day, "connect-whoop",
         "Ease in with a mobility flow", ActivityCategory.MOBILITY, ActivityPriority.RECOMMENDED,
-        RuleIds.STALE_DATA_FALLBACK, null,
+        RuleIds.STALE_DATA_FALLBACK, MetricType.RECOVERY_SCORE,
         why = "Today's WHOOP data isn't in yet. Here's a safe default while Spartan waits to personalize your plan.",
         steps = listOf("10 minutes of easy mobility.", "Connect or sync WHOOP for a tailored plan."),
         minutes = 10, intensity = Intensity.EASY, time = TimeOfDay.ANYTIME, note = null)

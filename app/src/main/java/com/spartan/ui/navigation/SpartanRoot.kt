@@ -123,6 +123,7 @@ fun SpartanRoot(
                     onManageConnections = { navController.navigate("connections") },
                     onLogExercise = viewModel::logExerciseDebrief,
                     onOpenRecoveryExplainer = { navController.navigate("detail/RECOVERY_SCORE") },
+                    onOpenMetric = { navController.navigate("detail/${it.name}") },
                 )
             }
             composable("metrics") {

@@ -12,6 +12,12 @@
     <string name="checkin_empty_plan">Nothing scheduled yet. Connect WHOOP or pull the latest data to generate today\'s plan.</string>
     <string name="checkin_expand_activity">Expand %1$s</string>
     <string name="checkin_find_time">Find a time</string>
+    <string name="checkin_improves_chip">Improves %1$s</string>
+    <string name="checkin_improves_detail">%1$s — improves %2$s. Tap to track it.</string>
+    <string name="checkin_open_metric">Open %1$s details</string>
+    <string name="checkin_urgency_due">Due today</string>
+    <string name="checkin_urgency_overdue">Overdue</string>
+    <string name="checkin_what_improves">WHAT THIS IMPROVES</string>
     <string name="checkin_follow_along_video">Follow along: %1$s (%2$d min)</string>
     <string name="checkin_footer_disclaimer">Spartan offers wellness and fitness guidance, not medical advice. For any health concern, contact a qualified clinician.</string>
     <string name="checkin_minutes_time_of_day">~%1$d min · %2$s</string>
@@ -90,6 +96,8 @@
 
     <!-- Metrics -->
     <string name="metrics_add_entry">Add entry</string>
+    <string name="metrics_import_banner_body">%1$d days imported · %2$s · everything below is your data</string>
+    <string name="metrics_import_banner_title">Your WHOOP data is in</string>
     <string name="metrics_add_metric">Add metric</string>
     <string name="metrics_edit_entry">Edit entry</string>
     <string name="metrics_edit_metric">Edit metric</string>

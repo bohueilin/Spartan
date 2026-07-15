@@ -17,6 +17,7 @@ import com.spartan.data.local.IntegrationProvider
 import com.spartan.data.local.MetricEntryEntity
 import com.spartan.data.local.PlanWorkoutOverrideEntity
 import com.spartan.data.local.PreferencesStore
+import com.spartan.data.local.WhoopCycleDao
 import com.spartan.data.local.ReminderEntity
 import com.spartan.data.local.ReminderFrequency
 import com.spartan.data.local.TargetEntity
@@ -95,6 +96,15 @@ data class MainUiState(
     val projections: List<MetricProjection> = emptyList(),
     /** State of an in-flight or finished WHOOP CSV import (null when none this session). */
     val whoopImport: WhoopImportUiState? = null,
+    /** Persistent summary of imported WHOOP data, for the Metrics-tab banner (null when none). */
+    val whoopImportInfo: WhoopImportInfo? = null,
+)
+
+/** Persistent "your WHOOP data is in" summary derived from the imported cycle table. */
+data class WhoopImportInfo(
+    val days: Int,
+    val firstDayEpoch: Long,
+    val lastDayEpoch: Long,
 )
 
 /** Progress + outcome of a WHOOP CSV import, rendered on the Connections screen. */
@@ -117,6 +127,7 @@ private data class HealthBundle(
     val reminders: List<ReminderEntity>,
     val exportText: String,
     val planOverrides: List<PlanWorkoutOverrideEntity> = emptyList(),
+    val whoopImportInfo: WhoopImportInfo? = null,
 )
 
 private data class CheckInBundle(
@@ -144,6 +155,7 @@ class MainViewModel @Inject constructor(
     private val whoopAuthManager: WhoopAuthManager,
     private val calendarAuthManager: CalendarAuthManager,
     private val whoopCsvImporter: WhoopCsvImporter,
+    private val whoopCycleDao: WhoopCycleDao,
     @param:ApplicationContext private val appContext: Context,
 ) : ViewModel() {
     private val today = LocalDate.now().toEpochDay()
@@ -154,6 +166,12 @@ class MainViewModel @Inject constructor(
     private val syncFailed = MutableStateFlow(false)
     private val reviewRequested = MutableStateFlow(false)
     private val whoopImportState = MutableStateFlow<WhoopImportUiState?>(null)
+
+    /** Persistent imported-data summary for the Metrics banner; null when nothing is imported. */
+    private val whoopImportInfoFlow = whoopCycleDao.observeImportInfo().map { row ->
+        if (row.dayCount == 0 || row.firstDay == null || row.lastDay == null) null
+        else WhoopImportInfo(days = row.dayCount, firstDayEpoch = row.firstDay, lastDayEpoch = row.lastDay)
+    }
 
     /** Transient signals folded into one flow (combine caps at five inputs). */
     private val transientFlags = combine(syncFailed, reviewRequested, whoopImportState) { s, r, i ->
@@ -206,9 +224,10 @@ class MainViewModel @Inject constructor(
             exportText = LocalExportFormatter.format(profile, metrics, targets, workouts, reminders = reminders),
         )
     }.let { baseFlow ->
-        combine(baseFlow, repository.planOverrides) { base, overrides ->
+        combine(baseFlow, repository.planOverrides, whoopImportInfoFlow) { base, overrides, importInfo ->
             base.copy(
                 planOverrides = overrides,
+                whoopImportInfo = importInfo,
                 exportText = LocalExportFormatter.format(
                     profile = base.profile,
                     metrics = base.rawMetrics,
@@ -285,6 +304,7 @@ class MainViewModel @Inject constructor(
             consistencyDays7 = checkIn.consistencyDays7,
             requestReview = reviewWanted,
             whoopImport = whoopImport,
+            whoopImportInfo = health.whoopImportInfo,
             projections = projectionEngine.project(
                 restingHeartRate = checkIn.readiness?.restingHeartRate
                     ?: latestValue(health.readings, MetricType.RESTING_HEART_RATE),
