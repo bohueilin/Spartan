@@ -108,6 +108,13 @@ run("video.clinicianFirstNoTraining") { video.testClinicianFirstMetricsGetNoTrai
 run("video.coachedMetricsHaveTraining") { video.testWhoopMetricsTheAppCoachesOnAllHaveTraining() }; testCount += 1
 run("video.trainingSlugsHaveVideos") { video.testEveryTrainingActivityTheEngineGeneratesHasAVideoAndSafetyItemsDoNot() }; testCount += 1
 run("video.durationsMatchEstimates") { try video.testActivityVideoDurationsRoughlyMatchTheActivityEstimate() }; testCount += 1
+run("video.everyGuideApprovedChannel") { video.testEveryGuideIsFromAnApprovedChannel() }; testCount += 1
+run("video.noProfileKeepsCuratedOrder") { try video.testRecommendWithNoProfileKeepsCuratedOrder() }; testCount += 1
+run("video.olderAdultGentleAndCaps") { try video.testRecommendForOlderAdultLeadsWithBeginnerAppendsGentleIntroAndCaps() }; testCount += 1
+run("video.offTargetReranksGentle") { try video.testRecommendForOffTargetMetricReranksGentleEvenWhenAgeUnknown() }; testCount += 1
+run("video.gentleDropsIntermediateStrength") { video.testGentleRankingDropsTheIntermediateStrengthProgression() }; testCount += 1
+run("video.strengthActivityAgeAware") { try video.testGuideForActivityPicksGentlerStrengthForOlderAdults() }; testCount += 1
+run("video.recommendCapsAtThree") { video.testRecommendCapsAtThreeGuides() }; testCount += 1
 
 print("\n\(testCount) tests, \(shimAssertionCount) assertions, \(shimFailureCount) failures")
 if shimFailureCount > 0 {
