@@ -130,8 +130,8 @@ dependencies {
     implementation("androidx.security:security-crypto:1.1.0-alpha06") // Keystore-backed EncryptedSharedPreferences
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("com.squareup.retrofit2:retrofit:2.11.0")
-    implementation("com.squareup.retrofit2:converter-kotlinx-serialization:2.11.0")
+    implementation("com.squareup.retrofit2:retrofit:3.0.0")
+    implementation("com.squareup.retrofit2:converter-kotlinx-serialization:3.0.0")
     implementation("net.openid:appauth:0.11.1") // OAuth 2.0 authorization-code + PKCE
 
     ksp("androidx.room:room-compiler:2.6.1")
