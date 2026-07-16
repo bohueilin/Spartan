@@ -120,7 +120,7 @@ dependencies {
     implementation("androidx.navigation:navigation-compose:2.8.5")
     implementation("androidx.room:room-ktx:2.6.1")
     implementation("androidx.work:work-runtime-ktx:2.10.0")
-    implementation("com.google.dagger:hilt-android:2.52")
+    implementation("com.google.dagger:hilt-android:2.60.1")
     implementation("androidx.hilt:hilt-work:1.2.0") // @HiltWorker for DailyPlanRefreshWorker
     implementation("com.google.android.play:review-ktx:2.0.2") // in-app review prompt
     implementation("androidx.health.connect:connect-client:1.1.0-alpha07") // HC adapter (flag-gated off)
@@ -135,7 +135,7 @@ dependencies {
     implementation("net.openid:appauth:0.11.1") // OAuth 2.0 authorization-code + PKCE
 
     ksp("androidx.room:room-compiler:2.6.1")
-    ksp("com.google.dagger:hilt-android-compiler:2.52")
+    ksp("com.google.dagger:hilt-android-compiler:2.60.1")
     ksp("androidx.hilt:hilt-compiler:1.2.0")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
