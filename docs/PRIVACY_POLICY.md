@@ -37,6 +37,12 @@ Spartan talks to exactly two external services, and only if you connect them:
 
 In both cases, data flows directly between your device and the provider over TLS-encrypted connections. It does not pass through any Spartan server, because there isn't one.
 
+One more external touchpoint exists, and only when you tap it: training activities can offer an
+optional **follow-along video**. Tapping it opens the video in your browser or YouTube app —
+outside Spartan — so YouTube learns only that your device opened that public video, governed by
+[Google's privacy policy](https://policies.google.com/privacy). The link never contains any of
+your health data, and Spartan neither embeds nor plays videos inside the app.
+
 There are no other third parties. Spartan contains no analytics SDK, no telemetry, no crash-reporting service, and no advertising SDK.
 
 ## 5. Your controls
@@ -49,7 +55,7 @@ Because all data is local, deletion is immediate and complete. There is no serve
 
 ## 6. Notifications
 
-Reminders (daily check-in, pre-activity nudges, missed-activity follow-ups) are generated and scheduled entirely on your device. No push service, no remote content, no data sent anywhere. Notifications respect the quiet hours you configure, and each kind can be turned off independently.
+Reminders (daily check-in, pre-activity nudges, missed-activity follow-ups) are generated and scheduled entirely on your device. No push service, no remote content, no data sent anywhere. Reminders you create in Settings → Reminders are individually configurable (time, days, on/off), late-night quiet hours are built in, on the lock screen notifications show only a generic "You have a reminder" until you unlock, and Android's per-channel notification settings give you system-level control over everything the app can post.
 
 ## 7. Children
 
@@ -63,7 +69,12 @@ Spartan provides wellness and fitness guidance only. It is not medical advice, n
 
 If this policy changes, we will update the effective date at the top and note material changes in the app's release notes before they take effect. Continued use after a change means the updated policy applies.
 
-Questions or requests: **support@spartan.app** (placeholder address — replace with the real support contact before publishing this policy).
+Questions or requests: **support@spartan.app**
+
+> **🚫 SUBMISSION BLOCKER — do not publish this policy or submit to either store until this
+> placeholder is replaced with a real, monitored mailbox.** GDPR Art 13(1)(a) requires a working
+> controller contact, and both stores reject listings whose privacy-policy contact bounces. The
+> same address must be entered in Play Console and App Store Connect support fields.
 
 ## 10. Google Play Data safety mapping
 

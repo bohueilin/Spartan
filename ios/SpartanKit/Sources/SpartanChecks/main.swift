@@ -73,6 +73,49 @@ run("explainers.coverAllNine") { proj.testExplainersCoverAllNineMetrics() }; tes
 run("explainers.respClinicianNote") { try proj.testRespiratoryRateExplainerCarriesClinicianNote() }; testCount += 1
 run("explainers.allCopySafe") { proj.testEveryUserFacingStringPassesSafetyCheck() }; testCount += 1
 
+// --- CoachingGymTests (domain-specific reward eval over the scenario manifest) ---
+let gym = CoachingGymTests()
+run("gym.manifestLargeDeterministicCoversDifficulties") { gym.testManifestIsLargeDeterministicAndCoversEveryDifficulty() }; testCount += 1
+run("gym.shippedEngineClearsTheBar") { gym.testShippedRulesEngineClearsTheBar() }; testCount += 1
+run("gym.deterministic") { gym.testGymIsDeterministic() }; testCount += 1
+run("gym.recklessPolicyCrushed") { gym.testRecklessPolicyIsCrushedByTheGraders() }; testCount += 1
+run("gym.lazyPolicyLosesOnQuality") { gym.testLazyPolicyLosesOnQualityAndRedFlagsNotOnGenericSafety() }; testCount += 1
+run("gym.alignmentPenalizesForbiddenHard") { try gym.testAlignmentGraderDirectlyPenalizesForbiddenHardTraining() }; testCount += 1
+run("gym.overAlarmScoresPointSeven") { try gym.testSafetyGraderOverAlarmismScoresExactlyPointSevenThroughTheGrader() }; testCount += 1
+run("gym.rewardMathHardGate") { gym.testRewardMathWeightsSumToOneAndSafetyIsAHardGate() }; testCount += 1
+
+// --- WhoopCsvImportTests (WHOOP export parsing + per-day merge) ---
+let csv = WhoopCsvImportTests()
+run("csv.detectsAllFourKinds") { csv.testParseDetectsAllFourKinds() }; testCount += 1
+run("csv.unknownCsvReturnsNil") { csv.testParseUnknownCsvReturnsNil() }; testCount += 1
+run("csv.cyclesMapValuesMinutesToHours") { try csv.testCyclesMapValuesAndConvertMinutesToHours() }; testCount += 1
+run("csv.noSleepBlanksParseAsNil") { try csv.testCyclesNoSleepCycleBlanksParseAsNil() }; testCount += 1
+run("csv.dayIsWakeDate") { try csv.testCyclesDayIsTheDateTheUserWokeUp() }; testCount += 1
+run("csv.inProgressCycleParses") { try csv.testCyclesInProgressCycleWithoutEndTimeParses() }; testCount += 1
+run("csv.napColumnBothWays") { try csv.testSleepsNapColumnParsedBothWays() }; testCount += 1
+run("csv.workoutsZonesAndHeartRates") { try csv.testWorkoutsParseDurationsZonesAndHeartRates() }; testCount += 1
+run("csv.quotedJournalNote") { try csv.testJournalQuotedNoteWithCommaAndNewlineDoesNotBreakRows() }; testCount += 1
+run("csv.mergerJoinsPerDay") { try csv.testMergerJoinsSleepJournalAndCyclesPerDay() }; testCount += 1
+run("csv.mergerDedupesSameDay") { try csv.testMergerDedupesSameDayKeepingTheRicherRecord() }; testCount += 1
+run("csv.mergerSleepsOnlyDays") { try csv.testMergerSleepsWithoutCyclesStillProduceSleepDays() }; testCount += 1
+run("csv.mergerExerciseMinutes") { try csv.testMergerSumsExerciseMinutesPerDayAndDedupesWorkouts() }; testCount += 1
+
+// --- VideoLibraryTests (follow-along video catalog) ---
+let video = VideoLibraryTests()
+run("video.httpsWatchUrlsSaneDurations") { video.testEveryGuideHasHttpsYoutubeWatchUrlAndSaneDuration() }; testCount += 1
+run("video.copyPassesSafetyEngine") { try video.testAllCopyPassesTheSafetyEngine() }; testCount += 1
+run("video.clinicianFirstNoTraining") { video.testClinicianFirstMetricsGetNoTrainingBlock() }; testCount += 1
+run("video.coachedMetricsHaveTraining") { video.testWhoopMetricsTheAppCoachesOnAllHaveTraining() }; testCount += 1
+run("video.trainingSlugsHaveVideos") { video.testEveryTrainingActivityTheEngineGeneratesHasAVideoAndSafetyItemsDoNot() }; testCount += 1
+run("video.durationsMatchEstimates") { try video.testActivityVideoDurationsRoughlyMatchTheActivityEstimate() }; testCount += 1
+run("video.everyGuideApprovedChannel") { video.testEveryGuideIsFromAnApprovedChannel() }; testCount += 1
+run("video.noProfileKeepsCuratedOrder") { try video.testRecommendWithNoProfileKeepsCuratedOrder() }; testCount += 1
+run("video.olderAdultGentleAndCaps") { try video.testRecommendForOlderAdultLeadsWithBeginnerAppendsGentleIntroAndCaps() }; testCount += 1
+run("video.offTargetReranksGentle") { try video.testRecommendForOffTargetMetricReranksGentleEvenWhenAgeUnknown() }; testCount += 1
+run("video.gentleDropsIntermediateStrength") { video.testGentleRankingDropsTheIntermediateStrengthProgression() }; testCount += 1
+run("video.strengthActivityAgeAware") { try video.testGuideForActivityPicksGentlerStrengthForOlderAdults() }; testCount += 1
+run("video.recommendCapsAtThree") { video.testRecommendCapsAtThreeGuides() }; testCount += 1
+
 print("\n\(testCount) tests, \(shimAssertionCount) assertions, \(shimFailureCount) failures")
 if shimFailureCount > 0 {
     exit(1)

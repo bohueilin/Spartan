@@ -1,9 +1,14 @@
 package com.spartan.ui.navigation
 
+import android.content.Intent
+import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.util.Consumer
 import androidx.compose.material.icons.automirrored.outlined.EventNote
 import androidx.compose.material.icons.outlined.Assessment
 import androidx.compose.material.icons.outlined.FavoriteBorder
@@ -66,6 +71,16 @@ fun SpartanRoot(
     }
 
     val navController = rememberNavController()
+
+    // singleTop MainActivity: deep links that arrive while the app is alive come through
+    // onNewIntent, not composition — without this, notification/widget taps go nowhere.
+    val activity = LocalContext.current as? ComponentActivity
+    DisposableEffect(activity, navController) {
+        val listener = Consumer<Intent> { intent -> navController.handleDeepLink(intent) }
+        activity?.addOnNewIntentListener(listener)
+        onDispose { activity?.removeOnNewIntentListener(listener) }
+    }
+
     Scaffold(
         bottomBar = {
             val backStack by navController.currentBackStackEntryAsState()
@@ -108,6 +123,7 @@ fun SpartanRoot(
                     onManageConnections = { navController.navigate("connections") },
                     onLogExercise = viewModel::logExerciseDebrief,
                     onOpenRecoveryExplainer = { navController.navigate("detail/RECOVERY_SCORE") },
+                    onOpenMetric = { navController.navigate("detail/${it.name}") },
                 )
             }
             composable("metrics") {

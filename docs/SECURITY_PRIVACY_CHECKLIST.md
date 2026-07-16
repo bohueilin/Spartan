@@ -8,6 +8,10 @@ and [Spartan_PRD.md](Spartan_PRD.md) (HIPAA/privacy/security & safety sections).
 
 Legend: ✅ implemented · 🟡 partial / scaffolded · ⬜ planned (documented, not built)
 
+Regulatory analysis (HIPAA applicability, GDPR Art 9 basis + rights mapping, FTC HBNR, threat
+model, store-form consistency) lives in [COMPLIANCE.md](COMPLIANCE.md); this checklist stays the
+engineering-control view.
+
 ## Data classification & minimization
 - ✅ WHOOP metrics, coaching plans, calendar-derived availability, and check-ins are treated as sensitive PHI-like data.
 - ✅ Calendar reads are **free/busy only** — never event titles or contents (`calendar.freebusy`).

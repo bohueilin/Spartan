@@ -1,9 +1,21 @@
 # Try Spartan locally
 
-A step-by-step guide to running the Spartan Android app on your Mac so you can inspect the
-UI/UX. **No credentials, no accounts, no network setup** — the app ships in mock mode and runs
-entirely on clearly-labeled sample data. (The iOS port lives under `ios/`; this guide covers the
-Android app at the repo root.)
+A step-by-step guide to testing Spartan on your Mac. **No credentials, no accounts, no network
+setup** — the app ships in mock mode and runs entirely on clearly-labeled sample data (until you
+import your own WHOOP export).
+
+## Android vs iOS — what you can test today
+
+| | Android (repo root) | iOS (`ios/`) |
+| --- | --- | --- |
+| Full app UI | ✅ Emulator or device (Paths A–C below) | Needs one Xcode pass (see the iOS section) |
+| Shared coaching core (rules, safety, CSV parser, video library, CoachingGym) | ✅ `./gradlew :app:testDebugUnitTest` — 129 tests | ✅ `swift run SpartanChecks` — 67 checks, no Xcode needed |
+| Real WHOOP data via CSV import | ✅ In-app (Connections screen) | Domain layer ported; UI wiring lands with the Xcode pass |
+| Follow-along training videos | ✅ Activity cards + "Train this metric" | Library ported (9 verified videos); UI wiring pending |
+
+The two platforms share one coaching spec: the same rules, thresholds, safety engine, CSV
+parsing, video catalog, and the same CoachingGym reward bar (see `docs/COACH_GYM.md`). If a
+behavior differs between platforms, that's a bug — the dual test suites exist to catch it.
 
 ## What you'll see
 
@@ -16,7 +28,8 @@ sample WHOOP client, so the numbers are deterministic and safe to poke at.
 | --- | --- | --- |
 | Onboarding | First launch | Name + optional weight, tone of the medical disclaimer |
 | Daily check-in | Home tab | Readiness ring (42, "Take it easy"), activity cards, debrief sheet after checking off a training activity, snooze / skip / find-a-time overflow menu |
-| Metrics + detail | Metrics tab → tap a metric | Trend chart, "what is this / why it matters" explainer sections |
+| Metrics + detail | Metrics tab → tap a metric | Trend chart, "what is this / why it matters" explainers, **"Train this metric"** — guided video sessions, with an explicit callout when the reading is outside your range |
+| Follow-along videos | Expand any training activity card | "Follow along: …" opens a specific curated YouTube session matching the activity (e.g. the 35-min strength day links a 30-min beginner strength video) |
 | Review | Review tab | Weekly trends, consistency, "Where this can take you" projection card |
 | Connections | Settings → Connections | Consent UX, "Sample data" labels on WHOOP/Calendar, **Import WHOOP export (.csv)** |
 | Settings | Settings tab | About, privacy/export/delete sheet, debug-only Diagnostics |
@@ -49,8 +62,8 @@ Homebrew JDK on this path.
 2. **First-run setup wizard** — pick "Standard". Studio will either detect the existing SDK at
    `~/android-sdk` or install its own copy under `~/Library/Android/sdk`; both work. Let it finish
    downloading components.
-3. **Open the project** — *File → Open…* → select `/Users/bohueilin/Documents/GitHub/Spartan`
-   (the repo root, not `app/`). Wait for the Gradle sync to finish (first sync downloads
+3. **Open the project** — *File → Open…* → select the repo root
+   (not `app/`). Wait for the Gradle sync to finish (first sync downloads
    dependencies; a few minutes is normal).
    - If Studio uses its own SDK at a different path, it will offer to update `local.properties`
      — accept.
@@ -102,7 +115,7 @@ package and `sdkmanager` itself (`~/android-sdk` has no `cmdline-tools/`).
    can race when parallelized):
 
    ```bash
-   cd /Users/bohueilin/Documents/GitHub/Spartan
+   cd <repo root>
    ./gradlew --no-daemon :app:assembleDebug
    adb install -r app/build/outputs/apk/debug/app-debug.apk
    ```
@@ -130,6 +143,47 @@ package and `sdkmanager` itself (`~/android-sdk` has no `cmdline-tools/`).
 4. Notes: on Android 13+ the app asks for **notification permission** on first launch — the
    07:15/19:00 reminders and snooze wake-ups are silent if you decline. Real hardware is the best
    place to judge the widget and notification UX.
+
+## iOS: test the shared core now, the app with Xcode
+
+The entire coaching domain is a Swift package at `ios/SpartanKit` — same rules, same copy, same
+CSV parser, same video catalog, same CoachingGym as Android. It verifies on any Mac with just
+Command Line Tools (**no Xcode required**):
+
+```bash
+cd ios/SpartanKit
+swift build
+swift run SpartanChecks   # 67 checks · 30,000+ assertions · expect "ALL CHECKS PASSED"
+```
+
+`SpartanChecks` covers the coaching engine + 756-plan eval sweep, the safety engine, the WHOOP
+CSV parser/merger (`csv.*` checks), the video library (`video.*`), and the CoachingGym reward
+bar (`gym.*`). With full Xcode installed, `swift test` runs the identical suite via XCTest.
+
+To run the actual iOS app (SwiftUI shell in `ios/SpartanApp`), you need one Xcode pass:
+
+```bash
+brew install xcodegen
+cd ios/SpartanApp && xcodegen generate   # then open in Xcode → run on a simulator
+```
+
+The shell is source-complete but compile-unverified without Xcode — details and the App Store
+checklist live in `ios/README.md` and `ios/docs/IOS_RELEASE_CHECKLIST.md`. The CSV-import file
+picker and video buttons are Android-only UI today; their shared logic is already in SpartanKit,
+so the iOS wiring is thin SwiftUI work during that pass.
+
+## Coaching quality bar (both platforms)
+
+Beyond unit tests, the **CoachingGym** grades every generated plan on readiness alignment,
+hard-gated safety, and coaching quality across ~790 gold scenarios, and fails the build if the
+engine drops below its reward floor (see `docs/COACH_GYM.md`):
+
+```bash
+# Android
+./gradlew :app:testDebugUnitTest --tests "com.spartan.domain.CoachingGymTest"
+# iOS (included in SpartanChecks as the gym.* checks)
+cd ios/SpartanKit && swift run SpartanChecks
+```
 
 ## Inspecting and tweaking the UI
 
@@ -161,6 +215,8 @@ package and `sdkmanager` itself (`~/android-sdk` has no `cmdline-tools/`).
 - [ ] Snoozing an activity updates its status line ("Snoozed until HH:MM").
 - [ ] Review shows trend rows plus the **"Where this can take you"** projection card.
 - [ ] A metric detail screen shows its explainer sections below the chart.
+- [ ] Expanding a training activity shows a **"Follow along: …"** video button that opens YouTube.
+- [ ] A metric outside its range (e.g. resting HR above a target) shows the highlighted **"Train this metric"** callout with video session cards.
 - [ ] The next-activity widget (listed as **Spartan** in the widget picker) adds to the home screen and shows the top activity.
 - [ ] Tapping a notification deep-links into the app (Today screen).
 - [ ] Settings → privacy sheet → **Delete local data** wipes state and returns to onboarding.

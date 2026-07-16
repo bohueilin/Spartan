@@ -1,8 +1,12 @@
 package com.spartan.ui.screens
 
+import android.content.Context
 import android.net.Uri
+import androidx.glance.appwidget.updateAll
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.spartan.ui.widget.NextActivityWidget
+import dagger.hilt.android.qualifiers.ApplicationContext
 import com.spartan.data.calendar.AvailabilityService
 import com.spartan.data.calendar.CalendarAuthManager
 import com.spartan.data.calendar.CalendarClient
@@ -13,6 +17,7 @@ import com.spartan.data.local.IntegrationProvider
 import com.spartan.data.local.MetricEntryEntity
 import com.spartan.data.local.PlanWorkoutOverrideEntity
 import com.spartan.data.local.PreferencesStore
+import com.spartan.data.local.WhoopCycleDao
 import com.spartan.data.local.ReminderEntity
 import com.spartan.data.local.ReminderFrequency
 import com.spartan.data.local.TargetEntity
@@ -29,6 +34,8 @@ import com.spartan.domain.engine.MetricEngine
 import com.spartan.domain.engine.PlanEngine
 import com.spartan.domain.engine.ReviewEngine
 import com.spartan.domain.model.ActivityStatus
+import com.spartan.domain.model.ClinicalStatus
+import com.spartan.domain.model.TargetStatus
 import com.spartan.domain.model.DailyActivity
 import com.spartan.domain.model.DailyPlan
 import com.spartan.domain.model.InsightCard
@@ -66,6 +73,10 @@ data class MainUiState(
     val notificationDenied: Boolean = false,
     val notificationsAvailable: Boolean = false,
     val profile: UserProfileEntity? = null,
+    /** From the profile's birth year; tailors follow-along video picks to the user's age. */
+    val userAgeYears: Int? = null,
+    /** Metrics whose latest reading is outside its clinical range or personal target. */
+    val offTargetMetrics: Set<MetricType> = emptySet(),
     val readings: List<MetricReading> = emptyList(),
     val assessments: List<MetricAssessment> = emptyList(),
     val insights: List<InsightCard> = emptyList(),
@@ -91,6 +102,15 @@ data class MainUiState(
     val projections: List<MetricProjection> = emptyList(),
     /** State of an in-flight or finished WHOOP CSV import (null when none this session). */
     val whoopImport: WhoopImportUiState? = null,
+    /** Persistent summary of imported WHOOP data, for the Metrics-tab banner (null when none). */
+    val whoopImportInfo: WhoopImportInfo? = null,
+)
+
+/** Persistent "your WHOOP data is in" summary derived from the imported cycle table. */
+data class WhoopImportInfo(
+    val days: Int,
+    val firstDayEpoch: Long,
+    val lastDayEpoch: Long,
 )
 
 /** Progress + outcome of a WHOOP CSV import, rendered on the Connections screen. */
@@ -113,6 +133,7 @@ private data class HealthBundle(
     val reminders: List<ReminderEntity>,
     val exportText: String,
     val planOverrides: List<PlanWorkoutOverrideEntity> = emptyList(),
+    val whoopImportInfo: WhoopImportInfo? = null,
 )
 
 private data class CheckInBundle(
@@ -140,6 +161,8 @@ class MainViewModel @Inject constructor(
     private val whoopAuthManager: WhoopAuthManager,
     private val calendarAuthManager: CalendarAuthManager,
     private val whoopCsvImporter: WhoopCsvImporter,
+    private val whoopCycleDao: WhoopCycleDao,
+    @param:ApplicationContext private val appContext: Context,
 ) : ViewModel() {
     private val today = LocalDate.now().toEpochDay()
     private val projectionEngine = ProjectionEngine()
@@ -149,6 +172,12 @@ class MainViewModel @Inject constructor(
     private val syncFailed = MutableStateFlow(false)
     private val reviewRequested = MutableStateFlow(false)
     private val whoopImportState = MutableStateFlow<WhoopImportUiState?>(null)
+
+    /** Persistent imported-data summary for the Metrics banner; null when nothing is imported. */
+    private val whoopImportInfoFlow = whoopCycleDao.observeImportInfo().map { row ->
+        if (row.dayCount == 0 || row.firstDay == null || row.lastDay == null) null
+        else WhoopImportInfo(days = row.dayCount, firstDayEpoch = row.firstDay, lastDayEpoch = row.lastDay)
+    }
 
     /** Transient signals folded into one flow (combine caps at five inputs). */
     private val transientFlags = combine(syncFailed, reviewRequested, whoopImportState) { s, r, i ->
@@ -201,9 +230,10 @@ class MainViewModel @Inject constructor(
             exportText = LocalExportFormatter.format(profile, metrics, targets, workouts, reminders = reminders),
         )
     }.let { baseFlow ->
-        combine(baseFlow, repository.planOverrides) { base, overrides ->
+        combine(baseFlow, repository.planOverrides, whoopImportInfoFlow) { base, overrides, importInfo ->
             base.copy(
                 planOverrides = overrides,
+                whoopImportInfo = importInfo,
                 exportText = LocalExportFormatter.format(
                     profile = base.profile,
                     metrics = base.rawMetrics,
@@ -256,11 +286,17 @@ class MainViewModel @Inject constructor(
             .map { metricEngine.assess(it, targetMap[it.type]) }
         val plan = applyPlanOverrides(planEngine.defaultPlan(health.logs), health.planOverrides)
         val review = reviewEngine.summarize(health.readings, health.logs)
+        val offTarget = assessments.filter { a ->
+            a.clinicalStatus == ClinicalStatus.ABOVE_RANGE || a.clinicalStatus == ClinicalStatus.BELOW_RANGE ||
+                a.targetStatus == TargetStatus.ABOVE_PERSONAL_TARGET || a.targetStatus == TargetStatus.BELOW_PERSONAL_TARGET
+        }.map { it.reading.type }.toSet()
         MainUiState(
             onboardingComplete = onboardingComplete,
             notificationDenied = notificationDenied,
             notificationsAvailable = reminderScheduler.hasNotificationPermission(),
             profile = health.profile,
+            userAgeYears = health.profile?.birthYear?.let { java.time.Year.now().value - it }?.takeIf { it in 13..100 },
+            offTargetMetrics = offTarget,
             readings = health.readings,
             assessments = assessments,
             insights = insightEngine.generate(assessments),
@@ -280,6 +316,7 @@ class MainViewModel @Inject constructor(
             consistencyDays7 = checkIn.consistencyDays7,
             requestReview = reviewWanted,
             whoopImport = whoopImport,
+            whoopImportInfo = health.whoopImportInfo,
             projections = projectionEngine.project(
                 restingHeartRate = checkIn.readiness?.restingHeartRate
                     ?: latestValue(health.readings, MetricType.RESTING_HEART_RATE),
@@ -370,9 +407,14 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    fun completeOnboarding(name: String, heightCm: Double?) {
+    fun completeOnboarding(name: String, heightCm: Double?, ageYears: Int?) {
         viewModelScope.launch {
-            repository.upsertProfile(UserProfileEntity(displayName = name.ifBlank { "You" }, heightCm = heightCm))
+            // Store age as a birth year so it stays correct as time passes; used only to bias
+            // follow-along video picks toward age-appropriate, joint-friendly sessions.
+            val birthYear = ageYears?.let { java.time.Year.now().value - it }
+            repository.upsertProfile(
+                UserProfileEntity(displayName = name.ifBlank { "You" }, heightCm = heightCm, birthYear = birthYear),
+            )
             preferencesStore.setOnboardingComplete(true)
         }
     }
@@ -593,13 +635,18 @@ class MainViewModel @Inject constructor(
 
     fun deleteAllLocalData() {
         viewModelScope.launch {
-            reminderScheduler.cancelAll()
+            // Erasure-grade: disarm every scheduled job (or the plan-refresh worker would
+            // repopulate the emptied DB), purge WorkManager's own DB, dismiss shown notifications.
+            reminderScheduler.purgeAllForErasure()
             // Full deletion includes any OAuth tokens, per the privacy policy.
             whoopAuthManager.disconnect()
             calendarAuthManager.disconnect()
             repository.deleteAllLocalData()
             preferencesStore.clear()
             preferencesStore.setDemoSeedCompleted(true)
+            // The home-screen widget must not keep rendering the deleted plan; with the DB empty
+            // it falls back to its neutral state. Glance failure must never break erasure.
+            runCatching { NextActivityWidget().updateAll(appContext) }
         }
     }
 

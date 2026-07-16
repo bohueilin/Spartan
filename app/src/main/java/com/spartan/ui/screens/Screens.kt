@@ -52,6 +52,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -68,6 +69,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.spartan.R
 import com.spartan.data.local.ReminderFrequency
+import com.spartan.domain.engine.TrainingProfile
 import com.spartan.domain.engine.VideoLibrary
 import com.spartan.domain.model.ClinicalStatus
 import com.spartan.domain.model.InsightCard
@@ -81,9 +83,10 @@ import com.spartan.domain.model.WorkoutType
 import kotlin.math.roundToInt
 
 @Composable
-fun OnboardingScreen(onComplete: (String, Double?) -> Unit) {
+fun OnboardingScreen(onComplete: (String, Double?, Int?) -> Unit) {
     var name by rememberSaveable { mutableStateOf("") }
     var height by rememberSaveable { mutableStateOf("") }
+    var age by rememberSaveable { mutableStateOf("") }
     Column(
         // Rendered outside the Scaffold, so it handles its own edge-to-edge insets.
         modifier = Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(28.dp),
@@ -124,8 +127,18 @@ fun OnboardingScreen(onComplete: (String, Double?) -> Unit) {
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
+        Spacer(Modifier.height(12.dp))
+        // Optional: tailors follow-along video picks toward age-appropriate, joint-friendly sessions.
+        OutlinedTextField(
+            age,
+            { age = it.filter(Char::isDigit).take(3) },
+            label = { Text(stringResource(R.string.onboarding_age_label)) },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
         Button(
-            onClick = { onComplete(name, height.toDoubleOrNull()) },
+            onClick = { onComplete(name, height.toDoubleOrNull(), age.toIntOrNull()?.takeIf { it in 13..100 }) },
             modifier = Modifier.fillMaxWidth().height(52.dp).padding(top = 8.dp),
         ) {
             Text(stringResource(R.string.onboarding_begin), fontWeight = FontWeight.SemiBold)
@@ -148,8 +161,49 @@ fun MetricsScreen(state: MainUiState, onAdd: () -> Unit, onMetricClick: (MetricT
                 IconButton(onClick = onAdd) { Icon(Icons.Outlined.Add, contentDescription = stringResource(R.string.metrics_add_metric)) }
             }
         }
+        state.whoopImportInfo?.let { info -> item { WhoopImportBanner(info) } }
         items(state.insights.take(2)) { InsightCardView(it) }
         items(state.assessments) { MetricRow(it, onMetricClick) }
+    }
+}
+
+/**
+ * Persistent "your real WHOOP data is in" banner at the top of the Metrics tab — the same message
+ * the Connections import success card shows, kept visible so the numbers below always carry their
+ * provenance and date span. Accent-tinted so it reads as a positive state, not a warning.
+ */
+@Composable
+private fun WhoopImportBanner(info: WhoopImportInfo) {
+    val fmt = remember { java.time.format.DateTimeFormatter.ofPattern("MMM d") }
+    val range = "${fmt.format(java.time.LocalDate.ofEpochDay(info.firstDayEpoch))} – " +
+        fmt.format(java.time.LocalDate.ofEpochDay(info.lastDayEpoch))
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                Icons.Outlined.Download,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(26.dp),
+            )
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    stringResource(R.string.metrics_import_banner_title),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Text(
+                    stringResource(R.string.metrics_import_banner_body, info.days, range),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
 }
 
@@ -170,7 +224,11 @@ fun MetricDetailScreen(state: MainUiState, type: MetricType, onAdd: () -> Unit, 
         TrendCard(stringResource(R.string.metrics_history), history.mapNotNull { it.value })
         // Plain-language education for WHOOP metrics (renders nothing for lab metrics).
         MetricExplainerSection(type)
-        TrainThisMetricSection(type, assessment)
+        TrainThisMetricSection(
+            type = type,
+            assessment = assessment,
+            profile = TrainingProfile(ageYears = state.userAgeYears, offTargetMetrics = state.offTargetMetrics),
+        )
         Text(stringResource(R.string.metrics_entries), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         history.forEach {
             OutlinedCard(Modifier.fillMaxWidth()) {
@@ -191,8 +249,8 @@ fun MetricDetailScreen(state: MainUiState, type: MetricType, onAdd: () -> Unit, 
  * "here is what to actually do about it" answer, one tap from the number itself.
  */
 @Composable
-private fun TrainThisMetricSection(type: MetricType, assessment: MetricAssessment?) {
-    val training = VideoLibrary.trainingFor(type) ?: return
+private fun TrainThisMetricSection(type: MetricType, assessment: MetricAssessment?, profile: TrainingProfile) {
+    val training = VideoLibrary.recommend(type, profile) ?: return
     val offTarget = assessment != null && (
         assessment.clinicalStatus == ClinicalStatus.ABOVE_RANGE ||
             assessment.clinicalStatus == ClinicalStatus.BELOW_RANGE ||

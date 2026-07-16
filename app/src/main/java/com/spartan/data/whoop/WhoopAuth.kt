@@ -11,6 +11,7 @@ import net.openid.appauth.AuthorizationResponse
 import net.openid.appauth.AuthorizationService
 import net.openid.appauth.AuthorizationServiceConfiguration
 import net.openid.appauth.ClientSecretPost
+import net.openid.appauth.NoClientAuthentication
 import net.openid.appauth.ResponseTypeValues
 import net.openid.appauth.TokenRequest
 import kotlin.coroutines.resume
@@ -28,7 +29,9 @@ data class WhoopConfig(
     val apiBaseUrl: String,
     val scopes: List<String> = DEFAULT_SCOPES,
 ) {
-    val isConfigured: Boolean get() = clientId.isNotBlank() && clientSecret.isNotBlank()
+    // A client id alone is a valid (PKCE public-client) configuration; the secret is optional and
+    // never present in release builds — see the release block in app/build.gradle.kts.
+    val isConfigured: Boolean get() = clientId.isNotBlank()
 
     companion object {
         // Least privilege for the MVP. `read:body_measurement` is intentionally omitted.
@@ -90,7 +93,12 @@ class WhoopAuthManager(
     private suspend fun performTokenRequest(request: TokenRequest): Result<Unit> =
         suspendCancellableCoroutine { cont ->
             val service = AuthorizationService(context)
-            service.performTokenRequest(request, ClientSecretPost(config.clientSecret)) { resp, ex ->
+            // Public-client (PKCE-only) when no secret is compiled in — always the case in
+            // release builds, where shipping a client secret inside the APK is prohibited.
+            val clientAuth =
+                if (config.clientSecret.isBlank()) NoClientAuthentication.INSTANCE
+                else ClientSecretPost(config.clientSecret)
+            service.performTokenRequest(request, clientAuth) { resp, ex ->
                 service.dispose()
                 if (resp != null) {
                     resp.accessToken?.let { tokenStore.save(SecureTokenStore.WHOOP_ACCESS, it) }

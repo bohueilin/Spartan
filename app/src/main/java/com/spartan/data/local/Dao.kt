@@ -200,4 +200,18 @@ interface WhoopCycleDao {
 
     @Query("SELECT * FROM whoop_workouts ORDER BY dateEpochDay DESC, startMinuteOfDay DESC")
     fun observeWorkouts(): Flow<List<WhoopWorkoutEntity>>
+
+    /**
+     * Reactive summary of the imported cycles for the Metrics-tab banner: how many days and the
+     * date span. On an empty table COUNT is 0 and MIN/MAX are null, so the UI shows no banner.
+     */
+    @Query("SELECT COUNT(*) AS dayCount, MIN(dateEpochDay) AS firstDay, MAX(dateEpochDay) AS lastDay FROM whoop_cycles")
+    fun observeImportInfo(): Flow<WhoopImportInfoRow>
 }
+
+/** Aggregate row backing the Metrics-tab import banner (see [WhoopCycleDao.observeImportInfo]). */
+data class WhoopImportInfoRow(
+    val dayCount: Int,
+    val firstDay: Long?,
+    val lastDay: Long?,
+)

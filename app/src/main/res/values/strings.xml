@@ -12,6 +12,12 @@
     <string name="checkin_empty_plan">Nothing scheduled yet. Connect WHOOP or pull the latest data to generate today\'s plan.</string>
     <string name="checkin_expand_activity">Expand %1$s</string>
     <string name="checkin_find_time">Find a time</string>
+    <string name="checkin_improves_chip">Improves %1$s</string>
+    <string name="checkin_improves_detail">%1$s — improves %2$s. Tap to track it.</string>
+    <string name="checkin_open_metric">Open %1$s details</string>
+    <string name="checkin_urgency_due">Due today</string>
+    <string name="checkin_urgency_overdue">Overdue</string>
+    <string name="checkin_what_improves">WHAT THIS IMPROVES</string>
     <string name="checkin_follow_along_video">Follow along: %1$s (%2$d min)</string>
     <string name="checkin_footer_disclaimer">Spartan offers wellness and fitness guidance, not medical advice. For any health concern, contact a qualified clinician.</string>
     <string name="checkin_minutes_time_of_day">~%1$d min · %2$s</string>
@@ -43,6 +49,7 @@
 
     <!-- Common -->
     <string name="common_brand">SPARTAN</string>
+    <string name="notification_public_body">You have a reminder. Unlock to see it.</string>
     <string name="common_cancel">Cancel</string>
     <string name="common_pending">pending</string>
     <string name="common_save">Save</string>
@@ -69,7 +76,7 @@
     <string name="connections_import_success_body">Imported %1$d days of your real WHOOP data (%2$s) with %3$d workouts and %4$d journal days. Today\'s plan and your WHOOP metrics now run on your data instead of the sample series.</string>
     <string name="connections_import_success_title">Your WHOOP data is in</string>
     <string name="connections_import_whoop_csv">Import WHOOP export (.csv)</string>
-    <string name="connections_import_whoop_hint">No developer credentials needed: in the WHOOP app go to App Settings → Data Export, then pick the exported CSV files here. Your data stays on this device.</string>
+    <string name="connections_import_whoop_hint">No developer credentials needed: in the WHOOP app go to App Settings → Data Export, then pick the exported CSV files here. The import reads your recovery, sleep and wake times, strain, workouts, and journal answers (caffeine, alcohol, late meals) from those files. Your data stays on this device.</string>
     <string name="connections_intro">Spartan treats your health, activity, and calendar data as sensitive. Data stays on your device, is used only to build your plan, and is never sold or used for ads.</string>
     <string name="connections_phase_note">Phase note: without a connection Spartan runs on clearly-labeled sample data. Import your WHOOP CSV export for real data with no credentials, or connect the OAuth flows once WHOOP/Google credentials are configured. You can disconnect or delete your data anytime.</string>
     <string name="connections_privacy_button">Privacy, export &amp; delete data</string>
@@ -89,6 +96,8 @@
 
     <!-- Metrics -->
     <string name="metrics_add_entry">Add entry</string>
+    <string name="metrics_import_banner_body">%1$d days imported · %2$s · everything below is your data</string>
+    <string name="metrics_import_banner_title">Your WHOOP data is in</string>
     <string name="metrics_add_metric">Add metric</string>
     <string name="metrics_edit_entry">Edit entry</string>
     <string name="metrics_edit_metric">Edit metric</string>
@@ -113,6 +122,7 @@
     <!-- Onboarding -->
     <string name="onboarding_begin">Begin</string>
     <string name="onboarding_disclaimer">Wellness and fitness guidance, not medical advice. You control your data and can delete it anytime.</string>
+    <string name="onboarding_age_label">Age (optional — tailors video picks)</string>
     <string name="onboarding_height_label">Height in cm (optional)</string>
     <string name="onboarding_intro">Connect WHOOP and get one simple, disciplined plan each day to improve recovery, sleep, and fitness — with the reasons behind every action.</string>
     <string name="onboarding_name_label">What should we call you?</string>

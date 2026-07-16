@@ -2,6 +2,7 @@ package com.spartan.data
 
 import com.spartan.data.local.WhoopCycleDao
 import com.spartan.data.local.WhoopCycleEntity
+import com.spartan.data.local.WhoopImportInfoRow
 import com.spartan.data.local.WhoopWorkoutEntity
 import com.spartan.data.whoop.LocalFirstWhoopClient
 import com.spartan.data.whoop.MockWhoopClient
@@ -23,6 +24,13 @@ class LocalFirstWhoopClientTest {
             cycles.sortedByDescending { it.dateEpochDay }.take(limit)
         override suspend fun cycleCount(): Int = cycles.size
         override fun observeWorkouts(): Flow<List<WhoopWorkoutEntity>> = MutableStateFlow(emptyList())
+        override fun observeImportInfo(): Flow<WhoopImportInfoRow> = MutableStateFlow(
+            WhoopImportInfoRow(
+                dayCount = cycles.size,
+                firstDay = cycles.minOfOrNull { it.dateEpochDay },
+                lastDay = cycles.maxOfOrNull { it.dateEpochDay },
+            ),
+        )
     }
 
     private fun cycle(day: Long, recovery: Int) = WhoopCycleEntity(dateEpochDay = day, recoveryScore = recovery)

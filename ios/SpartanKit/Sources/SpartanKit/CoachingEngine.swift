@@ -87,6 +87,10 @@ public final class CoachingEngine {
     }
 
     /// REQUIRED first, then RECOMMENDED, then OPTIONAL; always keep required + clinician referral.
+    /// When the cap forces choices, prefer covering DISTINCT needs (one card per rule) before a
+    /// second card from a rule that's already represented — a stacked day (red flag + poor sleep +
+    /// low recovery) must not spend its whole budget on one rule and drop the wind-down.
+    /// (Caught by the CoachingGym's quality grader.)
     private func prioritizeAndCap(_ activities: [DailyActivity], maxActivities: Int) -> [DailyActivity] {
         var seenIds = Set<String>()
         var deduped: [DailyActivity] = []
@@ -98,9 +102,20 @@ public final class CoachingEngine {
             $0.priority == .required || $0.ruleId == RuleIds.clinicianReferral
         }
         let mustKeepIds = Set(mustKeep.map { $0.id })
-        let rest = ordered.filter { !mustKeepIds.contains($0.id) }
+        let optional = ordered.filter { !mustKeepIds.contains($0.id) }
         let room = max(maxActivities - mustKeep.count, 0)
-        return stableSortByPriority(mustKeep + Array(rest.prefix(room)))
+
+        var picked: [DailyActivity] = []
+        var coveredRules = Set(mustKeep.map { $0.ruleId })
+        for activity in optional { // first pass: unrepresented rules, in priority order
+            if picked.count == room { break }
+            if coveredRules.insert(activity.ruleId).inserted { picked.append(activity) }
+        }
+        for activity in optional { // second pass: fill remaining room, in priority order
+            if picked.count == room { break }
+            if !picked.contains(activity) { picked.append(activity) }
+        }
+        return stableSortByPriority(mustKeep + picked)
     }
 
     /// Stable sort by priority rank (Swift's `sorted` does not guarantee stability, Kotlin's does).
@@ -152,14 +167,20 @@ public final class RuleBasedRecommendationSource: RecommendationSource {
 
         if options.painFlag { out.append(painDeload(day)) }
 
-        switch readiness.band {
-        case .rest, .easy:
-            out.append(contentsOf: lowRecoveryBlock(readiness, day: day))
-        case .primed:
-            // A concerning vital suppresses hard training even on a primed day — safety over strain.
-            out.append(contentsOf: concerning ? balancedSession(readiness, day: day) : greenlight(readiness, day: day))
-        case .balanced:
-            out.append(contentsOf: balancedSession(readiness, day: day))
+        // On a pain day the deload IS the training guidance, and on a stale day the gentle
+        // fallback is — no band-based session on top of either. (Both caught by the CoachingGym:
+        // a primed pain day used to green-light hard strength next to "gentle, comfortable
+        // movement only", and a no-data day used to prescribe a moderate session anyway.)
+        if !options.painFlag && !readiness.isStale {
+            switch readiness.band {
+            case .rest, .easy:
+                out.append(contentsOf: lowRecoveryBlock(readiness, day: day))
+            case .primed:
+                // A concerning vital suppresses hard training even on a primed day — safety over strain.
+                out.append(contentsOf: concerning ? balancedSession(readiness, day: day) : greenlight(readiness, day: day))
+            case .balanced:
+                out.append(contentsOf: balancedSession(readiness, day: day))
+            }
         }
 
         if highStrainLowRecovery(readiness) { out.append(activeRecovery(day)) }

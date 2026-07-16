@@ -50,12 +50,14 @@ Every morning you get 2–4 concrete activities — mobility, zone 2 cardio, bre
 
 If you connect Google Calendar, Spartan looks only at your free/busy times — never event titles or contents — and suggests open gaps that fit each activity. Local reminders nudge at the right moment and respect your quiet hours.
 
-What Spartan reads from WHOOP (read-only, with your consent): recovery, sleep, strain, HRV, resting heart rate, and respiratory rate — through WHOOP's official sign-in.
+What Spartan reads from WHOOP (with your consent): recovery, sleep and wake times, strain, HRV, resting heart rate, respiratory rate, workouts, and your journal answers — imported from the official WHOOP data export (CSV) that every member can download. No sign-in, no developer account, no cloud.
 
-A note on this version: Spartan 1.0 runs on clearly labeled sample data, so you can explore the full experience with nothing connected and no account. Live WHOOP and Google Calendar sign-in is coming in an update and will always require your explicit consent through their official sign-in flows.
+A note on this version: Spartan starts on clearly labeled sample data so you can explore everything with nothing connected. Import your WHOOP export whenever you're ready and the whole app switches to your real data. Live WHOOP and Google Calendar sign-in is coming in an update and will always require your explicit consent through their official sign-in flows.
 
 Features
 • Recovery-adjusted daily plan (2–4 activities), rebuilt each morning
+• Import your WHOOP data export (CSV) — your real recovery, sleep, and strain, no sign-in needed
+• Follow-along training videos on activities and metrics (opens in YouTube)
 • Plain-language "why it matters" and step-by-step instructions on every card
 • One-tap done, snooze, skip, or reschedule — your progress is saved
 • Calendar-aware scheduling using free/busy gaps only
@@ -71,9 +73,13 @@ A WHOOP device and account are required for live data. WHOOP is a trademark of i
 Questions: support@spartan.app
 ```
 
+> **🚫 Before pasting:** replace `support@spartan.app` here, in the privacy policy, and in the
+> Play Console support field with the real monitored mailbox — it is still a placeholder.
+
 Copy rules honored: leads with the daily-plan value prop, sample-data honesty note included,
 not-medical-advice disclaimer included, privacy paragraph included, no user counts, no
 "doctor recommended", no compliance-certification claims, no exclamation marks.
+(~2,700 / 4,000 characters after the 1.1.0 update — re-count if edited.)
 
 ---
 
@@ -123,10 +129,13 @@ apps in Health & Fitness.
 
 - **Declared health feature category:** Health and fitness → wellness / fitness coaching
   (activity planning driven by wearable recovery metrics).
-- **Health Connect:** Spartan 1.0 does **not** use Health Connect — no Health Connect permissions
-  in the manifest, no `androidx.health.connect` dependency. Declare "does not integrate with
-  Health Connect". If Health Connect is added later, the declaration, data safety form, and
-  privacy policy must be updated before release.
+- **Health Connect:** Spartan does **not** integrate with Health Connect in this release: no
+  Health Connect permissions are declared in the (merged) manifest and no Health Connect data is
+  ever read or written. Full transparency for the reviewer: the `androidx.health.connect`
+  client library IS present in the APK behind a permanently-disabled feature flag
+  (`USE_HEALTH_CONNECT=false`; without declared permissions it cannot access anything). Declare
+  "does not integrate with Health Connect". If the flag is ever enabled, the manifest permissions,
+  this declaration, the data safety form, and the privacy policy must all be updated before release.
 - **Medical positioning:** Spartan is wellness-only. No diagnosis, treatment, or prevention claims
   anywhere in the app or listing (enforced in code by a safety filter over all generated coaching
   copy).
@@ -135,15 +144,17 @@ apps in Health & Fitness.
 
 ```
 Spartan is a consumer wellness and fitness app. With the user's explicit consent, it reads
-recovery, sleep, strain, HRV, resting heart rate, and respiratory rate from the user's own WHOOP
-account via WHOOP's official read-only OAuth API, and generates a rules-based daily activity plan
-(mobility, zone 2 cardio, breathwork, sleep hygiene, hydration). Spartan is not a medical device
-and provides no medical advice, diagnosis, or treatment; concerning readings produce only a
-suggestion to consult a qualified clinician. The default build uses clearly labeled sample data;
-live integrations are opt-in. Spartan does not use Health Connect. All data is stored on the
-user's device: there is no cloud backend, no account system, no analytics or advertising SDKs,
-and no data sharing with third parties. Users can disconnect integrations and delete all app data
-in-app at any time.
+recovery, sleep, strain, HRV, resting heart rate, respiratory rate, workouts, and journal answers
+from the user's own WHOOP data export (CSV files the user selects via the system file picker), and
+generates a rules-based daily activity plan (mobility, zone 2 cardio, breathwork, sleep hygiene,
+hydration). Spartan is not a medical device and provides no medical advice, diagnosis, or
+treatment; concerning readings produce only a suggestion to consult a qualified clinician. The
+default build uses clearly labeled sample data until the user imports their export; OAuth
+integrations are present but disabled in this release. Spartan does not integrate with Health
+Connect (no Health Connect permissions declared; a dormant client library ships behind a disabled
+feature flag). All data is stored on the user's device: there is no cloud backend, no account
+system, no analytics or advertising SDKs, and no data sharing with third parties. Users can
+disconnect integrations and delete all app data in-app at any time.
 ```
 
 **Data safety form (related, same App content section):** declare **no data collected and no data
@@ -167,22 +178,26 @@ Keep the "Sample data" label visible where it appears — it is a trust asset, n
 | 5 | Privacy screen — on-device storage, disconnect, delete all data | Your data stays on your device |
 | 6 | Onboarding — sample-data welcome state with "Connect WHOOP" call to action | Explore with sample data before connecting anything |
 
-**Feature graphic (1024 × 500):** OLED-dark background (near-black), a single teal readiness-ring
-motif offset to one side, the Spartan wordmark set in the app typeface on the other. No screenshots
-embedded, no device frames, no claim text, no badges. Calm and premium; the ring is the only accent.
+**Feature graphic (1024 × 500):** shipped at
+[docs/assets/play-feature-graphic-1024x500.png](assets/play-feature-graphic-1024x500.png) —
+OLED-dark ground, luminous teal→green readiness ring ("92 · PRIMED") left, Spartan wordmark +
+tagline and a 45-day recovery-bar field (band-colored, threshold hairlines at 34/67) right. No
+device frames, no claim text, no badges; the ring is the hero accent. Regenerate with
+[assets/render_feature_graphic.py](assets/render_feature_graphic.py) if the palette changes.
 
 ---
 
-## 8. "What's new" — 1.0.0
+## 8. "What's new" — 1.1.0 (submission build)
 
 ```
 Initial release.
 • Daily plan matched to your WHOOP recovery, with why-it-matters on every activity
-• One-tap done, snooze, skip, or reschedule
-• Calendar-aware scheduling using free/busy gaps only
+• Import your WHOOP data export (CSV) — your real recovery, sleep, and strain, no sign-in needed
+• Follow-along videos on training activities, plus guided sessions for each metric
+• One-tap done, snooze, skip, or reschedule; calendar-aware scheduling (free/busy only)
 • Local reminders with quiet hours
 • On-device data, no accounts, no analytics, no ads
-Ships with labeled sample data — connect WHOOP and Google Calendar when you are ready.
+Explore with labeled sample data, then import your WHOOP export when you are ready.
 ```
 
 ---

@@ -29,9 +29,10 @@ developer.
 
 ## 2. The 1.0.0 sample-data build: Data Not Collected
 
-The shipped 1.0.0 build runs on a clearly labeled mock WHOOP source and a stub calendar. It makes
-**no network requests at all**. Everything (plan history, check-ins, optional name/height,
-preferences) lives in local storage on the device.
+The shipped 1.0.0 build runs on a clearly labeled mock WHOOP source and a stub calendar, and can
+import the user's own WHOOP CSV export, parsed and stored on-device only. It makes
+**no network requests at all**. Everything (plan history, check-ins, imported WHOOP data,
+optional name/height, preferences) lives in local storage on the device.
 
 App Store Connect answers:
 
@@ -44,7 +45,7 @@ Per-category confirmation (every Apple category, all "not collected"):
 
 | Apple data category | Does the app handle it? | Collected per Apple's definition? |
 |---|---|---|
-| Health & Fitness | Yes — sample (1.0.0) or user's own WHOOP metrics (later), stored on device | **No** — never leaves the device toward the developer or any partner |
+| Health & Fitness | Yes — sample or user's own WHOOP metrics via on-device CSV import (1.0.0); OAuth-fetched metrics (later); stored on device | **No** — never leaves the device toward the developer or any partner |
 | Contact Info — Name | Optional, user-entered, on device | **No** |
 | Contact Info — Email / Phone / Address | Not handled; no accounts | **No** |
 | User Content (calendar-derived free/busy, check-ins) | On device only | **No** |
@@ -101,12 +102,14 @@ Apple requires a privacy manifest bundled in the app. It must agree with the lab
 
 - `NSPrivacyTracking` → `false`; `NSPrivacyTrackingDomains` → empty.
 - `NSPrivacyCollectedDataTypes` → empty array (matches "Data Not Collected").
-- `NSPrivacyAccessedAPITypes` → declare required-reason APIs the app actually uses. Expected for
-  Spartan: `NSPrivacyAccessedAPICategoryUserDefaults` with reason `CA92.1` (app's own
-  preferences) and, if local JSON persistence checks file timestamps,
-  `NSPrivacyAccessedAPICategoryFileTimestamp` with reason `C617.1` (files inside the app
-  container). Audit the final source before submission; an undeclared required-reason API is an
-  upload rejection (ITMS-91053).
+- `NSPrivacyAccessedAPITypes` → **empty array**: no required-reason APIs are used today
+  (settings live in the JSON `SettingsStore`, not UserDefaults; the JSON stores read/write
+  whole files and call no file-timestamp APIs). This matches the shipped
+  `PrivacyInfo.xcprivacy`. If `@AppStorage`/UserDefaults is ever introduced, add
+  `NSPrivacyAccessedAPICategoryUserDefaults` with reason `CA92.1`; if file-timestamp checks
+  are added, add `NSPrivacyAccessedAPICategoryFileTimestamp` with reason `C617.1`. Audit the
+  final source before every submission; an undeclared required-reason API is an upload
+  rejection (ITMS-91053).
 
 ---
 
@@ -130,8 +133,10 @@ also what App Review checks the label against. Before submission:
 ## 6. Summary card (paste-ready for the reviewer conversation)
 
 > Spartan is local-first. The developer operates no servers and collects no data — no analytics,
-> ads, crash reporting, or telemetry SDKs are present. The 1.0.0 build runs entirely on clearly
-> labeled sample data and makes no network requests. When users later connect WHOOP or Google
+> ads, crash reporting, or telemetry SDKs are present. The 1.0.0 build runs on clearly labeled
+> sample data or the user's own WHOOP CSV export, imported and stored on-device (complete file
+> protection, excluded from iCloud backup, deletable in-app), and makes no network requests.
+> When users later connect WHOOP or Google
 > Calendar, data moves only between the user's device and the user's own accounts at those
 > services, over TLS, with read-only health scopes and free/busy-only calendar reads; none of it
 > is transmitted to the developer. App Privacy: Data Not Collected. Tracking: No.

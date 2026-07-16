@@ -5,6 +5,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.spartan.domain.engine.PlanUrgency
 import com.spartan.domain.model.ReadinessBand
 
 /**
@@ -62,4 +63,19 @@ fun bandLabel(band: ReadinessBand): String = when (band) {
     ReadinessBand.BALANCED -> "Balanced"
     ReadinessBand.EASY -> "Take it easy"
     ReadinessBand.REST -> "Recovery day"
+}
+
+/**
+ * Time-of-day urgency color for an incomplete plan item: amber once it's past midday, red after
+ * 6pm, null before then. Reuses the readiness-band amber/red so the palette stays coherent and
+ * theme-aware (the bright variants fail contrast on light surfaces, so light mode darkens them).
+ */
+@Composable
+fun planUrgencyColor(urgency: PlanUrgency): Color? {
+    val dark = isSystemInDarkTheme()
+    return when (urgency) {
+        PlanUrgency.DUE -> if (dark) SpartanBands.easyDark else SpartanBands.easyLight
+        PlanUrgency.OVERDUE -> if (dark) SpartanBands.restDark else SpartanBands.restLight
+        PlanUrgency.NONE -> null
+    }
 }

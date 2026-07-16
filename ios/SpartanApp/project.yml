@@ -46,6 +46,13 @@ targets:
     deploymentTarget: "16.0"
     sources:
       - Sources
+      # Apple privacy manifest — must ship inside the app bundle (tracking: false,
+      # collected data: none, no required-reason APIs in shell code).
+      - path: PrivacyInfo.xcprivacy
+        buildPhase: resources
+      # App icon catalog — actool compiles AppIcon (1024 App Store marketing icon,
+      # opaque, no alpha) into the bundle. See ASSETCATALOG_COMPILER_APPICON_NAME below.
+      - path: Assets.xcassets
     dependencies:
       - package: SpartanKit
     info:
@@ -62,8 +69,11 @@ targets:
         # NS*UsageDescription keys intentionally absent in mock mode — see header note.
     settings:
       base:
-        # Placeholder bundle id — replace with the real App Store id at signing time.
-        PRODUCT_BUNDLE_IDENTIFIER: com.spartan.app
+        # Shipping bundle id — must match the App ID and the App Store Connect record
+        # exactly (IOS_RELEASE_CHECKLIST.md §2/§5) and mirrors Android's applicationId.
+        PRODUCT_BUNDLE_IDENTIFIER: com.spartan
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         TARGETED_DEVICE_FAMILY: "1"
         ENABLE_USER_SCRIPT_SANDBOXING: YES
+        # Names the AppIcon set inside Assets.xcassets (Contents.json → AppIcon.appiconset).
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon

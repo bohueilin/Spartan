@@ -36,7 +36,9 @@ struct SettingsAboutView: View {
                         .font(.caption)
                         .foregroundColor(.spartanOnSurfaceVariant)
                         .padding(.top, 4)
-                    Text("Spartan offers wellness and fitness guidance, not medical advice, and is not a medical device. Your data stays on this device. See Privacy for export and deletion.")
+                    // iOS has no export flow yet (Android-only for now), so the copy only
+                    // claims what this build actually has: on-device storage + deletion.
+                    Text("Spartan offers wellness and fitness guidance, not medical advice, and is not a medical device. Your data stays on this device. You can delete all local data below.")
                         .font(.caption)
                         .foregroundColor(.spartanOnSurfaceVariant)
                         .fixedSize(horizontal: false, vertical: true)
