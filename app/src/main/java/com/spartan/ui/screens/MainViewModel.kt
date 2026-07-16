@@ -34,6 +34,8 @@ import com.spartan.domain.engine.MetricEngine
 import com.spartan.domain.engine.PlanEngine
 import com.spartan.domain.engine.ReviewEngine
 import com.spartan.domain.model.ActivityStatus
+import com.spartan.domain.model.ClinicalStatus
+import com.spartan.domain.model.TargetStatus
 import com.spartan.domain.model.DailyActivity
 import com.spartan.domain.model.DailyPlan
 import com.spartan.domain.model.InsightCard
@@ -71,6 +73,10 @@ data class MainUiState(
     val notificationDenied: Boolean = false,
     val notificationsAvailable: Boolean = false,
     val profile: UserProfileEntity? = null,
+    /** From the profile's birth year; tailors follow-along video picks to the user's age. */
+    val userAgeYears: Int? = null,
+    /** Metrics whose latest reading is outside its clinical range or personal target. */
+    val offTargetMetrics: Set<MetricType> = emptySet(),
     val readings: List<MetricReading> = emptyList(),
     val assessments: List<MetricAssessment> = emptyList(),
     val insights: List<InsightCard> = emptyList(),
@@ -280,11 +286,17 @@ class MainViewModel @Inject constructor(
             .map { metricEngine.assess(it, targetMap[it.type]) }
         val plan = applyPlanOverrides(planEngine.defaultPlan(health.logs), health.planOverrides)
         val review = reviewEngine.summarize(health.readings, health.logs)
+        val offTarget = assessments.filter { a ->
+            a.clinicalStatus == ClinicalStatus.ABOVE_RANGE || a.clinicalStatus == ClinicalStatus.BELOW_RANGE ||
+                a.targetStatus == TargetStatus.ABOVE_PERSONAL_TARGET || a.targetStatus == TargetStatus.BELOW_PERSONAL_TARGET
+        }.map { it.reading.type }.toSet()
         MainUiState(
             onboardingComplete = onboardingComplete,
             notificationDenied = notificationDenied,
             notificationsAvailable = reminderScheduler.hasNotificationPermission(),
             profile = health.profile,
+            userAgeYears = health.profile?.birthYear?.let { java.time.Year.now().value - it }?.takeIf { it in 13..100 },
+            offTargetMetrics = offTarget,
             readings = health.readings,
             assessments = assessments,
             insights = insightEngine.generate(assessments),
@@ -395,9 +407,14 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    fun completeOnboarding(name: String, heightCm: Double?) {
+    fun completeOnboarding(name: String, heightCm: Double?, ageYears: Int?) {
         viewModelScope.launch {
-            repository.upsertProfile(UserProfileEntity(displayName = name.ifBlank { "You" }, heightCm = heightCm))
+            // Store age as a birth year so it stays correct as time passes; used only to bias
+            // follow-along video picks toward age-appropriate, joint-friendly sessions.
+            val birthYear = ageYears?.let { java.time.Year.now().value - it }
+            repository.upsertProfile(
+                UserProfileEntity(displayName = name.ifBlank { "You" }, heightCm = heightCm, birthYear = birthYear),
+            )
             preferencesStore.setOnboardingComplete(true)
         }
     }

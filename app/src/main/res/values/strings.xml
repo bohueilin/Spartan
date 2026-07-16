@@ -122,6 +122,7 @@
     <!-- Onboarding -->
     <string name="onboarding_begin">Begin</string>
     <string name="onboarding_disclaimer">Wellness and fitness guidance, not medical advice. You control your data and can delete it anytime.</string>
+    <string name="onboarding_age_label">Age (optional — tailors video picks)</string>
     <string name="onboarding_height_label">Height in cm (optional)</string>
     <string name="onboarding_intro">Connect WHOOP and get one simple, disciplined plan each day to improve recovery, sleep, and fitness — with the reasons behind every action.</string>
     <string name="onboarding_name_label">What should we call you?</string>

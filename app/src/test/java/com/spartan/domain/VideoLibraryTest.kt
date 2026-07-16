@@ -3,11 +3,14 @@ package com.spartan.domain
 import com.spartan.domain.engine.CoachingOptions
 import com.spartan.domain.engine.RuleBasedRecommendationSource
 import com.spartan.domain.engine.SafetyEngine
+import com.spartan.domain.engine.TrainingLevel
+import com.spartan.domain.engine.TrainingProfile
 import com.spartan.domain.engine.VideoLibrary
 import com.spartan.domain.model.MetricType
 import com.spartan.domain.model.ReadinessSnapshot
 import com.spartan.domain.model.WhoopSnapshot
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -96,9 +99,70 @@ class VideoLibraryTest {
 
     @Test
     fun activityVideoDurations_roughlyMatchTheActivityEstimate() {
-        // The zone2 session (25 min est) links a ~30 min walk; mobility (10 min) a ~10 min flow.
+        // The zone2 session (25 min est) links a ~30 min walk; mobility (10 min) an ~11 min flow.
         assertEquals(30, VideoLibrary.guideForActivity("1:zone2")!!.minutes)
-        assertEquals(10, VideoLibrary.guideForActivity("1:mobility")!!.minutes)
+        assertEquals(11, VideoLibrary.guideForActivity("1:mobility")!!.minutes)
         assertEquals(15, VideoLibrary.guideForActivity("1:zone2-walk")!!.minutes)
+    }
+
+    @Test
+    fun everyGuide_isFromAnApprovedChannel_andHasCompleteMetadata() {
+        val approved = setOf(
+            "Walk at Home", "growwithjo", "Team Body Project", "Fitness Blender", "HASfit",
+            "Juice & Toya", "Caroline Girvan", "Yoga With Adriene",
+        )
+        VideoLibrary.allGuides.forEach { g ->
+            assertTrue("${g.id} from unapproved channel '${g.channel}'", g.channel in approved)
+        }
+    }
+
+    // --- age + needs-aware ranking -------------------------------------------------------------
+
+    @Test
+    fun recommend_withNoProfile_keepsCuratedOrder() {
+        val training = VideoLibrary.recommend(MetricType.STRENGTH_SESSIONS, TrainingProfile.NONE)!!
+        // First curated pick for strength is the beginner HASfit session.
+        assertEquals("strength_hasfit_20", training.guides.first().id)
+        assertFalse(training.intro.contains("low-impact and beginner-friendly"))
+    }
+
+    @Test
+    fun recommend_forOlderAdult_leadsWithBeginnerLowImpact_andDropsTheHardIntermediate() {
+        val profile = TrainingProfile(ageYears = 44)
+        val training = VideoLibrary.recommend(MetricType.STRENGTH_SESSIONS, profile)!!
+        assertTrue("older-adult intro should flag gentle picks", training.intro.contains("low-impact and beginner-friendly"))
+        // The only INTERMEDIATE/HARD option (Caroline Girvan) must not lead, and with a 3-cap it
+        // sinks below the three beginner sessions.
+        assertEquals(TrainingLevel.BEGINNER, training.guides.first().level)
+        assertTrue(
+            "the hard intermediate session should not surface for an older beginner",
+            training.guides.none { it.level == TrainingLevel.INTERMEDIATE },
+        )
+    }
+
+    @Test
+    fun recommend_forOffTargetMetric_reranksGentleEvenWhenAgeUnknown() {
+        val profile = TrainingProfile(ageYears = null, offTargetMetrics = setOf(MetricType.STRENGTH_SESSIONS))
+        val training = VideoLibrary.recommend(MetricType.STRENGTH_SESSIONS, profile)!!
+        assertTrue(training.intro.contains("low-impact and beginner-friendly"))
+        assertEquals(TrainingLevel.BEGINNER, training.guides.first().level)
+    }
+
+    @Test
+    fun guideForActivity_picksGentlerStrength_forOlderAdults() {
+        val young = VideoLibrary.guideForActivity("1:strength", TrainingProfile(ageYears = 28))
+        val older = VideoLibrary.guideForActivity("1:strength", TrainingProfile(ageYears = 46))
+        assertEquals("strength_juicetoya_30", young!!.id)
+        assertEquals("strength_hasfit_20", older!!.id)
+        assertEquals(TrainingLevel.BEGINNER, older.level)
+    }
+
+    @Test
+    fun recommend_cappsAtThreeGuides() {
+        MetricType.entries.forEach { type ->
+            VideoLibrary.recommend(type, TrainingProfile(ageYears = 44))?.let {
+                assertTrue("$type returned more than 3 guides", it.guides.size <= 3)
+            }
+        }
     }
 }

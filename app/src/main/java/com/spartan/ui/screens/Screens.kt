@@ -69,6 +69,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.spartan.R
 import com.spartan.data.local.ReminderFrequency
+import com.spartan.domain.engine.TrainingProfile
 import com.spartan.domain.engine.VideoLibrary
 import com.spartan.domain.model.ClinicalStatus
 import com.spartan.domain.model.InsightCard
@@ -82,9 +83,10 @@ import com.spartan.domain.model.WorkoutType
 import kotlin.math.roundToInt
 
 @Composable
-fun OnboardingScreen(onComplete: (String, Double?) -> Unit) {
+fun OnboardingScreen(onComplete: (String, Double?, Int?) -> Unit) {
     var name by rememberSaveable { mutableStateOf("") }
     var height by rememberSaveable { mutableStateOf("") }
+    var age by rememberSaveable { mutableStateOf("") }
     Column(
         // Rendered outside the Scaffold, so it handles its own edge-to-edge insets.
         modifier = Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(28.dp),
@@ -125,8 +127,18 @@ fun OnboardingScreen(onComplete: (String, Double?) -> Unit) {
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
+        Spacer(Modifier.height(12.dp))
+        // Optional: tailors follow-along video picks toward age-appropriate, joint-friendly sessions.
+        OutlinedTextField(
+            age,
+            { age = it.filter(Char::isDigit).take(3) },
+            label = { Text(stringResource(R.string.onboarding_age_label)) },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
         Button(
-            onClick = { onComplete(name, height.toDoubleOrNull()) },
+            onClick = { onComplete(name, height.toDoubleOrNull(), age.toIntOrNull()?.takeIf { it in 13..100 }) },
             modifier = Modifier.fillMaxWidth().height(52.dp).padding(top = 8.dp),
         ) {
             Text(stringResource(R.string.onboarding_begin), fontWeight = FontWeight.SemiBold)
@@ -212,7 +224,11 @@ fun MetricDetailScreen(state: MainUiState, type: MetricType, onAdd: () -> Unit, 
         TrendCard(stringResource(R.string.metrics_history), history.mapNotNull { it.value })
         // Plain-language education for WHOOP metrics (renders nothing for lab metrics).
         MetricExplainerSection(type)
-        TrainThisMetricSection(type, assessment)
+        TrainThisMetricSection(
+            type = type,
+            assessment = assessment,
+            profile = TrainingProfile(ageYears = state.userAgeYears, offTargetMetrics = state.offTargetMetrics),
+        )
         Text(stringResource(R.string.metrics_entries), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         history.forEach {
             OutlinedCard(Modifier.fillMaxWidth()) {
@@ -233,8 +249,8 @@ fun MetricDetailScreen(state: MainUiState, type: MetricType, onAdd: () -> Unit, 
  * "here is what to actually do about it" answer, one tap from the number itself.
  */
 @Composable
-private fun TrainThisMetricSection(type: MetricType, assessment: MetricAssessment?) {
-    val training = VideoLibrary.trainingFor(type) ?: return
+private fun TrainThisMetricSection(type: MetricType, assessment: MetricAssessment?, profile: TrainingProfile) {
+    val training = VideoLibrary.recommend(type, profile) ?: return
     val offTarget = assessment != null && (
         assessment.clinicalStatus == ClinicalStatus.ABOVE_RANGE ||
             assessment.clinicalStatus == ClinicalStatus.BELOW_RANGE ||

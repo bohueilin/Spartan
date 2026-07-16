@@ -69,6 +69,7 @@ import androidx.compose.ui.unit.sp
 import com.spartan.R
 import com.spartan.domain.engine.MetricBenefits
 import com.spartan.domain.engine.PlanClock
+import com.spartan.domain.engine.TrainingProfile
 import com.spartan.domain.engine.PlanUrgency
 import com.spartan.domain.engine.VideoLibrary
 import com.spartan.domain.model.ActivityCategory
@@ -113,6 +114,10 @@ fun CheckInScreen(
             delay(60_000)
         }
     }
+    // Who we're recommending videos for — biases the follow-along picks by age + off-target metrics.
+    val trainingProfile = remember(state.userAgeYears, state.offTargetMetrics) {
+        TrainingProfile(ageYears = state.userAgeYears, offTargetMetrics = state.offTargetMetrics)
+    }
     // Checking off a training activity opens a 5-second debrief (minutes/effort/pain) that feeds
     // the adaptive rules — dismissible with one tap, never required.
     var debriefFor by remember { mutableStateOf<DailyActivity?>(null) }
@@ -155,7 +160,7 @@ fun CheckInScreen(
                     compareBy({ it.priority.ordinal }, { it.bestTimeOfDay.ordinal }),
                 )
                 items(ordered, key = { it.id }) { activity ->
-                    ActivityCard(activity, nowMinuteOfDay, completeWithDebrief, onUncomplete, onSnooze, onSkip, onSchedule, onOpenMetric)
+                    ActivityCard(activity, nowMinuteOfDay, trainingProfile, completeWithDebrief, onUncomplete, onSnooze, onSkip, onSchedule, onOpenMetric)
                 }
             }
         }
@@ -271,6 +276,7 @@ private fun PlanProgress(state: MainUiState) {
 private fun ActivityCard(
     activity: DailyActivity,
     nowMinuteOfDay: Int,
+    trainingProfile: TrainingProfile,
     onComplete: (String) -> Unit,
     onUncomplete: (String) -> Unit,
     onSnooze: (String) -> Unit,
@@ -380,7 +386,7 @@ private fun ActivityCard(
                     Spacer(Modifier.height(Spacing.sm))
                     Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary)
                 }
-                VideoLibrary.guideForActivity(activity.id)?.let { guide ->
+                VideoLibrary.guideForActivity(activity.id, trainingProfile)?.let { guide ->
                     val uriHandler = LocalUriHandler.current
                     TextButton(onClick = { uriHandler.openUri(guide.url) }, modifier = Modifier.padding(top = Spacing.xs)) {
                         Icon(Icons.Outlined.PlayCircle, contentDescription = null, modifier = Modifier.size(18.dp))

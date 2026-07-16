@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/assets/spartan-poster.png" alt="Spartan — your daily readiness, decided" width="100%" />
+<img src="docs/assets/spartan-github.png" alt="Spartan — your daily readiness, decided" width="100%" />
 
 # SPARTAN
 
@@ -33,7 +33,7 @@ calendar. That's the whole app — deliberately.
 | **Reads your body** | WHOOP recovery, sleep, strain, HRV, resting HR, respiratory rate — read-only, with your consent. **Import your WHOOP CSV export** (Settings → Connections) to run on your real data with zero credentials, or ship with clearly labeled sample data until you do. |
 | **Decides the day** | A transparent rules engine (not a black box) maps readiness to a plan: recovery days protect you, primed days green-light quality training, concerning vitals always suppress intensity and suggest a clinician — never a diagnosis. |
 | **Explains the numbers** | Tap any metric for plain-language education: what it is, what moves it, what a good pattern looks like. |
-| **Shows you how** | Every training activity links a **specific follow-along video** (large, established channels), and each trainable metric has a "Train this metric" section — when a reading is outside your range, the app tells you and hands you the exact guided sessions that move that number. |
+| **Shows you how** | Every training activity links a **specific follow-along video**, curated from evidence-minded channels for adults ~40 starting out (Fitness Blender, Team Body Project, HASfit, Juice & Toya, growwithjo, Walk at Home, Yoga With Adriene, Caroline Girvan) — beginner, low-impact, well-cued. Picks are **ranked to your age and which metrics are off-target**: gentler, joint-friendly sessions lead when you're 40+ or a number needs to move. Each trainable metric has a "Train this metric" section that hands you the exact guided sessions. |
 | **Tracks the work** | Checking off a session takes a 5-second debrief (minutes, effort, pain) that *adapts next week's plan* — pain automatically deloads you. |
 | **Shows the payoff** | *"Where this can take you"*: honest, capped ranges for resting HR, HRV, and recovery after 8 weeks at your actual consistency — typical ranges, never promises. |
 | **Nudges, never nags** | A 7:15 morning digest, a guilt-free 19:00 reminder only when activities remain, quiet hours respected, one tap from notification to plan. |
