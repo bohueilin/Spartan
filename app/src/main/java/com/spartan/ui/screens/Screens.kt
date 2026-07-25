@@ -370,31 +370,37 @@ fun AddMetricScreen(
 fun PlanScreen(state: MainUiState, onEditMinutes: (String, Int) -> Unit, onComplete: (PlannedWorkout) -> Unit) {
     ScreenColumn {
         Text(stringResource(R.string.plan_title), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold)
-        Text(state.weeklyPlan?.focus.orEmpty(), style = MaterialTheme.typography.bodyLarge)
-        state.weeklyPlan?.workouts.orEmpty().forEach { workout ->
-            val key = "${workout.day}-${workout.type.name}"
-            val minutes = workout.minutes
-            OutlinedCard(Modifier.fillMaxWidth()) {
-                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("${workout.day} - ${workout.type.name.replace('_', ' ')}", fontWeight = FontWeight.SemiBold)
-                        Text(stringResource(R.string.plan_minutes_intensity, minutes, workout.intensity))
-                        Text(workout.guidance, style = MaterialTheme.typography.bodySmall)
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
-                            TextButton(onClick = { onEditMinutes(key, (minutes - 5).coerceAtLeast(5)) }) {
-                                Text(stringResource(R.string.plan_minus_five))
-                            }
-                            TextButton(onClick = { onEditMinutes(key, (minutes + 5).coerceAtMost(180)) }) {
-                                Text(stringResource(R.string.plan_plus_five))
-                            }
+        WeeklyPlanSection(state, onEditMinutes, onComplete)
+    }
+}
+
+/** The weekly-plan cards, shared by [PlanScreen] and the Coach hub. */
+@Composable
+fun WeeklyPlanSection(state: MainUiState, onEditMinutes: (String, Int) -> Unit, onComplete: (PlannedWorkout) -> Unit) {
+    Text(state.weeklyPlan?.focus.orEmpty(), style = MaterialTheme.typography.bodyLarge)
+    state.weeklyPlan?.workouts.orEmpty().forEach { workout ->
+        val key = "${workout.day}-${workout.type.name}"
+        val minutes = workout.minutes
+        OutlinedCard(Modifier.fillMaxWidth()) {
+            Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("${workout.day} - ${workout.type.name.replace('_', ' ')}", fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.plan_minutes_intensity, minutes, workout.intensity))
+                    Text(workout.guidance, style = MaterialTheme.typography.bodySmall)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
+                        TextButton(onClick = { onEditMinutes(key, (minutes - 5).coerceAtLeast(5)) }) {
+                            Text(stringResource(R.string.plan_minus_five))
+                        }
+                        TextButton(onClick = { onEditMinutes(key, (minutes + 5).coerceAtMost(180)) }) {
+                            Text(stringResource(R.string.plan_plus_five))
                         }
                     }
-                    Button(onClick = { onComplete(workout.copy(minutes = minutes)) }) { Text(stringResource(R.string.plan_log)) }
                 }
+                Button(onClick = { onComplete(workout.copy(minutes = minutes)) }) { Text(stringResource(R.string.plan_log)) }
             }
         }
-        Text(state.weeklyPlan?.safetyNote.orEmpty(), style = MaterialTheme.typography.bodySmall)
     }
+    Text(state.weeklyPlan?.safetyNote.orEmpty(), style = MaterialTheme.typography.bodySmall)
 }
 
 @Composable

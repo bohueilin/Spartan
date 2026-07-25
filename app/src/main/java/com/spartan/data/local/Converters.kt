@@ -69,4 +69,18 @@ class Converters {
 
     @TypeConverter
     fun stringToConnectionStatus(v: String): ConnectionStatus = ConnectionStatus.valueOf(v)
+
+    @TypeConverter
+    fun goalTypeToString(v: com.spartan.domain.engine.GoalType): String = v.name
+
+    @TypeConverter
+    fun stringToGoalType(v: String): com.spartan.domain.engine.GoalType =
+        com.spartan.domain.engine.GoalType.valueOf(v)
+
+    @TypeConverter
+    fun goalStatusToString(v: com.spartan.domain.engine.GoalStatus): String = v.name
+
+    @TypeConverter
+    fun stringToGoalStatus(v: String): com.spartan.domain.engine.GoalStatus =
+        com.spartan.domain.engine.GoalStatus.valueOf(v)
 }

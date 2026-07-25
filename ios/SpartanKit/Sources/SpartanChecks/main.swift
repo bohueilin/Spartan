@@ -116,6 +116,24 @@ run("video.gentleDropsIntermediateStrength") { video.testGentleRankingDropsTheIn
 run("video.strengthActivityAgeAware") { try video.testGuideForActivityPicksGentlerStrengthForOlderAdults() }; testCount += 1
 run("video.recommendCapsAtThree") { video.testRecommendCapsAtThreeGuides() }; testCount += 1
 
+// --- CoachEnginesTests (reference ranges, goals, stress patterns) ---
+let coach = CoachEnginesTests()
+run("coach.epochDayWeekdayMath") { coach.testEpochDayWeekdayMathMatchesJavaTime() }; testCount += 1
+run("coach.referenceRangesTopFiveAgeSex") { try coach.testReferenceRangesCoverTopFiveAndAdjustByAgeAndSex() }; testCount += 1
+run("coach.referenceRangesCopySafe") { try coach.testReferenceRangesEducationCopyPassesSafetyEngine() }; testCount += 1
+run("coach.weightGoalSafeRateAccepted") { coach.testWeightGoalWithin2lbPerWeekIsAccepted() }; testCount += 1
+run("coach.weightGoalCounterOffered") { try coach.testWeightGoalTooFastIsCounterOfferedAtSafeRateNotRefused() }; testCount += 1
+run("coach.sleepGoalValidation") { try coach.testSleepGoal10pctIn3WeeksIsAcceptedAnd30pctIn2WeeksIsAdjusted() }; testCount += 1
+run("coach.invalidGoalsRejected") { coach.testInvalidGoalsZeroTargetOrNoRunwayAreRejected() }; testCount += 1
+run("coach.weightProgressKgToLb") { coach.testWeightProgressConvertsKgReadingsToPounds() }; testCount += 1
+run("coach.sleepProgressPercentGain") { coach.testSleepProgressPercentGainVsBaseline() }; testCount += 1
+run("coach.stressGoalHabitCounting") { coach.testStressGoalIsAHabitGoalCountingCalmSessions() }; testCount += 1
+run("coach.goalModifiersBendPlan") { coach.testGoalModifiersBendThePlanTowardTheGoal() }; testCount += 1
+run("coach.weekdayEffectFindsStressor") { try coach.testWeekdayEffectFindsTheStressorDayWithEnoughEvidence() }; testCount += 1
+run("coach.weekdayEffectSilentOnThinData") { coach.testWeekdayEffectStaysSilentOnThinOrFlatData() }; testCount += 1
+run("coach.pressureWindowsAndNudge") { coach.testPressureWindowsMatchDaysAndNudgeFiresFiveMinutesEarly() }; testCount += 1
+run("coach.sundayBitAndMidnightClamp") { coach.testPressureWindowSundayBitAndMidnightClamp() }; testCount += 1
+
 print("\n\(testCount) tests, \(shimAssertionCount) assertions, \(shimFailureCount) failures")
 if shimFailureCount > 0 {
     exit(1)

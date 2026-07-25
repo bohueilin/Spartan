@@ -40,7 +40,7 @@ import com.spartan.ui.screens.DiagnosticsScreen
 import com.spartan.ui.screens.MetricDetailScreen
 import com.spartan.ui.screens.MetricsScreen
 import com.spartan.ui.screens.OnboardingScreen
-import com.spartan.ui.screens.PlanScreen
+import com.spartan.ui.screens.CoachScreen
 import com.spartan.ui.screens.PrivacyScreen
 import com.spartan.ui.screens.ReminderSettingsScreen
 import com.spartan.ui.screens.ReviewScreen
@@ -53,7 +53,7 @@ private data class Tab(val route: String, val label: String, val icon: androidx.
 private val tabs = listOf(
     Tab("today", "Today", Icons.Outlined.FavoriteBorder),
     Tab("metrics", "Metrics", Icons.Outlined.Assessment),
-    Tab("plan", "Plan", Icons.AutoMirrored.Outlined.EventNote),
+    Tab("plan", "Coach", Icons.AutoMirrored.Outlined.EventNote),
     Tab("review", "Review", Icons.Outlined.Flag),
     Tab("settings", "Settings", Icons.Outlined.Settings),
 )
@@ -155,12 +155,20 @@ fun SpartanRoot(
                 )
             }
             composable("plan") {
-                PlanScreen(
+                CoachScreen(
                     state = state,
+                    onSaveGoal = viewModel::saveGoal,
+                    onAbandonGoal = viewModel::abandonGoal,
+                    onDismissGoalNotice = viewModel::dismissGoalNotice,
+                    onAddWindow = viewModel::addPressureWindow,
+                    onRemoveWindow = viewModel::removePressureWindow,
+                    onSaveDemographics = viewModel::updateDemographics,
                     onEditMinutes = viewModel::savePlanMinutes,
-                ) { workout ->
-                    navController.navigate("complete/${workout.type.name}/${workout.minutes}")
-                }
+                    onComplete = { workout ->
+                        navController.navigate("complete/${workout.type.name}/${workout.minutes}")
+                    },
+                    onMetricClick = { navController.navigate("detail/${it.name}") },
+                )
             }
             composable("complete/{type}/{minutes}") { entry ->
                 val type = entry.arguments?.getString("type")?.let(WorkoutType::valueOf) ?: WorkoutType.ZONE_2

@@ -8,8 +8,10 @@ import com.spartan.data.local.DailyActivityEntity
 import com.spartan.data.local.HealthDao
 import com.spartan.data.local.IntegrationConnectionEntity
 import com.spartan.data.local.IntegrationProvider
+import com.spartan.data.local.GoalEntity
 import com.spartan.data.local.MetricEntryEntity
 import com.spartan.data.local.PlanWorkoutOverrideEntity
+import com.spartan.data.local.PressureWindowEntity
 import com.spartan.data.local.ReminderEntity
 import com.spartan.data.local.TargetEntity
 import com.spartan.data.local.UserProfileEntity
@@ -44,6 +46,8 @@ class HealthRepository @Inject constructor(
     val planOverrides: Flow<List<PlanWorkoutOverrideEntity>> = dao.observePlanOverrides()
     val reminders: Flow<List<ReminderEntity>> = dao.observeReminders()
     val connections: Flow<List<IntegrationConnectionEntity>> = dao.observeConnections()
+    val goals: Flow<List<GoalEntity>> = dao.observeGoals()
+    val pressureWindows: Flow<List<PressureWindowEntity>> = dao.observePressureWindows()
 
     fun dailyActivities(dateEpochDay: Long): Flow<List<DailyActivityEntity>> =
         dao.observeActivitiesForDay(dateEpochDay)
@@ -123,6 +127,21 @@ class HealthRepository @Inject constructor(
 
     suspend fun deleteReminder(id: String) = dao.deleteReminder(id)
 
+    // --- Coach: goals + pressure windows ---
+    suspend fun upsertGoal(goal: GoalEntity) {
+        dao.upsertGoal(goal)
+        logAudit("PLAN", "GOAL_${goal.status.name}", "type=${goal.type.name}")
+    }
+
+    suspend fun updateGoalStatus(id: String, status: com.spartan.domain.engine.GoalStatus) {
+        dao.updateGoalStatus(id, status)
+        logAudit("PLAN", "GOAL_${status.name}")
+    }
+
+    suspend fun upsertPressureWindow(window: PressureWindowEntity) = dao.upsertPressureWindow(window)
+
+    suspend fun deletePressureWindow(id: String) = dao.deletePressureWindow(id)
+
     // --- Audit trail (append-only; actions + timestamps only, never PHI) ---
     suspend fun logAudit(category: String, action: String, detail: String = "") {
         dao.insertAuditEvent(
@@ -140,6 +159,10 @@ class HealthRepository @Inject constructor(
     /** Distinct days with at least one completed activity in the trailing [days]-day window. */
     suspend fun consistencyDays(days: Int, todayEpochDay: Long): Int =
         dao.daysWithCompletedActivity(todayEpochDay - (days - 1), todayEpochDay)
+
+    /** Completed calm sessions in [startDay, endDay] — the stress habit goal's progress signal. */
+    suspend fun completedBreathworkCount(startDay: Long, endDay: Long): Int =
+        dao.completedBreathworkCount(startDay, endDay)
 
     // --- WHOOP sync (normalize snapshots into metric_entries; idempotent per day) ---
     /**
@@ -270,6 +293,8 @@ class HealthRepository @Inject constructor(
         dao.deleteConnections()
         dao.deleteWhoopCycles()
         dao.deleteWhoopWorkouts()
+        dao.deleteGoals()
+        dao.deletePressureWindows()
         // The user's right to erase includes the audit trail itself; leave a single fresh marker.
         dao.deleteAuditEvents()
         logAudit("DATA", "ALL_DATA_DELETED")

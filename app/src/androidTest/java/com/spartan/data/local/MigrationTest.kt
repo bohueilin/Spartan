@@ -57,8 +57,14 @@ class MigrationTest {
         }
 
         helper.runMigrationsAndValidate(dbName, 6, true, AppDatabase.MIGRATION_5_6).apply {
-            // WHOOP import tables exist; pre-migration user data survived the whole chain.
             query("SELECT COUNT(*) FROM whoop_cycles").use { c -> c.moveToFirst(); assertEquals(0, c.getInt(0)) }
+            close()
+        }
+
+        helper.runMigrationsAndValidate(dbName, 7, true, AppDatabase.MIGRATION_6_7).apply {
+            // Coach tables exist; pre-migration user data survived the whole chain.
+            query("SELECT COUNT(*) FROM goals").use { c -> c.moveToFirst(); assertEquals(0, c.getInt(0)) }
+            query("SELECT COUNT(*) FROM pressure_windows").use { c -> c.moveToFirst(); assertEquals(0, c.getInt(0)) }
             query("SELECT COUNT(*) FROM whoop_workouts").use { c -> c.moveToFirst(); assertEquals(0, c.getInt(0)) }
             query("SELECT value, note FROM metric_entries WHERE type = 'RESTING_HEART_RATE'").use { c ->
                 assertTrue(c.moveToFirst())

@@ -153,6 +153,13 @@ interface HealthDao {
     )
     suspend fun daysWithCompletedActivity(startDay: Long, endDay: Long): Int
 
+    /** Completed calm sessions in the window — the stress habit goal's progress signal. */
+    @Query(
+        "SELECT COUNT(*) FROM daily_activities " +
+            "WHERE category = 'BREATHWORK' AND status = 'DONE' AND dateEpochDay BETWEEN :startDay AND :endDay",
+    )
+    suspend fun completedBreathworkCount(startDay: Long, endDay: Long): Int
+
     // --- Imported WHOOP data cleanup (disconnect / delete-all) ---
     @Query("DELETE FROM whoop_cycles")
     suspend fun deleteWhoopCycles()
@@ -177,6 +184,31 @@ interface HealthDao {
      */
     @Query("DELETE FROM daily_activities WHERE dateEpochDay = :day AND status != 'DONE'")
     suspend fun deleteNonCompletedActivitiesForDay(day: Long)
+
+    // --- Coach: goals + pressure windows ---
+    @Query("SELECT * FROM goals ORDER BY createdAtMillis DESC")
+    fun observeGoals(): Flow<List<GoalEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertGoal(goal: GoalEntity)
+
+    @Query("UPDATE goals SET status = :status WHERE id = :id")
+    suspend fun updateGoalStatus(id: String, status: com.spartan.domain.engine.GoalStatus)
+
+    @Query("DELETE FROM goals")
+    suspend fun deleteGoals()
+
+    @Query("SELECT * FROM pressure_windows ORDER BY startMinuteOfDay")
+    fun observePressureWindows(): Flow<List<PressureWindowEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertPressureWindow(window: PressureWindowEntity)
+
+    @Query("DELETE FROM pressure_windows WHERE id = :id")
+    suspend fun deletePressureWindow(id: String)
+
+    @Query("DELETE FROM pressure_windows")
+    suspend fun deletePressureWindows()
 }
 
 /**
@@ -207,6 +239,10 @@ interface WhoopCycleDao {
      */
     @Query("SELECT COUNT(*) AS dayCount, MIN(dateEpochDay) AS firstDay, MAX(dateEpochDay) AS lastDay FROM whoop_cycles")
     fun observeImportInfo(): Flow<WhoopImportInfoRow>
+
+    /** Recent imported days for stress-pattern analysis (Coach hub), newest first. */
+    @Query("SELECT * FROM whoop_cycles ORDER BY dateEpochDay DESC LIMIT 60")
+    fun observeRecentCycles(): Flow<List<WhoopCycleEntity>>
 }
 
 /** Aggregate row backing the Metrics-tab import banner (see [WhoopCycleDao.observeImportInfo]). */

@@ -15,6 +15,13 @@ doable plan for today — with the reasons behind every action.*
 
 ---
 
+## Vision
+
+**Increase human longevity by providing personalized habit building and an engaging community.**
+Spartan's bet: longevity is won through small daily habits your own physiology chooses for you —
+and kept through people doing it together. The full coach architecture (goals, stress patterns,
+age/sex-aware education, community roadmap) lives in [docs/COACH_DESIGN.md](docs/COACH_DESIGN.md).
+
 ## The problem
 
 Wearables are excellent at measuring and terrible at deciding. They hand you a recovery score at

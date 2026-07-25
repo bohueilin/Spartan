@@ -20,8 +20,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         AuditEventEntity::class,
         WhoopCycleEntity::class,
         WhoopWorkoutEntity::class,
+        GoalEntity::class,
+        PressureWindowEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -164,6 +166,38 @@ abstract class AppDatabase : RoomDatabase() {
                 )
                 db.execSQL(
                     "CREATE INDEX IF NOT EXISTS index_whoop_workouts_dateEpochDay ON whoop_workouts(dateEpochDay)",
+                )
+            }
+        }
+
+        // Coach hub: personal goals + declared pressure windows. Additive, no data loss.
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS goals (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        type TEXT NOT NULL,
+                        targetValue REAL NOT NULL,
+                        baselineValue REAL,
+                        startEpochDay INTEGER NOT NULL,
+                        targetEpochDay INTEGER NOT NULL,
+                        status TEXT NOT NULL,
+                        createdAtMillis INTEGER NOT NULL
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS pressure_windows (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        daysOfWeekMask INTEGER NOT NULL,
+                        startMinuteOfDay INTEGER NOT NULL,
+                        endMinuteOfDay INTEGER NOT NULL,
+                        label TEXT NOT NULL,
+                        createdAtMillis INTEGER NOT NULL
+                    )
+                    """.trimIndent(),
                 )
             }
         }

@@ -181,6 +181,34 @@ data class WhoopWorkoutEntity(
 )
 
 /**
+ * A personal coach goal (weight / sleep-recovery / stress habit), validated by GoalEngine at
+ * creation. One ACTIVE goal at a time in the launch scope; history rows keep their status.
+ */
+@Entity(tableName = "goals")
+data class GoalEntity(
+    @PrimaryKey val id: String,
+    val type: com.spartan.domain.engine.GoalType,
+    val targetValue: Double,
+    val baselineValue: Double?,
+    val startEpochDay: Long,
+    val targetEpochDay: Long,
+    val status: com.spartan.domain.engine.GoalStatus,
+    val createdAtMillis: Long = System.currentTimeMillis(),
+)
+
+/** A recurring high-pressure window the user declared (Tue/Thu 11:00–12:00 → pre-window calm). */
+@Entity(tableName = "pressure_windows")
+data class PressureWindowEntity(
+    @PrimaryKey val id: String,
+    /** Bit 0 = Monday … bit 6 = Sunday (DayOfWeek.ordinal). */
+    val daysOfWeekMask: Int,
+    val startMinuteOfDay: Int,
+    val endMinuteOfDay: Int,
+    val label: String = "",
+    val createdAtMillis: Long = System.currentTimeMillis(),
+)
+
+/**
  * Append-only audit trail of privacy-relevant actions (consent granted/revoked, sync runs, data
  * deletion). Carries actions and timestamps ONLY — never metric values, plan text, or any PHI.
  * Local-only today; the seam future coach/HIPAA deployments audit against.
