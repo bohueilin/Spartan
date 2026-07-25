@@ -28,8 +28,21 @@ import com.spartan.data.reminder.ReminderScheduler
 import com.spartan.data.repository.HealthRepository
 import com.spartan.data.whoop.WhoopAuthManager
 import com.spartan.data.whoop.WhoopClient
+import com.spartan.data.local.toEntity
 import com.spartan.data.whoop.csv.WhoopCsvImporter
+import com.spartan.data.whoop.csv.toWhoopSnapshot
+import com.spartan.domain.engine.Goal
+import com.spartan.domain.engine.GoalEngine
+import com.spartan.domain.engine.GoalPlanModifiers
+import com.spartan.domain.engine.GoalProgress
+import com.spartan.domain.engine.GoalStatus
+import com.spartan.domain.engine.GoalType
+import com.spartan.domain.engine.GoalValidation
 import com.spartan.domain.engine.InsightEngine
+import com.spartan.domain.engine.PressureWindow
+import com.spartan.domain.engine.SexAtBirth
+import com.spartan.domain.engine.StressPatterns
+import com.spartan.domain.engine.WeekdayEffect
 import com.spartan.domain.engine.MetricEngine
 import com.spartan.domain.engine.PlanEngine
 import com.spartan.domain.engine.ReviewEngine
@@ -104,6 +117,14 @@ data class MainUiState(
     val whoopImport: WhoopImportUiState? = null,
     /** Persistent summary of imported WHOOP data, for the Metrics-tab banner (null when none). */
     val whoopImportInfo: WhoopImportInfo? = null,
+    // Coach hub
+    val activeGoal: Goal? = null,
+    val goalProgress: GoalProgress? = null,
+    /** Counter-offer / confirmation copy from the last goal save (transient, dismissible). */
+    val goalNotice: String? = null,
+    val pressureWindows: List<PressureWindow> = emptyList(),
+    val weekdayEffects: List<WeekdayEffect> = emptyList(),
+    val userSexAtBirth: SexAtBirth = SexAtBirth.UNSPECIFIED,
 )
 
 /** Persistent "your WHOOP data is in" summary derived from the imported cycle table. */
@@ -134,6 +155,15 @@ private data class HealthBundle(
     val exportText: String,
     val planOverrides: List<PlanWorkoutOverrideEntity> = emptyList(),
     val whoopImportInfo: WhoopImportInfo? = null,
+    val coach: CoachBundle = CoachBundle(),
+)
+
+/** Coach-hub state derived from persisted goals/windows + imported cycles. */
+data class CoachBundle(
+    val activeGoal: Goal? = null,
+    val goalProgress: GoalProgress? = null,
+    val windows: List<PressureWindow> = emptyList(),
+    val weekdayEffects: List<WeekdayEffect> = emptyList(),
 )
 
 private data class CheckInBundle(
@@ -179,9 +209,42 @@ class MainViewModel @Inject constructor(
         else WhoopImportInfo(days = row.dayCount, firstDayEpoch = row.firstDay, lastDayEpoch = row.lastDay)
     }
 
+    /** Goals + pressure windows + stress patterns for the Coach hub, all reactive. */
+    private val coachFlow = combine(
+        repository.goals,
+        repository.pressureWindows,
+        whoopCycleDao.observeRecentCycles(),
+        repository.metrics,
+    ) { goals, windows, cycles, metrics ->
+        val activeGoal = goals.firstOrNull { it.status == GoalStatus.ACTIVE }?.toDomain()
+        val readings = metrics.map {
+            MetricReading(it.type, it.value, LocalDate.ofEpochDay(it.recordedAtEpochDay), it.note, it.id)
+        }
+        val breathworkThisWeek = repository.completedBreathworkCount(today - 6, today)
+        CoachBundle(
+            activeGoal = activeGoal,
+            goalProgress = activeGoal?.let {
+                GoalEngine.progress(it, readings, today, breathworkThisWeek)
+            },
+            windows = windows.map { it.toDomain() },
+            weekdayEffects = StressPatterns.weekdayEffects(
+                cycles.sortedBy { it.dateEpochDay }.map { it.toWhoopSnapshot() },
+            ),
+        )
+    }
+
     /** Transient signals folded into one flow (combine caps at five inputs). */
-    private val transientFlags = combine(syncFailed, reviewRequested, whoopImportState) { s, r, i ->
-        Triple(s, r, i)
+    private val goalNotice = MutableStateFlow<String?>(null)
+
+    private data class Transients(
+        val syncFailed: Boolean,
+        val reviewWanted: Boolean,
+        val whoopImport: WhoopImportUiState?,
+        val goalNotice: String?,
+    )
+
+    private val transientFlags = combine(syncFailed, reviewRequested, whoopImportState, goalNotice) { s, r, i, g ->
+        Transients(s, r, i, g)
     }
 
     private val healthBundle = combine(
@@ -230,10 +293,11 @@ class MainViewModel @Inject constructor(
             exportText = LocalExportFormatter.format(profile, metrics, targets, workouts, reminders = reminders),
         )
     }.let { baseFlow ->
-        combine(baseFlow, repository.planOverrides, whoopImportInfoFlow) { base, overrides, importInfo ->
+        combine(baseFlow, repository.planOverrides, whoopImportInfoFlow, coachFlow) { base, overrides, importInfo, coach ->
             base.copy(
                 planOverrides = overrides,
                 whoopImportInfo = importInfo,
+                coach = coach,
                 exportText = LocalExportFormatter.format(
                     profile = base.profile,
                     metrics = base.rawMetrics,
@@ -276,7 +340,8 @@ class MainViewModel @Inject constructor(
         healthBundle,
         checkInBundle,
         transientFlags,
-    ) { onboardingComplete, notificationDenied, health, checkIn, (syncDidFail, reviewWanted, whoopImport) ->
+    ) { onboardingComplete, notificationDenied, health, checkIn, transients ->
+        val (syncDidFail, reviewWanted, whoopImport, goalNoticeText) = transients
         val latest = latestReadings(health.readings)
         val targetMap = health.targets.associateBy(TargetValue::metricType)
         // Assess only values the engine considers valid: one out-of-range persisted row
@@ -284,7 +349,13 @@ class MainViewModel @Inject constructor(
         val assessments = latest
             .filter { metricEngine.validate(it.type, it.value) }
             .map { metricEngine.assess(it, targetMap[it.type]) }
-        val plan = applyPlanOverrides(planEngine.defaultPlan(health.logs), health.planOverrides)
+        // Goal emphasis bends the weekly plan (extra Zone-2 volume for a weight goal); the
+        // recovery-gated daily engine still owns the intensity floor.
+        val modifiers = GoalEngine.planModifiers(health.coach.activeGoal, health.coach.windows)
+        val plan = applyGoalEmphasis(
+            applyPlanOverrides(planEngine.defaultPlan(health.logs), health.planOverrides),
+            modifiers,
+        )
         val review = reviewEngine.summarize(health.readings, health.logs)
         val offTarget = assessments.filter { a ->
             a.clinicalStatus == ClinicalStatus.ABOVE_RANGE || a.clinicalStatus == ClinicalStatus.BELOW_RANGE ||
@@ -317,6 +388,16 @@ class MainViewModel @Inject constructor(
             requestReview = reviewWanted,
             whoopImport = whoopImport,
             whoopImportInfo = health.whoopImportInfo,
+            activeGoal = health.coach.activeGoal,
+            goalProgress = health.coach.goalProgress,
+            goalNotice = goalNoticeText,
+            pressureWindows = health.coach.windows,
+            weekdayEffects = health.coach.weekdayEffects,
+            userSexAtBirth = when (health.profile?.sexAtBirth?.uppercase()) {
+                "FEMALE" -> SexAtBirth.FEMALE
+                "MALE" -> SexAtBirth.MALE
+                else -> SexAtBirth.UNSPECIFIED
+            },
             projections = projectionEngine.project(
                 restingHeartRate = checkIn.readiness?.restingHeartRate
                     ?: latestValue(health.readings, MetricType.RESTING_HEART_RATE),
@@ -357,6 +438,30 @@ class MainViewModel @Inject constructor(
         readinessState.value = outcome.readiness
         generatedPlan.value = outcome.plan
         latestSnapshot.value = outcome.latestSnapshot
+        schedulePressureNudges()
+    }
+
+    /**
+     * Arms today's pre-window breathwork nudges (5 minutes before each declared high-pressure
+     * window). Past times and quiet hours are filtered by the scheduler; re-arming replaces the
+     * previous one-shot for the same window, so re-syncing never duplicates.
+     */
+    private suspend fun schedulePressureNudges() {
+        val windows = repository.pressureWindows.first().map { it.toDomain() }
+        if (windows.isEmpty()) return
+        val zone = ZoneId.systemDefault()
+        val date = LocalDate.now()
+        StressPatterns.windowsForDay(windows, date).forEach { window ->
+            val trigger = date.atStartOfDay(zone)
+                .plusMinutes(StressPatterns.nudgeMinuteFor(window).toLong())
+                .toInstant().toEpochMilli()
+            reminderScheduler.scheduleActivityReminder(
+                activityId = "pressure-${window.id}",
+                title = "5-minute breathing before ${window.label.ifBlank { "your next block" }}",
+                body = "Inhale 4 seconds, exhale 6. A calm start beats a rushed one.",
+                triggerAtMillis = trigger,
+            )
+        }
     }
 
     /**
@@ -386,6 +491,88 @@ class MainViewModel @Inject constructor(
 
     fun dismissWhoopImportResult() {
         whoopImportState.value = null
+    }
+
+    // --- Coach hub: goals, pressure windows, demographics ---
+
+    /**
+     * Validates and saves a goal. A too-aggressive ask is never refused — GoalEngine
+     * counter-offers the nearest safe version, which is what gets saved, and [MainUiState.goalNotice]
+     * explains the adjustment. Any previously active goal is retired (one active goal at a time).
+     */
+    fun saveGoal(type: GoalType, targetValue: Double, weeks: Int) {
+        viewModelScope.launch {
+            val readings = uiState.value.readings
+            val requested = Goal(
+                id = java.util.UUID.randomUUID().toString(),
+                type = type,
+                targetValue = targetValue,
+                baselineValue = GoalEngine.baselineFor(type, readings, today),
+                startEpochDay = today,
+                targetEpochDay = today + weeks * 7L,
+            )
+            val (toSave, notice) = when (val v = GoalEngine.validate(requested)) {
+                is GoalValidation.Ok -> v.goal to "Goal set. The weekly plan now leans toward it."
+                is GoalValidation.Adjusted -> v.adjusted to v.why
+                is GoalValidation.Invalid -> {
+                    goalNotice.value = v.why
+                    return@launch
+                }
+            }
+            repository.goals.first()
+                .filter { it.status == GoalStatus.ACTIVE }
+                .forEach { repository.updateGoalStatus(it.id, GoalStatus.ABANDONED) }
+            repository.upsertGoal(toSave.toEntity())
+            goalNotice.value = notice
+        }
+    }
+
+    fun abandonGoal(id: String) {
+        viewModelScope.launch { repository.updateGoalStatus(id, GoalStatus.ABANDONED) }
+    }
+
+    fun dismissGoalNotice() {
+        goalNotice.value = null
+    }
+
+    fun addPressureWindow(daysOfWeekMask: Int, startMinuteOfDay: Int, endMinuteOfDay: Int, label: String) {
+        if (daysOfWeekMask == 0 || endMinuteOfDay <= startMinuteOfDay) return
+        viewModelScope.launch {
+            repository.upsertPressureWindow(
+                PressureWindow(
+                    id = java.util.UUID.randomUUID().toString(),
+                    daysOfWeekMask = daysOfWeekMask,
+                    startMinuteOfDay = startMinuteOfDay,
+                    endMinuteOfDay = endMinuteOfDay,
+                    label = label.trim(),
+                ).toEntity(),
+            )
+            schedulePressureNudges()
+        }
+    }
+
+    fun removePressureWindow(id: String) {
+        viewModelScope.launch {
+            repository.deletePressureWindow(id)
+            reminderScheduler.cancelActivityReminder("pressure-$id")
+        }
+    }
+
+    /** Optional demographics for reference-range education; stored on-device only. */
+    fun updateDemographics(ageYears: Int?, sexAtBirth: SexAtBirth) {
+        viewModelScope.launch {
+            val current = repository.profile.first() ?: UserProfileEntity()
+            repository.upsertProfile(
+                current.copy(
+                    birthYear = ageYears?.takeIf { it in 13..100 }
+                        ?.let { java.time.Year.now().value - it } ?: current.birthYear,
+                    sexAtBirth = when (sexAtBirth) {
+                        SexAtBirth.UNSPECIFIED -> null
+                        else -> sexAtBirth.name
+                    },
+                ),
+            )
+        }
     }
 
     /**
@@ -654,6 +841,22 @@ class MainViewModel @Inject constructor(
         MetricType.entries.mapNotNull { type ->
             readings.filter { it.type == type }.maxByOrNull { it.recordedAt }
         }
+
+    /**
+     * Weekly-plan emphasis from the active goal: extra Zone-2 volume is spread across the plan's
+     * aerobic slots. Intensity and rest days are untouched — the daily engine owns safety.
+     */
+    private fun applyGoalEmphasis(plan: WeeklyPlan, modifiers: GoalPlanModifiers): WeeklyPlan {
+        if (modifiers.extraZone2MinutesPerWeek <= 0) return plan
+        val zone2Slots = plan.workouts.count { it.type == WorkoutType.ZONE_2 }
+        if (zone2Slots == 0) return plan
+        val extraPer = modifiers.extraZone2MinutesPerWeek / zone2Slots
+        return plan.copy(
+            workouts = plan.workouts.map {
+                if (it.type == WorkoutType.ZONE_2) it.copy(minutes = (it.minutes + extraPer).coerceAtMost(90)) else it
+            },
+        )
+    }
 
     private fun applyPlanOverrides(plan: WeeklyPlan, overrides: List<PlanWorkoutOverrideEntity>): WeeklyPlan {
         val overrideMap = overrides.associateBy(PlanWorkoutOverrideEntity::slotKey)

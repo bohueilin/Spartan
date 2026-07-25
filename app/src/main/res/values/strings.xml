@@ -47,6 +47,44 @@
     <string name="checkin_todays_plan">TODAY\'S PLAN</string>
     <string name="checkin_why_this_matters">WHY THIS MATTERS</string>
 
+    <!-- Coach hub -->
+    <string name="coach_title">Coach</string>
+    <string name="coach_goal_section">YOUR GOAL</string>
+    <string name="coach_goal_intro">Pick one focused goal. Spartan checks it against safe, sustainable rates and bends the week toward it.</string>
+    <string name="coach_set_goal">Set a goal</string>
+    <string name="coach_goal_type_weight">Lose weight</string>
+    <string name="coach_goal_type_sleep">Sleep &amp; recovery</string>
+    <string name="coach_goal_type_stress">Calm under pressure</string>
+    <string name="coach_goal_target_weight">Pounds to lose</string>
+    <string name="coach_goal_target_sleep">Percent improvement</string>
+    <string name="coach_goal_target_stress">Calm sessions per week</string>
+    <string name="coach_goal_weeks">Weeks</string>
+    <string name="coach_goal_save">Set goal</string>
+    <string name="coach_goal_abandon">Retire goal</string>
+    <string name="coach_goal_on_track">On track</string>
+    <string name="coach_goal_behind">Keep going</string>
+    <string name="coach_windows_section">HIGH-PRESSURE WINDOWS</string>
+    <string name="coach_windows_intro">Tell Spartan when your week gets tense — recurring meetings, reviews. It schedules a five-minute breathing reset just before each one.</string>
+    <string name="coach_window_add">Add window</string>
+    <string name="coach_window_label">Label (e.g. Standup)</string>
+    <string name="coach_window_start">Start hour (0–23)</string>
+    <string name="coach_window_end">End hour (1–24)</string>
+    <string name="coach_window_remove">Remove</string>
+    <string name="coach_stress_section">WHAT YOUR DATA SAYS</string>
+    <string name="coach_ranges_section">YOUR HEALTHY RANGES</string>
+    <string name="coach_ranges_intro">Typical ranges for a %1$s, next to your numbers. Your own baseline beats any table.</string>
+    <string name="coach_ranges_profile_cta">Add age and sex for tighter ranges</string>
+    <string name="coach_ranges_edit">Edit profile</string>
+    <string name="coach_range_typical">Typical %1$s</string>
+    <string name="coach_range_yours">You: %1$s</string>
+    <string name="coach_profile_sheet_title">About you</string>
+    <string name="coach_profile_sheet_body">Optional and on-device only: age and sex at birth tune the reference ranges and video picks. Spartan deliberately never asks your race — published reference data doesn\'t support race-based ranges, and your own baseline is the standard that matters.</string>
+    <string name="coach_profile_age">Age</string>
+    <string name="coach_profile_save">Save</string>
+    <string name="coach_sex_female">Female</string>
+    <string name="coach_sex_male">Male</string>
+    <string name="coach_sex_unspecified">Prefer not to say</string>
+
     <!-- Common -->
     <string name="common_brand">SPARTAN</string>
     <string name="notification_public_body">You have a reminder. Unlock to see it.</string>

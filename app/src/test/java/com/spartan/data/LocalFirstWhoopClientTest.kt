@@ -31,6 +31,8 @@ class LocalFirstWhoopClientTest {
                 lastDay = cycles.maxOfOrNull { it.dateEpochDay },
             ),
         )
+        override fun observeRecentCycles(): Flow<List<WhoopCycleEntity>> =
+            MutableStateFlow(cycles.sortedByDescending { it.dateEpochDay }.take(60))
     }
 
     private fun cycle(day: Long, recovery: Int) = WhoopCycleEntity(dateEpochDay = day, recoveryScore = recovery)
