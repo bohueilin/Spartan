@@ -1,6 +1,7 @@
 package com.spartan.ui.screens
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -88,8 +89,13 @@ fun OnboardingScreen(onComplete: (String, Double?, Int?) -> Unit) {
     var height by rememberSaveable { mutableStateOf("") }
     var age by rememberSaveable { mutableStateOf("") }
     Column(
-        // Rendered outside the Scaffold, so it handles its own edge-to-edge insets.
-        modifier = Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(28.dp),
+        // Rendered outside the Scaffold, so it paints its own background (the window can show the
+        // wallpaper through on some devices) and handles its own edge-to-edge insets.
+        modifier = Modifier.fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .safeDrawingPadding()
+            .verticalScroll(rememberScrollState())
+            .padding(28.dp),
         verticalArrangement = Arrangement.Center,
     ) {
         Text(
