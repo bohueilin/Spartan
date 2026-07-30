@@ -436,7 +436,6 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             refreshing.value = true
             preferencesStore.recordFirstOpenIfNeeded(System.currentTimeMillis())
-            refreshing.value = true
             try {
                 refreshPlan(forceReseed = false)
             } finally {
