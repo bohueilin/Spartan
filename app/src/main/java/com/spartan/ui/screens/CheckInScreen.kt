@@ -2,7 +2,9 @@ package com.spartan.ui.screens
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -31,6 +33,8 @@ import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -41,12 +45,16 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.delay
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -93,6 +101,7 @@ import java.time.format.DateTimeFormatter
  * accent, instant hierarchy, tactile check-off, and honest loading/empty states. Every interactive
  * element carries semantics for TalkBack and meets the 48dp touch-target minimum.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CheckInScreen(
     state: MainUiState,
@@ -105,6 +114,7 @@ fun CheckInScreen(
     onLogExercise: (DailyActivity, Int, Int, Boolean) -> Unit = { _, _, _, _ -> },
     onOpenRecoveryExplainer: () -> Unit = {},
     onOpenMetric: (MetricType) -> Unit = {},
+    onRefresh: () -> Unit = {},
 ) {
     // Device-local minute of day, re-read each minute so an untouched plan escalates to amber at
     // noon and red after 6pm live, without the user having to reopen the screen.
@@ -133,6 +143,11 @@ fun CheckInScreen(
     // the empty state + banner instead of looping the skeleton forever.
     val loading = state.planHeadline.isBlank() && state.todayActivities.isEmpty() &&
         state.readinessBand == null && !state.syncFailed
+    PullToRefreshBox(
+        isRefreshing = state.isRefreshing,
+        onRefresh = onRefresh,
+        modifier = Modifier.fillMaxSize(),
+    ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(horizontal = Spacing.xl),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
@@ -143,7 +158,14 @@ fun CheckInScreen(
         if (loading) {
             item { LoadingPlan() }
         } else {
+            item { Greeting(state) }
             item { PlanProgress(state) }
+            if (state.consistencyFlags.any { it }) {
+                item { ConsistencyStrip(state.consistencyFlags) }
+            }
+            if (planFinished(state)) {
+                item { DayCompleteCard(state) }
+            }
             if (state.syncFailed) {
                 item { SafetyBanner(stringResource(R.string.checkin_sync_failed)) }
             }
@@ -165,6 +187,7 @@ fun CheckInScreen(
             }
         }
         item { Footer() }
+    }
     }
 
     debriefFor?.let { activity ->
@@ -237,14 +260,19 @@ private fun ReadinessRing(recovery: Int?, bandName: String, state: MainUiState) 
         Modifier.size(88.dp).semantics(mergeDescendants = true) { contentDescription = a11y },
         contentAlignment = Alignment.Center,
     ) {
+        // The morning ritual: ring sweeps in and the number counts up on first reveal.
+        var reveal by remember { mutableFloatStateOf(0f) }
+        val revealAnim by animateFloatAsState(reveal, tween(Motion.slow * 2), label = "ringReveal")
+        LaunchedEffect(recovery) { reveal = 1f }
         Canvas(Modifier.size(88.dp)) {
             val stroke = 9.dp.toPx()
             drawArc(track, 0f, 360f, false, style = Stroke(width = stroke, cap = StrokeCap.Round))
-            val sweep = ((recovery ?: 0).coerceIn(0, 100)) / 100f * 360f
+            val sweep = ((recovery ?: 0).coerceIn(0, 100)) / 100f * 360f * revealAnim
             drawArc(color, -90f, sweep, false, style = Stroke(width = stroke, cap = StrokeCap.Round))
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(recovery?.toString() ?: "--", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            val shown = recovery?.let { (it * revealAnim).toInt().toString() } ?: "--"
+            Text(shown, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             Text(stringResource(R.string.checkin_recovery_caption), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
@@ -410,6 +438,12 @@ private fun ActivityCard(
 
 @Composable
 private fun SpartanCheck(done: Boolean, label: String, onToggle: () -> Unit) {
+    val haptic = LocalHapticFeedback.current
+    val scale by animateFloatAsState(
+        if (done) 1f else 0.96f,
+        spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "checkScale",
+    )
     val bg by animateColorAsState(if (done) MaterialTheme.colorScheme.primary else Color.Transparent, tween(Motion.fast), label = "bg")
     val border by animateColorAsState(if (done) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant, tween(Motion.fast), label = "border")
     val checkAlpha by animateFloatAsState(if (done) 1f else 0f, tween(Motion.fast), label = "check")
@@ -419,12 +453,16 @@ private fun SpartanCheck(done: Boolean, label: String, onToggle: () -> Unit) {
     Box(
         Modifier
             .size(48.dp)
-            .toggleable(value = done, role = Role.Checkbox, onValueChange = { onToggle() })
+            .toggleable(value = done, role = Role.Checkbox, onValueChange = {
+                if (!done) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                onToggle()
+            })
             .semantics { stateDescription = if (done) completedDescription else notCompletedDescription; contentDescription = label },
         contentAlignment = Alignment.Center,
     ) {
         Box(
-            Modifier.size(26.dp).clip(RoundedCornerShape(9.dp)).background(bg).border(2.dp, border, RoundedCornerShape(9.dp)),
+            Modifier.size(26.dp).graphicsLayer { scaleX = scale; scaleY = scale }
+                .clip(RoundedCornerShape(9.dp)).background(bg).border(2.dp, border, RoundedCornerShape(9.dp)),
             contentAlignment = Alignment.Center,
         ) {
             Icon(Icons.Rounded.Check, contentDescription = null, tint = onPrimary, modifier = Modifier.size(17.dp).graphicsLayer { alpha = checkAlpha })
@@ -582,6 +620,94 @@ private fun Footer() {
 
 private fun timeOfDayLabel(activity: DailyActivity): String =
     activity.bestTimeOfDay.name.lowercase().replaceFirstChar { it.uppercase() }
+
+
+/** The whole plan is resolved and at least one thing was actually done. */
+private fun planFinished(state: MainUiState): Boolean =
+    state.todayActivities.isNotEmpty() &&
+        state.todayActivities.any { it.status == ActivityStatus.DONE } &&
+        state.todayActivities.all { it.status == ActivityStatus.DONE || it.status == ActivityStatus.SKIPPED }
+
+@Composable
+private fun Greeting(state: MainUiState) {
+    val hour = remember { java.time.LocalTime.now().hour }
+    val base = stringResource(
+        when {
+            hour < 12 -> R.string.checkin_good_morning
+            hour < 17 -> R.string.checkin_good_afternoon
+            else -> R.string.checkin_good_evening
+        },
+    )
+    val name = state.profile?.displayName?.takeIf { it.isNotBlank() && it != "You" }
+    Text(
+        if (name != null) "$base, $name." else "$base.",
+        style = MaterialTheme.typography.titleLarge,
+        fontWeight = FontWeight.Bold,
+    )
+}
+
+/** Seven calm dots, oldest → today. Consistency shown, never a streak to lose. */
+@Composable
+private fun ConsistencyStrip(flags: List<Boolean>) {
+    val activeDays = flags.count { it }
+    val description = stringResource(R.string.checkin_consistency_a11y, activeDays)
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = description },
+    ) {
+        Text(
+            stringResource(R.string.checkin_consistency_label),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        flags.forEachIndexed { index, active ->
+            val isToday = index == flags.lastIndex
+            Box(
+                Modifier
+                    .size(if (isToday) 10.dp else 8.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(
+                        if (active) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.surfaceVariant,
+                    ),
+            )
+        }
+    }
+}
+
+/** The calm completion moment — an ending, not a firework. */
+@Composable
+private fun DayCompleteCard(state: MainUiState) {
+    Surface(
+        Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(Radius.card),
+        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
+    ) {
+        Row(Modifier.padding(Spacing.lg), verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                Icons.Rounded.Check,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(22.dp),
+            )
+            Spacer(Modifier.width(Spacing.md))
+            Column {
+                Text(
+                    stringResource(R.string.checkin_day_complete),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Text(
+                    stringResource(R.string.checkin_day_complete_sub),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
 
 private val clockFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("h:mm a")
 private fun clockTime(epochMillis: Long): String =

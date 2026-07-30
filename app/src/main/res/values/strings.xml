@@ -46,6 +46,13 @@
     <string name="checkin_sync_failed">Couldn\'t refresh WHOOP data. Showing your most recent sync.</string>
     <string name="checkin_todays_plan">TODAY\'S PLAN</string>
     <string name="checkin_why_this_matters">WHY THIS MATTERS</string>
+    <string name="checkin_good_morning">Good morning</string>
+    <string name="checkin_good_afternoon">Good afternoon</string>
+    <string name="checkin_good_evening">Good evening</string>
+    <string name="checkin_consistency_label">Last 7 days</string>
+    <string name="checkin_consistency_a11y">Active on %1$d of the last 7 days</string>
+    <string name="checkin_day_complete">Day complete.</string>
+    <string name="checkin_day_complete_sub">Recovery earned. See where this takes you in Review.</string>
 
     <!-- Coach hub -->
     <string name="coach_title">Coach</string>

@@ -48,6 +48,11 @@
             </intent-filter>
         </receiver>
 
+        <!-- Notification action buttons (Done / Snooze) — explicit intents only. -->
+        <receiver
+            android:name=".data.reminder.ActivityActionReceiver"
+            android:exported="false" />
+
         <!-- Home-screen "next activity" widget. -->
         <receiver
             android:name=".ui.widget.NextActivityWidgetReceiver"

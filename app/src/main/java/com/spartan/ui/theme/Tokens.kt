@@ -30,6 +30,7 @@ object Radius {
 object Motion {
     const val fast = 140      // micro-interactions (check-off)
     const val medium = 220    // card expand / state change
+    const val slow = 420      // reveal moments (readiness ring sweep)
 }
 
 /**

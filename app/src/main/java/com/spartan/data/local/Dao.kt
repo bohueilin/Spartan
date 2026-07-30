@@ -209,6 +209,13 @@ interface HealthDao {
 
     @Query("DELETE FROM pressure_windows")
     suspend fun deletePressureWindows()
+
+    /** The distinct days that had a completed activity — powers the 7-day consistency strip. */
+    @Query(
+        "SELECT DISTINCT dateEpochDay FROM daily_activities " +
+            "WHERE status = 'DONE' AND dateEpochDay BETWEEN :startDay AND :endDay",
+    )
+    suspend fun completedActivityDays(startDay: Long, endDay: Long): List<Long>
 }
 
 /**

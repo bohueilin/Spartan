@@ -113,6 +113,10 @@ data class MainUiState(
     val requestReview: Boolean = false,
     /** Expected-improvement ranges at the current consistency (typical ranges, never guarantees). */
     val projections: List<MetricProjection> = emptyList(),
+    /** Oldest→today: which of the trailing 7 days had a completed activity (consistency strip). */
+    val consistencyFlags: List<Boolean> = emptyList(),
+    /** True while a user-initiated refresh (pull-to-refresh) is in flight. */
+    val isRefreshing: Boolean = false,
     /** State of an in-flight or finished WHOOP CSV import (null when none this session). */
     val whoopImport: WhoopImportUiState? = null,
     /** Persistent summary of imported WHOOP data, for the Metrics-tab banner (null when none). */
@@ -173,6 +177,7 @@ private data class CheckInBundle(
     val whoopConnected: Boolean,
     val calendarConnected: Boolean,
     val consistencyDays7: Int,
+    val consistencyFlags: List<Boolean>,
 )
 
 @HiltViewModel
@@ -201,6 +206,7 @@ class MainViewModel @Inject constructor(
     private val latestSnapshot = MutableStateFlow<WhoopSnapshot?>(null)
     private val syncFailed = MutableStateFlow(false)
     private val reviewRequested = MutableStateFlow(false)
+    private val refreshing = MutableStateFlow(false)
     private val whoopImportState = MutableStateFlow<WhoopImportUiState?>(null)
 
     /** Persistent imported-data summary for the Metrics banner; null when nothing is imported. */
@@ -241,11 +247,13 @@ class MainViewModel @Inject constructor(
         val reviewWanted: Boolean,
         val whoopImport: WhoopImportUiState?,
         val goalNotice: String?,
+        val refreshing: Boolean,
     )
 
-    private val transientFlags = combine(syncFailed, reviewRequested, whoopImportState, goalNotice) { s, r, i, g ->
-        Transients(s, r, i, g)
-    }
+    private val transientFlags =
+        combine(syncFailed, reviewRequested, whoopImportState, goalNotice, refreshing) { s, r, i, g, f ->
+            Transients(s, r, i, g, f)
+        }
 
     private val healthBundle = combine(
         repository.profile,
@@ -311,7 +319,7 @@ class MainViewModel @Inject constructor(
     }
 
     private val consistencyFlow = repository.dailyActivities(today)
-        .map { repository.consistencyDays(7, today) }
+        .map { repository.consistencyDays(7, today) to repository.consistencyFlags(7, today) }
 
     private val checkInBundle = combine(
         repository.dailyActivities(today),
@@ -319,7 +327,7 @@ class MainViewModel @Inject constructor(
         generatedPlan,
         readinessState,
         consistencyFlow,
-    ) { entities, connections, plan, readiness, consistency ->
+    ) { entities, connections, plan, readiness, (consistencyCount, consistencyBits) ->
         CheckInBundle(
             activities = entities.map { it.toDomain() },
             plan = plan,
@@ -330,7 +338,8 @@ class MainViewModel @Inject constructor(
             calendarConnected = connections.any {
                 it.provider == IntegrationProvider.GOOGLE_CALENDAR && it.status == ConnectionStatus.CONNECTED
             },
-            consistencyDays7 = consistency,
+            consistencyDays7 = consistencyCount,
+            consistencyFlags = consistencyBits,
         )
     }
 
@@ -341,7 +350,7 @@ class MainViewModel @Inject constructor(
         checkInBundle,
         transientFlags,
     ) { onboardingComplete, notificationDenied, health, checkIn, transients ->
-        val (syncDidFail, reviewWanted, whoopImport, goalNoticeText) = transients
+        val (syncDidFail, reviewWanted, whoopImport, goalNoticeText, refreshBusy) = transients
         val latest = latestReadings(health.readings)
         val targetMap = health.targets.associateBy(TargetValue::metricType)
         // Assess only values the engine considers valid: one out-of-range persisted row
@@ -386,6 +395,8 @@ class MainViewModel @Inject constructor(
             syncFailed = syncDidFail,
             consistencyDays7 = checkIn.consistencyDays7,
             requestReview = reviewWanted,
+            consistencyFlags = checkIn.consistencyFlags,
+            isRefreshing = refreshBusy,
             whoopImport = whoopImport,
             whoopImportInfo = health.whoopImportInfo,
             activeGoal = health.coach.activeGoal,
@@ -423,8 +434,14 @@ class MainViewModel @Inject constructor(
      */
     fun loadToday() {
         viewModelScope.launch {
+            refreshing.value = true
             preferencesStore.recordFirstOpenIfNeeded(System.currentTimeMillis())
-            refreshPlan(forceReseed = false)
+            refreshing.value = true
+            try {
+                refreshPlan(forceReseed = false)
+            } finally {
+                refreshing.value = false
+            }
         }
     }
 

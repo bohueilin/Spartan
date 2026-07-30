@@ -20,8 +20,11 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.util.Consumer
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -81,6 +84,7 @@ fun SpartanRoot(
         onDispose { activity?.removeOnNewIntentListener(listener) }
     }
 
+
     Scaffold(
         bottomBar = {
             val backStack by navController.currentBackStackEntryAsState()
@@ -124,6 +128,7 @@ fun SpartanRoot(
                     onLogExercise = viewModel::logExerciseDebrief,
                     onOpenRecoveryExplainer = { navController.navigate("detail/RECOVERY_SCORE") },
                     onOpenMetric = { navController.navigate("detail/${it.name}") },
+                    onRefresh = viewModel::loadToday,
                 )
             }
             composable("metrics") {

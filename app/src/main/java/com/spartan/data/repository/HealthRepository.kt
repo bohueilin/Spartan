@@ -164,6 +164,12 @@ class HealthRepository @Inject constructor(
     suspend fun completedBreathworkCount(startDay: Long, endDay: Long): Int =
         dao.completedBreathworkCount(startDay, endDay)
 
+    /** Oldest→today booleans for the trailing [days]: did each day have a completed activity? */
+    suspend fun consistencyFlags(days: Int, todayEpochDay: Long): List<Boolean> {
+        val active = dao.completedActivityDays(todayEpochDay - (days - 1), todayEpochDay).toSet()
+        return ((days - 1) downTo 0).map { offset -> (todayEpochDay - offset) in active }
+    }
+
     // --- WHOOP sync (normalize snapshots into metric_entries; idempotent per day) ---
     /**
      * [extraReadings] lets the CSV import add per-day exercise minutes (tagged 'WHOOP workouts',

@@ -72,6 +72,8 @@ class ReminderScheduler @Inject constructor(
                     .putString(ReminderWorker.KEY_TITLE, title)
                     .putString(ReminderWorker.KEY_BODY, body)
                     .putInt(ReminderWorker.KEY_DAYS_OF_WEEK_MASK, 127)
+                    .putString(ReminderWorker.KEY_ACTIVITY_ID, activityId)
+                    .putString(ReminderWorker.KEY_ACTIVITY_TITLE, title)
                     .build(),
             )
             .build()

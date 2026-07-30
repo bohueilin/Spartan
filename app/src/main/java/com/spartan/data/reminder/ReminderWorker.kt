@@ -23,7 +23,11 @@ class ReminderWorker(
         val reminderId = inputData.getString(KEY_REMINDER_ID) ?: inputData.getString(KEY_TITLE) ?: "spartan"
         val title = inputData.getString(KEY_TITLE) ?: "Spartan"
         val body = inputData.getString(KEY_BODY) ?: "Take a minute to log your health data."
-        postNotification(applicationContext, reminderId, title, body)
+        postNotification(
+            applicationContext, reminderId, title, body,
+            activityId = inputData.getString(KEY_ACTIVITY_ID),
+            activityTitle = inputData.getString(KEY_ACTIVITY_TITLE),
+        )
         return Result.success()
     }
 
@@ -33,12 +37,21 @@ class ReminderWorker(
         const val KEY_TITLE = "title"
         const val KEY_BODY = "body"
         const val KEY_DAYS_OF_WEEK_MASK = "days_of_week_mask"
+        const val KEY_ACTIVITY_ID = "activity_id"
+        const val KEY_ACTIVITY_TITLE = "activity_title"
 
         /**
          * Post a Spartan notification. Tapping deep-links to the daily check-in (spartan://today).
          * Swallows SecurityException (permission revoked mid-flight) — reminders must never crash.
          */
-        fun postNotification(context: Context, id: String, title: String, body: String) {
+        fun postNotification(
+            context: Context,
+            id: String,
+            title: String,
+            body: String,
+            activityId: String? = null,
+            activityTitle: String? = null,
+        ) {
             ensureChannel(context)
             val deepLink = Intent(Intent.ACTION_VIEW, Uri.parse("spartan://today")).apply {
                 setPackage(context.packageName)
@@ -59,7 +72,7 @@ class ReminderWorker(
                 .setContentIntent(contentIntent)
                 .setAutoCancel(true)
                 .build()
-            val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+            val builder = NotificationCompat.Builder(context, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_notification)
                 .setContentTitle(title)
                 .setContentText(body)
@@ -69,7 +82,26 @@ class ReminderWorker(
                 .setAutoCancel(true)
                 .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
                 .setPublicVersion(publicVersion)
-                .build()
+            // Per-activity reminders get one-tap actions — work the plan without opening the app.
+            if (activityId != null) {
+                fun actionIntent(action: String, requestOffset: Int): PendingIntent {
+                    val intent = Intent(context, ActivityActionReceiver::class.java).apply {
+                        this.action = action
+                        putExtra(ActivityActionHandler.EXTRA_ACTIVITY_ID, activityId)
+                        putExtra(ActivityActionHandler.EXTRA_ACTIVITY_TITLE, activityTitle ?: title)
+                        putExtra(ActivityActionHandler.EXTRA_NOTIFICATION_ID, id.hashCode())
+                    }
+                    return PendingIntent.getBroadcast(
+                        context,
+                        id.hashCode() + requestOffset,
+                        intent,
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                    )
+                }
+                builder.addAction(0, "Done", actionIntent(ActivityActionHandler.ACTION_DONE, 1))
+                builder.addAction(0, "Snooze 1 hour", actionIntent(ActivityActionHandler.ACTION_SNOOZE, 2))
+            }
+            val notification = builder.build()
             try {
                 NotificationManagerCompat.from(context).notify(id.hashCode(), notification)
             } catch (_: SecurityException) {
