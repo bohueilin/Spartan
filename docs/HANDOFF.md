@@ -163,8 +163,8 @@ mock/sample data stays visibly labeled; projections stay capped ranges; no analy
 `Spartan_Decisions.md` wins naming disputes; keep Android and iOS engines behaviorally identical
 (the mirrored test suites are the contract); commit + push at every stable checkpoint.
 
-**Open threads:** (a) the fitness-app design-research sweep was interrupted mid-run — if
-`docs/research/` is missing or thin, re-run it (resume: `Workflow({scriptPath, resumeFromRunId:
-"wf_1e043c4b-9ea"})` from the prior session, or just relaunch fresh); (b) `docs/NEXT_PHASES.md`
-exists from the overnight cycle — reconcile it against research once re-run; (c) the GitHub poster
-image slot (`docs/assets/spartan-github.png`) — regenerate anytime with `docs/assets/POSTER_PROMPT.md`.
+**Open threads:** (a) the design-research sweep completed its deliverables before the session was
+interrupted — `docs/research/FITNESS_APP_DESIGN_2026.md` and `HABIT_RETENTION_UX_2026.md` are in
+place; mine them (with [NEXT_PHASES.md](NEXT_PHASES.md)) when picking the next UX build cycle;
+(b) the GitHub banner slot (`docs/assets/spartan-github.png`) can be regenerated anytime with
+`docs/assets/POSTER_PROMPT.md`.
