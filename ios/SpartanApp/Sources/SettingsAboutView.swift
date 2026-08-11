@@ -21,12 +21,11 @@ struct SettingsAboutView: View {
     }
 
     var body: some View {
+        // NavigationStack large title (not a hand-rolled Text): collapse-on-scroll and the
+        // scroll-edge treatment are what make this surface feel native on iOS.
+        NavigationStack {
         ScrollView {
             VStack(alignment: .leading, spacing: SpartanSpacing.md) {
-                Text("Settings")
-                    .font(.largeTitle.weight(.semibold))
-                    .foregroundColor(.spartanOnSurface)
-
                 // About card (settings_about / settings_version / settings_disclaimer).
                 VStack(alignment: .leading, spacing: 0) {
                     Text("About Spartan")
@@ -98,11 +97,13 @@ struct SettingsAboutView: View {
             .padding(SpartanSpacing.xl)
         }
         .background(Color.spartanBackground.ignoresSafeArea())
+        .navigationTitle("Settings")
         .alert("Delete local data?", isPresented: $confirmDelete) {
             Button("Delete", role: .destructive) { viewModel.deleteAllData() }
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("This deletes local health data on this device. This action cannot be undone.")
+        }
         }
     }
 }

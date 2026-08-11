@@ -36,15 +36,16 @@ object Motion {
 /**
  * The single place readiness band → color is defined. Used by the ring, band label, and progress.
  * Theme-aware: the bright variants fail WCAG 3:1 on light surfaces (verified by the contrast
- * audit in docs/ACCESSIBILITY.md), so light mode uses darkened equivalents (all ≥4.5:1 on white).
+ * audit in docs/ACCESSIBILITY.md), so light mode uses darkened equivalents — all ≥4.5:1 on white
+ * AND on their own 18%-alpha tinted chips (the urgency-chip case the original audit missed).
  */
 object SpartanBands {
     val primedDark = Color(0xFF38D07E)
     val easyDark = Color(0xFFE7B25A)
     val restDark = Color(0xFFE67A5A)
     val primedLight = Color(0xFF0E7B43)
-    val easyLight = Color(0xFF8F6410)
-    val restLight = Color(0xFFB23E20)
+    val easyLight = Color(0xFF7C570E)
+    val restLight = Color(0xFFA0381D)
 }
 
 @Composable

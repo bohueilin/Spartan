@@ -1,7 +1,10 @@
 package com.spartan.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -9,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -67,17 +71,22 @@ fun CoachScreen(
     var showGoalSheet by remember { mutableStateOf(false) }
     var showProfileSheet by remember { mutableStateOf(false) }
 
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
     LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier.widthIn(max = 600.dp).fillMaxSize().padding(horizontal = Spacing.xl),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         item { Spacer(Modifier.height(Spacing.sm)) }
         item {
-            Text(
-                stringResource(R.string.coach_title),
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.SemiBold,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    stringResource(R.string.coach_title),
+                    style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f),
+                )
+                if (state.whoopIsMock) SampleDataChip()
+            }
         }
 
         state.goalNotice?.let { notice ->
@@ -139,11 +148,12 @@ fun CoachScreen(
 
         item { CoachSectionLabel(stringResource(R.string.plan_title).uppercase()) }
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
                 WeeklyPlanSection(state, onEditMinutes, onComplete)
             }
         }
         item { Spacer(Modifier.height(Spacing.lg)) }
+    }
     }
 
     if (showGoalSheet) {
@@ -232,6 +242,7 @@ private fun goalTitle(type: GoalType, target: Double): String = when (type) {
     GoalType.STRESS_RESILIENCE -> "${stringResource(R.string.coach_goal_type_stress)} · ${target.toInt()}/wk"
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun PressureWindowsCard(
     windows: List<PressureWindow>,
@@ -270,7 +281,12 @@ private fun PressureWindowsCard(
                     Text(stringResource(R.string.coach_window_add))
                 }
             } else {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                // FlowRow: seven day chips need ~400dp — on a 360dp phone a fixed Row pushed
+                // Saturday and Sunday off-screen entirely.
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+                ) {
                     DayOfWeek.entries.forEach { day ->
                         val bit = 1 shl day.ordinal
                         FilterChip(

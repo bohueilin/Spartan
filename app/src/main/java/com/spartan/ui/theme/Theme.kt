@@ -19,10 +19,10 @@ private val SpartanAccent = Color(0xFF15C9B0)
 private val SpartanAccentDark = Color(0xFF3FE0C8)
 
 private val LightColors: ColorScheme = lightColorScheme(
-    primary = Color(0xFF0E7C6E),
+    primary = Color(0xFF0B685C),
     onPrimary = Color.White,
     secondary = Color(0xFF2C3A44),
-    tertiary = Color(0xFF9A6A1B),
+    tertiary = Color(0xFF7E5613),
     background = Color(0xFFF6F8F8),
     surface = Color(0xFFFFFFFF),
     surfaceVariant = Color(0xFFE6ECEB),

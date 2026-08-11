@@ -6,7 +6,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -25,9 +27,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.spartan.R
 import com.spartan.domain.model.DailyActivity
 import kotlin.math.roundToInt
 
@@ -67,16 +74,31 @@ fun ExerciseDebriefSheet(
                 modifier = Modifier.fillMaxWidth(),
             )
             Text("Effort ${rpe.roundToInt()} of 10", style = MaterialTheme.typography.labelLarge)
-            Slider(value = rpe, onValueChange = { rpe = it }, valueRange = 1f..10f, steps = 8)
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            val effortDescription = stringResource(R.string.a11y_effort_slider)
+            Slider(
+                value = rpe,
+                onValueChange = { rpe = it },
+                valueRange = 1f..10f,
+                steps = 8,
+                // The visible "Effort N of 10" text is a separate node; without this TalkBack
+                // announces an anonymous slider — and this value feeds the deload rules.
+                modifier = Modifier.semantics { contentDescription = effortDescription },
+            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                // Row-level toggleable merges label + role + state into one TalkBack announcement
+                // and makes the whole row the target — this is the safety-critical pain input.
+                modifier = Modifier.toggleable(value = pain, role = Role.Switch, onValueChange = { pain = it }),
+            ) {
                 Text("Pain or concerning symptoms", Modifier.weight(1f))
-                Switch(checked = pain, onCheckedChange = { pain = it })
+                Switch(checked = pain, onCheckedChange = null)
             }
             Button(
                 onClick = {
                     onSave(minutesText.toIntOrNull() ?: activity.estimatedMinutes, rpe.roundToInt(), pain)
                 },
-                modifier = Modifier.fillMaxWidth().height(52.dp),
+                // heightIn, not height: the label must grow with font scale, not clip.
+                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
             ) { Text("Save session", fontWeight = FontWeight.SemiBold) }
             TextButton(onClick = onSkip, modifier = Modifier.fillMaxWidth()) { Text("Skip") }
             Text(

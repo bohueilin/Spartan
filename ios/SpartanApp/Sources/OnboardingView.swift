@@ -9,6 +9,7 @@
 // authoring machine).
 
 import SwiftUI
+import UIKit
 
 struct OnboardingView: View {
     @EnvironmentObject private var viewModel: CheckInViewModel
@@ -36,12 +37,12 @@ struct OnboardingView: View {
                     .padding(.top, SpartanSpacing.md)
                 Spacer().frame(height: 32)
 
-                TextField("What should we call you?", text: $name)
-                    .textFieldStyle(.roundedBorder)
+                // Persistent labels above token-styled fields: a placeholder-as-label vanishes
+                // the moment the user types, leaving anonymous boxes (Android keeps its
+                // OutlinedTextField floating labels — this is the SwiftUI equivalent).
+                SpartanLabeledField(label: "What should we call you?", text: $name)
                 Spacer().frame(height: SpartanSpacing.md)
-                TextField("Height in cm (optional)", text: $height)
-                    .textFieldStyle(.roundedBorder)
-                    .keyboardType(.decimalPad)
+                SpartanLabeledField(label: "Height in cm (optional)", text: $height, keyboard: .decimalPad)
                 Spacer().frame(height: SpartanSpacing.lg)
 
                 Button {
@@ -66,5 +67,34 @@ struct OnboardingView: View {
             .padding(28)
         }
         .background(Color.spartanBackground.ignoresSafeArea())
+    }
+}
+
+/// Onboarding text field with a label that persists after input, styled with the Spartan
+/// surface/outline/radius tokens instead of the stock system `.roundedBorder`.
+private struct SpartanLabeledField: View {
+    let label: String
+    @Binding var text: String
+    var keyboard: UIKeyboardType = .default
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: SpartanSpacing.xs) {
+            Text(label)
+                .font(.caption.weight(.semibold))
+                .foregroundColor(.spartanOnSurfaceVariant)
+            TextField("", text: $text)
+                .textFieldStyle(.plain)
+                .keyboardType(keyboard)
+                .padding(SpartanSpacing.md)
+                .background(
+                    RoundedRectangle(cornerRadius: SpartanRadius.chip)
+                        .fill(Color.spartanSurface)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: SpartanRadius.chip)
+                        .strokeBorder(Color.spartanOutline, lineWidth: 1)
+                )
+                .accessibilityLabel(label)
+        }
     }
 }

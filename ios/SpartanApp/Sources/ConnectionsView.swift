@@ -26,11 +26,11 @@ struct ConnectionsView: View {
     @State private var showWhoopImporter = false
 
     var body: some View {
+        // NavigationStack large title (not a hand-rolled Text): collapse-on-scroll and the
+        // scroll-edge treatment are what make this surface feel native on iOS.
+        NavigationStack {
         ScrollView {
             VStack(alignment: .leading, spacing: SpartanSpacing.lg) {
-                Text("Connections")
-                    .font(.largeTitle.weight(.semibold))
-                    .foregroundColor(.spartanOnSurface)
                 Text("Spartan treats your health, activity, and calendar data as sensitive. Data stays on your device, is used only to build your plan, and is never sold or used for ads.")
                     .font(.subheadline)
                     .foregroundColor(.spartanOnSurfaceVariant)
@@ -39,6 +39,7 @@ struct ConnectionsView: View {
                 IntegrationCard(
                     title: "WHOOP",
                     connected: viewModel.whoopConnected,
+                    isSample: viewModel.whoopIsMock,
                     body: "Reads your recovery, sleep, strain, HRV, resting heart rate, and respiratory rate to personalize your daily plan. Read-only. No data is written back to WHOOP.",
                     scopes: [
                         "read:recovery, read:sleep — recovery and sleep",
@@ -62,12 +63,15 @@ struct ConnectionsView: View {
                 IntegrationCard(
                     title: "Google Calendar",
                     connected: viewModel.calendarConnected,
+                    // This build's calendar client is always the offline stub — the card must
+                    // say so instead of offering a "Connect" that connects nothing.
+                    isSample: true,
                     body: "Reads your free/busy times only — never event titles or details — to schedule activities into open windows. Creating calendar events is a separate, optional step you confirm each time.",
                     scopes: [
                         "calendar.freebusy — busy/free times only",
                         "calendar.events — only if you opt in to adding events",
                     ],
-                    connectLabel: "Connect Calendar",
+                    connectLabel: "Use sample calendar",
                     onConnect: { viewModel.connectCalendar() },
                     onDisconnect: { viewModel.disconnectCalendar() }
                 )
@@ -82,6 +86,7 @@ struct ConnectionsView: View {
             .padding(SpartanSpacing.xl)
         }
         .background(Color.spartanBackground.ignoresSafeArea())
+        .navigationTitle("Connections")
         .fileImporter(
             isPresented: $showWhoopImporter,
             allowedContentTypes: [.commaSeparatedText, .plainText, .data],
@@ -90,6 +95,7 @@ struct ConnectionsView: View {
             if case let .success(urls) = result {
                 importWhoopExport(urls)
             }
+        }
         }
     }
 
@@ -125,6 +131,7 @@ struct ConnectionsView: View {
 private struct IntegrationCard: View {
     let title: String
     let connected: Bool
+    let isSample: Bool
     let body_: String
     let scopes: [String]
     let connectLabel: String
@@ -137,6 +144,7 @@ private struct IntegrationCard: View {
     init(
         title: String,
         connected: Bool,
+        isSample: Bool = false,
         body: String,
         scopes: [String],
         connectLabel: String,
@@ -148,6 +156,7 @@ private struct IntegrationCard: View {
     ) {
         self.title = title
         self.connected = connected
+        self.isSample = isSample
         self.body_ = body
         self.scopes = scopes
         self.connectLabel = connectLabel
@@ -165,7 +174,10 @@ private struct IntegrationCard: View {
                     .font(.headline.weight(.semibold))
                     .foregroundColor(.spartanOnSurface)
                 Spacer()
-                if connected { ConnectedChip() }
+                // Honest provenance: sample/stub integrations never wear the CONNECTED chip.
+                if connected {
+                    if isSample { SampleSourceChip() } else { ConnectedChip() }
+                }
             }
             Text(body_)
                 .font(.subheadline)
@@ -324,6 +336,21 @@ private struct ConnectedChip: View {
             .background(
                 RoundedRectangle(cornerRadius: 6)
                     .fill(Color.spartanAccent.opacity(0.16))
+            )
+    }
+}
+
+/// Same styling as the check-in's SAMPLE DATA chip (tertiary on 16% tint).
+private struct SampleSourceChip: View {
+    var body: some View {
+        Text("SAMPLE DATA")
+            .font(.caption2.weight(.bold))
+            .foregroundColor(.spartanTertiary)
+            .padding(.horizontal, SpartanSpacing.sm)
+            .padding(.vertical, 3)
+            .background(
+                RoundedRectangle(cornerRadius: SpartanRadius.chip)
+                    .fill(Color.spartanTertiary.opacity(0.16))
             )
     }
 }

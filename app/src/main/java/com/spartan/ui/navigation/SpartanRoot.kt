@@ -4,6 +4,9 @@ import android.content.Intent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.runtime.DisposableEffect
@@ -49,6 +52,7 @@ import com.spartan.ui.screens.ReviewScreen
 import com.spartan.ui.screens.SettingsScreen
 import com.spartan.ui.screens.WorkoutCompletionScreen
 import com.spartan.ui.screens.MainViewModel
+import com.spartan.ui.theme.Motion
 
 private data class Tab(val route: String, val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector)
 
@@ -111,6 +115,12 @@ fun SpartanRoot(
             navController = navController,
             startDestination = "today",
             modifier = Modifier.padding(padding),
+            // Motion.medium fades: the library default is a 700ms cross-fade, which reads as lag
+            // on tab switches — the highest-frequency gesture in the app.
+            enterTransition = { fadeIn(tween(Motion.medium)) },
+            exitTransition = { fadeOut(tween(Motion.medium)) },
+            popEnterTransition = { fadeIn(tween(Motion.medium)) },
+            popExitTransition = { fadeOut(tween(Motion.medium)) },
         ) {
             composable(
                 "today",

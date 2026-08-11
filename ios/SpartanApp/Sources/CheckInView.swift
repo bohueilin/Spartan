@@ -11,6 +11,7 @@
 // authoring machine).
 
 import SwiftUI
+import UIKit
 import SpartanKit
 
 struct CheckInView: View {
@@ -143,6 +144,13 @@ private struct ReadinessRing: View {
     let recovery: Int?
     let band: ReadinessBand?
 
+    // The ring grows with Dynamic Type so the score and caption never outgrow the circle.
+    @ScaledMetric(relativeTo: .title2) private var ringSize: CGFloat = 88
+    // The morning ritual (Android CheckInScreen parity): the arc sweeps in once on first
+    // appear. @State keeps it revealed across tab switches, so returns never replay it.
+    @State private var revealed = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         let color = spartanBandColor(band)
         let sweep = Double(min(max(recovery ?? 0, 0), 100)) / 100.0
@@ -150,9 +158,10 @@ private struct ReadinessRing: View {
             Circle()
                 .stroke(Color.spartanSurfaceVariant, style: StrokeStyle(lineWidth: 9, lineCap: .round))
             Circle()
-                .trim(from: 0, to: CGFloat(sweep))
+                .trim(from: 0, to: revealed ? CGFloat(sweep) : 0)
                 .stroke(color, style: StrokeStyle(lineWidth: 9, lineCap: .round))
                 .rotationEffect(.degrees(-90))
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.42), value: revealed)
             VStack(spacing: 0) {
                 Text(recovery.map(String.init) ?? "--")
                     .font(.title2.weight(.bold))
@@ -162,7 +171,8 @@ private struct ReadinessRing: View {
                     .foregroundColor(.spartanOnSurfaceVariant)
             }
         }
-        .frame(width: 88, height: 88)
+        .frame(width: ringSize, height: ringSize)
+        .onAppear { revealed = true }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(a11yLabel)
     }
@@ -380,13 +390,20 @@ private struct ActivityCard: View {
 }
 
 /// Tactile 26pt rounded check inside a 48pt touch target, with checkbox semantics.
+/// Android parity: haptic on completion only, and a 0.96→1.0 spring scale on top of the
+/// 140ms color fade — the check-off is the core daily interaction and must feel physical.
 private struct SpartanCheck: View {
     let done: Bool
     let label: String
     let onToggle: () -> Void
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
-        Button(action: onToggle) {
+        Button(action: {
+            if !done { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
+            onToggle()
+        }) {
             ZStack {
                 RoundedRectangle(cornerRadius: 9)
                     .fill(done ? Color.spartanAccent : Color.clear)
@@ -398,9 +415,11 @@ private struct SpartanCheck: View {
                     .opacity(done ? 1 : 0)
             }
             .frame(width: 26, height: 26)
+            .animation(.easeInOut(duration: 0.14), value: done)
+            .scaleEffect(done ? 1.0 : 0.96)
+            .animation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.5), value: done)
             .frame(width: 48, height: 48)
             .contentShape(Rectangle())
-            .animation(.easeInOut(duration: 0.14), value: done)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)

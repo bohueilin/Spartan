@@ -1,6 +1,7 @@
 package com.spartan.data.repository
 
 import androidx.room.withTransaction
+import com.spartan.BuildConfig
 import com.spartan.data.local.AppDatabase
 import com.spartan.data.local.AuditEventEntity
 import com.spartan.data.local.ConnectionStatus
@@ -311,6 +312,9 @@ class HealthRepository @Inject constructor(
     }
 
     suspend fun seedIfEmpty() {
+        // Demo labs are for debug builds only: a release user must never open Metrics and find
+        // fabricated abnormal readings presented as their own record.
+        if (!BuildConfig.DEBUG) return
         if (dao.metricCount() > 0) return
         dao.upsertProfile(UserProfileEntity(displayName = "You", heightCm = 177.0))
         val today = LocalDate.now()

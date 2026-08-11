@@ -1,0 +1,37 @@
+package com.spartan.ui.screens
+
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import com.spartan.R
+import com.spartan.ui.theme.Radius
+import com.spartan.ui.theme.Spacing
+
+/**
+ * The "SAMPLE DATA" provenance chip. Rendered on EVERY surface that shows WHOOP-derived numbers
+ * while the app runs on sample data (check-in header, Metrics, Review, Coach, Connections) — a
+ * user must never mistake fabricated readings for their own.
+ */
+@Composable
+fun SampleDataChip(modifier: Modifier = Modifier) {
+    Surface(
+        shape = RoundedCornerShape(Radius.chip),
+        color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.16f),
+        modifier = modifier,
+    ) {
+        Text(
+            stringResource(R.string.checkin_sample_data),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.tertiary,
+            modifier = Modifier.padding(horizontal = Spacing.sm, vertical = 3.dp),
+        )
+    }
+}

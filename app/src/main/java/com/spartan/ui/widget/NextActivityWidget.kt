@@ -55,12 +55,20 @@ class NextActivityWidget : GlanceAppWidget() {
             .fromApplication(context, WidgetEntryPoint::class.java)
             .healthDao()
         val today = LocalDate.now().toEpochDay()
-        val next = runCatching {
-            dao.observeActivitiesForDay(today).first()
-                .map { it.toDomain() }
-                .filter { it.status == ActivityStatus.PLANNED || it.status == ActivityStatus.RESCHEDULED }
-                .minByOrNull { it.priority.ordinal * 10 + it.bestTimeOfDay.ordinal }
-        }.getOrNull()
+        val activities = runCatching {
+            dao.observeActivitiesForDay(today).first().map { it.toDomain() }
+        }.getOrNull().orEmpty()
+        // Snoozed means "remind me later", not done — it stays in the open set.
+        val next = activities
+            .filter {
+                it.status == ActivityStatus.PLANNED ||
+                    it.status == ActivityStatus.RESCHEDULED ||
+                    it.status == ActivityStatus.SNOOZED
+            }
+            .minByOrNull { it.priority.ordinal * 10 + it.bestTimeOfDay.ordinal }
+        // "All done" is earned, never fabricated: an empty day (fresh install, post-erase) says
+        // "No plan yet", and a day of only-skipped activities never claims completion.
+        val anyDone = activities.any { it.status == ActivityStatus.DONE }
 
         provideContent {
             val openToday = actionStartActivity(
@@ -100,7 +108,11 @@ class NextActivityWidget : GlanceAppWidget() {
                     )
                 } else {
                     Text(
-                        text = "All done for today",
+                        text = when {
+                            activities.isEmpty() -> "No plan yet"
+                            anyDone -> "All done for today"
+                            else -> "No activities left today"
+                        },
                         style = TextStyle(color = ColorProvider(Color(0xFFEAF1EF)), fontSize = 14.sp),
                         modifier = GlanceModifier.padding(top = 4.dp),
                     )

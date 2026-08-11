@@ -93,6 +93,7 @@
     <string name="coach_sex_unspecified">Prefer not to say</string>
 
     <!-- Common -->
+    <string name="a11y_effort_slider">Effort, 1 to 10</string>
     <string name="common_brand">SPARTAN</string>
     <string name="notification_public_body">You have a reminder. Unlock to see it.</string>
     <string name="common_cancel">Cancel</string>
@@ -127,6 +128,7 @@
     <string name="connections_privacy_button">Privacy, export &amp; delete data</string>
     <string name="connections_requests_label">What Spartan requests:</string>
     <string name="connections_title">Connections</string>
+    <string name="connections_use_sample_calendar">Use sample calendar</string>
     <string name="connections_use_sample_data">Use sample data</string>
     <string name="connections_whoop_body">Reads your recovery, sleep, strain, HRV, resting heart rate, and respiratory rate to personalize your daily plan. Read-only. No data is written back to WHOOP.</string>
     <string name="connections_whoop_scope_cycles">read:cycles, read:workout — strain and workouts</string>
@@ -196,10 +198,11 @@
     <string name="reminders_exercise_title">Exercise</string>
     <string name="reminders_frequency_custom">Custom</string>
     <string name="reminders_frequency_daily">Daily</string>
-    <string name="reminders_frequency_selected">%1$s selected</string>
     <string name="reminders_frequency_weekdays">Weekdays</string>
     <string name="reminders_frequency_weekends">Weekends</string>
+    <string name="reminders_hour_error">Enter an hour from 0 to 23</string>
     <string name="reminders_hour_label">Hour</string>
+    <string name="reminders_minute_error">Enter a minute from 0 to 59</string>
     <string name="reminders_logging_body">Log today\'s health signals.</string>
     <string name="reminders_logging_title">Health logging</string>
     <string name="reminders_minute_label">Minute</string>

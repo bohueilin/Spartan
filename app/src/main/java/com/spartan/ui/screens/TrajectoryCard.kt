@@ -2,7 +2,6 @@ package com.spartan.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -36,12 +35,13 @@ fun TrajectoryCard(projections: List<MetricProjection>) {
             projections.forEach { projection ->
                 val week8 = projection.points.last()
                 val flat = week8.low == week8.high && week8.low == projection.currentValue
-                Row(Modifier.fillMaxWidth()) {
+                // Label above value: in a Row the unweighted value wins measurement, and at large
+                // font scales it squeezed the metric name into a letter-per-line sliver.
+                Column(Modifier.fillMaxWidth()) {
                     Text(
                         projection.label,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium,
-                        modifier = Modifier.weight(1f),
                     )
                     Text(
                         if (flat) {

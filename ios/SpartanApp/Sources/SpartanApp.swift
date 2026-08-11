@@ -72,18 +72,22 @@ extension Color {
     static let spartanBackground = spartanDynamic(light: 0xF6F8F8, dark: 0x0A0F0E)
     static let spartanSurface = spartanDynamic(light: 0xFFFFFF, dark: 0x121817)
     static let spartanSurfaceVariant = spartanDynamic(light: 0xE6ECEB, dark: 0x1E2A26)
-    static let spartanAccent = spartanDynamic(light: 0x0E7C6E, dark: 0x3FE0C8)
+    // Light accent/tertiary darkened one step (0x0E7C6E→0x0B685C, 0x9A6A1B→0x7E5613) so 11pt-bold
+    // chip text passes 4.5:1 on its own 12–16% tinted containers, not just on plain surfaces —
+    // mirrors the same fix in the Android Theme.kt.
+    static let spartanAccent = spartanDynamic(light: 0x0B685C, dark: 0x3FE0C8)
     static let spartanOnAccent = spartanDynamic(light: 0xFFFFFF, dark: 0x04211D)
     static let spartanSecondary = spartanDynamic(light: 0x2C3A44, dark: 0xB7C4C2)
-    static let spartanTertiary = spartanDynamic(light: 0x9A6A1B, dark: 0xE7B25A)
+    static let spartanTertiary = spartanDynamic(light: 0x7E5613, dark: 0xE7B25A)
     static let spartanOnSurface = spartanDynamic(light: 0x11201E, dark: 0xEAF1EF)
     static let spartanOnSurfaceVariant = spartanDynamic(light: 0x4A5654, dark: 0x9DB0AB)
     static let spartanOutline = spartanDynamic(light: 0xC3CFCD, dark: 0x293630)
 
-    // Readiness band colors (Tokens.kt SpartanBands), incl. WCAG light-mode variants.
+    // Readiness band colors (Tokens.kt SpartanBands), incl. WCAG light-mode variants
+    // (easy/rest darkened so band text passes 4.5:1 on 18%-alpha tinted chips too).
     static let spartanBandPrimed = spartanDynamic(light: 0x0E7B43, dark: 0x38D07E)
-    static let spartanBandEasy = spartanDynamic(light: 0x8F6410, dark: 0xE7B25A)
-    static let spartanBandRest = spartanDynamic(light: 0xB23E20, dark: 0xE67A5A)
+    static let spartanBandEasy = spartanDynamic(light: 0x7C570E, dark: 0xE7B25A)
+    static let spartanBandRest = spartanDynamic(light: 0xA0381D, dark: 0xE67A5A)
 }
 
 private extension UIColor {

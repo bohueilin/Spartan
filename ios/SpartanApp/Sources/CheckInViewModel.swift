@@ -331,13 +331,10 @@ public final class CheckInViewModel: ObservableObject {
             body: "~\(activity.estimatedMinutes) min. Open Spartan for why this helps today.",
             triggerAtMillis: slot.startEpochMinute * 60_000
         )
-        if calendarConnected {
-            _ = calendarClient.createEvent(
-                title: activity.title,
-                startEpochMinute: slot.startEpochMinute,
-                durationMinutes: activity.estimatedMinutes
-            )
-        }
+        // No calendar write here: the consent copy promises event creation is "a separate,
+        // optional step you confirm each time" (PRD CR-3). Until an opt-in + per-event
+        // confirmation flow exists, "Find a time" only reads free/busy and schedules the
+        // local reminder above. (Mirrors MainViewModel.scheduleActivity on Android.)
     }
 
     /// Mirrors HealthRepository.updateActivityStatus: the status columns are replaced,

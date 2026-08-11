@@ -21,7 +21,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -42,15 +44,16 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Surface
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.delay
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -62,6 +65,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -149,44 +153,49 @@ fun CheckInScreen(
         modifier = Modifier.fillMaxSize(),
     ) {
     LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(horizontal = Spacing.xl),
+        // Capped at 600dp so tablet/landscape line lengths stay readable; centered in the viewport.
+        modifier = Modifier
+            .align(Alignment.TopCenter)
+            .widthIn(max = 600.dp)
+            .fillMaxSize()
+            .padding(horizontal = Spacing.xl),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
-        item { Spacer(Modifier.height(Spacing.lg)) }
-        item { ReadinessHeader(state, onOpenRecoveryExplainer) }
+        item(key = "top-spacer") { Spacer(Modifier.height(Spacing.lg)) }
+        item(key = "readiness") { ReadinessHeader(state, onOpenRecoveryExplainer) }
 
         if (loading) {
-            item { LoadingPlan() }
+            item(key = "loading") { LoadingPlan() }
         } else {
-            item { Greeting(state) }
-            item { PlanProgress(state) }
+            item(key = "greeting") { Greeting(state) }
+            item(key = "progress") { PlanProgress(state) }
             if (state.consistencyFlags.any { it }) {
-                item { ConsistencyStrip(state.consistencyFlags) }
+                item(key = "consistency") { ConsistencyStrip(state.consistencyFlags) }
             }
             if (planFinished(state)) {
-                item { DayCompleteCard(state) }
+                item(key = "day-complete") { DayCompleteCard(state, animatedItem()) }
             }
             if (state.syncFailed) {
-                item { SafetyBanner(stringResource(R.string.checkin_sync_failed)) }
+                item(key = "sync-banner") { SafetyBanner(stringResource(R.string.checkin_sync_failed), animatedItem()) }
             }
-            state.planSafetyBanner?.let { banner -> item { SafetyBanner(banner) } }
+            state.planSafetyBanner?.let { banner -> item(key = "safety-banner") { SafetyBanner(banner, animatedItem()) } }
             if (!state.whoopConnected) {
-                item { ConnectPrompt(isMock = state.whoopIsMock, onManageConnections = onManageConnections) }
+                item(key = "connect-prompt") { ConnectPrompt(isMock = state.whoopIsMock, onManageConnections = onManageConnections, modifier = animatedItem()) }
             }
-            item { SectionLabel(stringResource(R.string.checkin_todays_plan)) }
+            item(key = "plan-label") { SectionLabel(stringResource(R.string.checkin_todays_plan)) }
             if (state.todayActivities.isEmpty()) {
-                item { EmptyPlan() }
+                item(key = "empty-plan") { EmptyPlan() }
             } else {
                 // Priority first, then the natural order of the day (morning → evening).
                 val ordered = state.todayActivities.sortedWith(
                     compareBy({ it.priority.ordinal }, { it.bestTimeOfDay.ordinal }),
                 )
                 items(ordered, key = { it.id }) { activity ->
-                    ActivityCard(activity, nowMinuteOfDay, trainingProfile, completeWithDebrief, onUncomplete, onSnooze, onSkip, onSchedule, onOpenMetric)
+                    ActivityCard(activity, nowMinuteOfDay, trainingProfile, completeWithDebrief, onUncomplete, onSnooze, onSkip, onSchedule, onOpenMetric, animatedItem())
                 }
             }
         }
-        item { Footer() }
+        item(key = "footer") { Footer() }
     }
     }
 
@@ -201,6 +210,16 @@ fun CheckInScreen(
         )
     }
 }
+
+/**
+ * Placement/appearance animation for list items that insert, leave, or shift (day-complete card,
+ * banners, reordered activities) — Motion.medium so the list settles instead of jumping.
+ */
+private fun LazyItemScope.animatedItem(): Modifier = Modifier.animateItem(
+    fadeInSpec = tween(Motion.medium),
+    placementSpec = tween(Motion.medium),
+    fadeOutSpec = tween(Motion.medium),
+)
 
 @Composable
 private fun ReadinessHeader(state: MainUiState, onOpenRecoveryExplainer: () -> Unit = {}) {
@@ -256,15 +275,19 @@ private fun ReadinessRing(recovery: Int?, bandName: String, state: MainUiState) 
             ?: stringResource(R.string.checkin_recovery_not_available),
         bandName,
     )
+    // The ring grows with the user's font scale so the score and caption never overflow it.
+    val ringSize = 88.dp * LocalDensity.current.fontScale
     Box(
-        Modifier.size(88.dp).semantics(mergeDescendants = true) { contentDescription = a11y },
+        Modifier.size(ringSize).semantics(mergeDescendants = true) { contentDescription = a11y },
         contentAlignment = Alignment.Center,
     ) {
-        // The morning ritual: ring sweeps in and the number counts up on first reveal.
-        var reveal by remember { mutableFloatStateOf(0f) }
-        val revealAnim by animateFloatAsState(reveal, tween(Motion.slow * 2), label = "ringReveal")
-        LaunchedEffect(recovery) { reveal = 1f }
-        Canvas(Modifier.size(88.dp)) {
+        // The morning ritual: ring sweeps in and the number counts up — once per fresh reading.
+        // rememberSaveable survives tab switches and back-navigation, so returning to Today never
+        // replays the sweep (which would transiently show wrong recovery numbers).
+        var revealed by rememberSaveable(recovery) { mutableStateOf(false) }
+        val revealAnim by animateFloatAsState(if (revealed) 1f else 0f, tween(Motion.slow), label = "ringReveal")
+        LaunchedEffect(recovery) { revealed = true }
+        Canvas(Modifier.size(ringSize)) {
             val stroke = 9.dp.toPx()
             drawArc(track, 0f, 360f, false, style = Stroke(width = stroke, cap = StrokeCap.Round))
             val sweep = ((recovery ?: 0).coerceIn(0, 100)) / 100f * 360f * revealAnim
@@ -311,6 +334,7 @@ private fun ActivityCard(
     onSkip: (String) -> Unit,
     onSchedule: (String) -> Unit,
     onOpenMetric: (MetricType) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     var expanded by remember(activity.id) { mutableStateOf(false) }
     var menuOpen by remember(activity.id) { mutableStateOf(false) }
@@ -327,7 +351,7 @@ private fun ActivityCard(
     val borderWidth = if (urgency == PlanUrgency.OVERDUE) 2.dp else 1.dp
 
     OutlinedCard(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(Radius.card),
         border = androidx.compose.foundation.BorderStroke(borderWidth, borderColor),
     ) {
@@ -372,7 +396,7 @@ private fun ActivityCard(
                     StatusLine(activity)
                 }
                 Box {
-                    IconButton(onClick = { menuOpen = true }, modifier = Modifier.size(44.dp)) {
+                    IconButton(onClick = { menuOpen = true }) {
                         Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.checkin_more_options, activity.title))
                     }
                     DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
@@ -390,13 +414,13 @@ private fun ActivityCard(
                     MetricBenefits.forMetric(metric)?.let { benefit ->
                         Spacer(Modifier.height(Spacing.sm))
                         Label(stringResource(R.string.checkin_what_improves))
+                        // Not clickable: the ImprovesChip above is the one (48dp) affordance that
+                        // routes to this metric — an invisible ~20dp text target would duplicate it.
                         Text(
                             stringResource(R.string.checkin_improves_detail, metric.label, benefit),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier
-                                .padding(top = 2.dp)
-                                .clickable(onClickLabel = stringResource(R.string.checkin_open_metric, metric.label)) { onOpenMetric(metric) },
+                            modifier = Modifier.padding(top = 2.dp),
                         )
                     }
                 }
@@ -522,7 +546,9 @@ private fun ImprovesChip(metric: MetricType, dimmed: Boolean, onClick: () -> Uni
         color = tint.copy(alpha = 0.12f),
         modifier = Modifier
             .padding(top = Spacing.xs)
-            .clickable(onClickLabel = stringResource(R.string.checkin_open_metric, metric.label), onClick = onClick),
+            .clickable(onClickLabel = stringResource(R.string.checkin_open_metric, metric.label), onClick = onClick)
+            // Keeps the compact pill visual but expands the tap/semantics bounds to 48dp.
+            .minimumInteractiveComponentSize(),
     ) {
         Row(
             Modifier.padding(horizontal = Spacing.sm, vertical = 3.dp),
@@ -536,22 +562,15 @@ private fun ImprovesChip(metric: MetricType, dimmed: Boolean, onClick: () -> Uni
 }
 
 @Composable
-private fun SampleDataChip() {
-    Surface(shape = RoundedCornerShape(Radius.chip), color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.16f)) {
-        Text(stringResource(R.string.checkin_sample_data), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.tertiary, modifier = Modifier.padding(horizontal = Spacing.sm, vertical = 3.dp))
-    }
-}
-
-@Composable
-private fun SafetyBanner(text: String) {
-    Surface(shape = RoundedCornerShape(Radius.card), color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth()) {
+private fun SafetyBanner(text: String, modifier: Modifier = Modifier) {
+    Surface(shape = RoundedCornerShape(Radius.card), color = MaterialTheme.colorScheme.surfaceVariant, modifier = modifier.fillMaxWidth()) {
         Text(text, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(Spacing.md), color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
 @Composable
-private fun ConnectPrompt(isMock: Boolean, onManageConnections: () -> Unit) {
-    OutlinedCard(Modifier.fillMaxWidth().clickable(onClick = onManageConnections), shape = RoundedCornerShape(Radius.card)) {
+private fun ConnectPrompt(isMock: Boolean, onManageConnections: () -> Unit, modifier: Modifier = Modifier) {
+    OutlinedCard(modifier.fillMaxWidth().clickable(onClick = onManageConnections), shape = RoundedCornerShape(Radius.card)) {
         Row(Modifier.padding(Spacing.lg), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(stringResource(R.string.checkin_connect_whoop), fontWeight = FontWeight.SemiBold)
@@ -639,10 +658,11 @@ private fun Greeting(state: MainUiState) {
         },
     )
     val name = state.profile?.displayName?.takeIf { it.isNotBlank() && it != "You" }
+    // titleMedium/SemiBold: the greeting stays warm but defers to the readiness data around it.
     Text(
         if (name != null) "$base, $name." else "$base.",
-        style = MaterialTheme.typography.titleLarge,
-        fontWeight = FontWeight.Bold,
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold,
     )
 }
 
@@ -678,9 +698,9 @@ private fun ConsistencyStrip(flags: List<Boolean>) {
 
 /** The calm completion moment — an ending, not a firework. */
 @Composable
-private fun DayCompleteCard(state: MainUiState) {
+private fun DayCompleteCard(state: MainUiState, modifier: Modifier = Modifier) {
     Surface(
-        Modifier.fillMaxWidth(),
+        modifier.fillMaxWidth(),
         shape = RoundedCornerShape(Radius.card),
         color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
     ) {

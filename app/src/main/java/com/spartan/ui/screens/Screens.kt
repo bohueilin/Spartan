@@ -7,15 +7,19 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -32,17 +36,21 @@ import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material.icons.outlined.PrivacyTip
 import androidx.compose.material.icons.outlined.Share
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
@@ -64,11 +72,16 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.spartan.R
+import com.spartan.ui.theme.Radius
+import com.spartan.ui.theme.Spacing
 import com.spartan.data.local.ReminderFrequency
 import com.spartan.domain.engine.TrainingProfile
 import com.spartan.domain.engine.VideoLibrary
@@ -97,7 +110,9 @@ fun OnboardingScreen(onComplete: (String, Double?, Int?) -> Unit) {
             .verticalScroll(rememberScrollState())
             .padding(28.dp),
         verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        Column(Modifier.widthIn(max = 600.dp).fillMaxWidth()) {
         Text(
             stringResource(R.string.common_brand),
             style = MaterialTheme.typography.titleMedium,
@@ -145,7 +160,9 @@ fun OnboardingScreen(onComplete: (String, Double?, Int?) -> Unit) {
         )
         Button(
             onClick = { onComplete(name, height.toDoubleOrNull(), age.toIntOrNull()?.takeIf { it in 13..100 }) },
-            modifier = Modifier.fillMaxWidth().height(52.dp).padding(top = 8.dp),
+            // heightIn, not height: the 52dp resting size grows with the user's font scale
+            // instead of clipping the label; padding stays outside the touch target.
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp).heightIn(min = 52.dp),
         ) {
             Text(stringResource(R.string.onboarding_begin), fontWeight = FontWeight.SemiBold)
         }
@@ -155,21 +172,28 @@ fun OnboardingScreen(onComplete: (String, Double?, Int?) -> Unit) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 20.dp),
         )
+        }
     }
 }
 
 @Composable
 fun MetricsScreen(state: MainUiState, onAdd: () -> Unit, onMetricClick: (MetricType) -> Unit) {
-    LazyColumn(modifier = Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+    LazyColumn(
+        modifier = Modifier.widthIn(max = 600.dp).fillMaxSize().padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
+    ) {
         item {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.metrics_title), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                if (state.whoopIsMock) SampleDataChip()
                 IconButton(onClick = onAdd) { Icon(Icons.Outlined.Add, contentDescription = stringResource(R.string.metrics_add_metric)) }
             }
         }
         state.whoopImportInfo?.let { info -> item { WhoopImportBanner(info) } }
         items(state.insights.take(2)) { InsightCardView(it) }
         items(state.assessments) { MetricRow(it, onMetricClick) }
+    }
     }
 }
 
@@ -219,7 +243,7 @@ fun MetricDetailScreen(state: MainUiState, type: MetricType, onAdd: () -> Unit, 
     val history = state.readings.filter { it.type == type }
     ScreenColumn {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(type.label, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            Text(type.label, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
             IconButton(onClick = onAdd) { Icon(Icons.Outlined.Edit, contentDescription = stringResource(R.string.metrics_add_entry)) }
         }
         assessment?.let {
@@ -390,7 +414,7 @@ fun WeeklyPlanSection(state: MainUiState, onEditMinutes: (String, Int) -> Unit, 
         OutlinedCard(Modifier.fillMaxWidth()) {
             Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("${workout.day} - ${workout.type.name.replace('_', ' ')}", fontWeight = FontWeight.SemiBold)
+                    Text("${workout.day} - ${workoutTypeLabel(workout.type)}", fontWeight = FontWeight.SemiBold)
                     Text(stringResource(R.string.plan_minutes_intensity, minutes, workout.intensity))
                     Text(workout.guidance, style = MaterialTheme.typography.bodySmall)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
@@ -402,7 +426,8 @@ fun WeeklyPlanSection(state: MainUiState, onEditMinutes: (String, Int) -> Unit, 
                         }
                     }
                 }
-                Button(onClick = { onComplete(workout.copy(minutes = minutes)) }) { Text(stringResource(R.string.plan_log)) }
+                // Tonal, not filled: seven-plus per-card actions must defer to the view's primary.
+                FilledTonalButton(onClick = { onComplete(workout.copy(minutes = minutes)) }) { Text(stringResource(R.string.plan_log)) }
             }
         }
     }
@@ -421,7 +446,7 @@ fun WorkoutCompletionScreen(
     var pain by rememberSaveable { mutableStateOf(false) }
     ScreenColumn {
         Text(stringResource(R.string.workout_title), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold)
-        Text(type.name.replace('_', ' '))
+        Text(workoutTypeLabel(type))
         OutlinedTextField(
             completed,
             { completed = it },
@@ -430,10 +455,24 @@ fun WorkoutCompletionScreen(
             modifier = Modifier.fillMaxWidth(),
         )
         Text(stringResource(R.string.workout_rpe, rpe.roundToInt()))
-        Slider(value = rpe, onValueChange = { rpe = it }, valueRange = 1f..10f, steps = 8)
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        val effortDescription = stringResource(R.string.a11y_effort_slider)
+        Slider(
+            value = rpe,
+            onValueChange = { rpe = it },
+            valueRange = 1f..10f,
+            steps = 8,
+            // The visible "RPE N" text is a separate node; without this TalkBack announces an
+            // anonymous slider — and this value feeds the deload rules.
+            modifier = Modifier.semantics { contentDescription = effortDescription },
+        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            // Row-level toggleable merges label + role + state into one TalkBack announcement
+            // and makes the whole row the target — this switch drives the pain deload.
+            modifier = Modifier.toggleable(value = pain, role = Role.Switch, onValueChange = { pain = it }),
+        ) {
             Text(stringResource(R.string.workout_pain_label), modifier = Modifier.weight(1f))
-            Switch(checked = pain, onCheckedChange = { pain = it })
+            Switch(checked = pain, onCheckedChange = null)
         }
         Button(
             onClick = {
@@ -449,7 +488,10 @@ fun WorkoutCompletionScreen(
 fun ReviewScreen(state: MainUiState) {
     val review = state.review
     ScreenColumn {
-        Text(stringResource(R.string.review_title), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold)
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.review_title), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            if (state.whoopIsMock) SampleDataChip()
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
             SummaryCard(stringResource(R.string.review_adherence), stringResource(R.string.review_percent_value, review?.adherencePercent ?: 0), Modifier.weight(1f))
             SummaryCard(stringResource(R.string.review_strength), "${review?.strengthSessions ?: 0}", Modifier.weight(1f))
@@ -467,9 +509,9 @@ fun ReviewScreen(state: MainUiState) {
             SummaryCard(stringResource(R.string.review_seven_day_rhr), review?.sevenDayRhrAverage?.let { "%.0f".format(it) } ?: stringResource(R.string.review_no_entry), Modifier.weight(1f))
         }
         Text(stringResource(R.string.review_what_improved), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-        review?.improved.orEmpty().forEach { Text("- $it") }
+        review?.improved.orEmpty().forEach { Text("•  $it", style = MaterialTheme.typography.bodyMedium) }
         Text(stringResource(R.string.review_needs_attention), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-        review?.needsAttention.orEmpty().forEach { Text("- $it") }
+        review?.needsAttention.orEmpty().forEach { Text("•  $it", style = MaterialTheme.typography.bodyMedium) }
         Text(stringResource(R.string.review_next_week_focus), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         Text(review?.nextWeekFocus.orEmpty())
     }
@@ -577,7 +619,13 @@ fun PrivacyScreen(state: MainUiState, onShare: (String) -> Unit, onDelete: () ->
             Text(stringResource(R.string.privacy_share_export))
         }
         Text(stringResource(R.string.privacy_share_note), style = MaterialTheme.typography.bodySmall)
-        Button(onClick = { confirmDelete = true }, modifier = Modifier.fillMaxWidth()) {
+        // Outlined + error content: the destructive action must not share the primary style of
+        // "Share local export" above it.
+        OutlinedButton(
+            onClick = { confirmDelete = true },
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
             Icon(Icons.Outlined.Delete, contentDescription = null)
             Spacer(Modifier.width(8.dp))
             Text(stringResource(R.string.privacy_delete_data))
@@ -609,9 +657,15 @@ fun PrivacyScreen(state: MainUiState, onShare: (String) -> Unit, onDelete: () ->
 private fun ScreenColumn(content: @Composable ColumnScope.() -> Unit) {
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        content = content,
-    )
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        // 600dp cap keeps tablet/landscape line lengths inside the readable range.
+        Column(
+            modifier = Modifier.widthIn(max = 600.dp).fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            content = content,
+        )
+    }
 }
 
 @Composable
@@ -628,7 +682,7 @@ private fun SummaryCard(label: String, value: String, modifier: Modifier = Modif
 private fun MetricRow(assessment: MetricAssessment, onClick: (MetricType) -> Unit) {
     OutlinedCard(
         modifier = Modifier.fillMaxWidth().clickable { onClick(assessment.reading.type) },
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(Radius.card),
     ) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -663,7 +717,7 @@ private fun StatusBadge(label: String) {
 
 @Composable
 private fun InsightCardView(card: InsightCard) {
-    OutlinedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+    OutlinedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(Radius.card)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(card.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Text(card.explanation)
@@ -724,6 +778,7 @@ private fun SettingsCard(title: String, subtitle: String, icon: androidx.compose
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ReminderEditor(
     id: String,
@@ -752,10 +807,15 @@ private fun ReminderEditor(
                     Text(title, fontWeight = FontWeight.SemiBold)
                     Text("%02d:%02d".format(hour, minute), style = MaterialTheme.typography.bodySmall)
                 }
-                Switch(checked = enabled, onCheckedChange = { checked ->
-                    if (validTime && checked) onRequestNotifications()
-                    if (validTime) onSave(id, title, body, parsedHour ?: hour, parsedMinute ?: minute, checked, selectedFrequency, selectedDaysMask)
-                })
+                Switch(
+                    checked = enabled,
+                    onCheckedChange = { checked ->
+                        if (validTime && checked) onRequestNotifications()
+                        if (validTime) onSave(id, title, body, parsedHour ?: hour, parsedMinute ?: minute, checked, selectedFrequency, selectedDaysMask)
+                    },
+                    // Names which reminder this switch controls — TalkBack otherwise hears "off, switch".
+                    modifier = Modifier.semantics { contentDescription = title },
+                )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
@@ -764,6 +824,7 @@ private fun ReminderEditor(
                     label = { Text(stringResource(R.string.reminders_hour_label)) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     isError = parsedHour !in 0..23,
+                    supportingText = { if (parsedHour !in 0..23) Text(stringResource(R.string.reminders_hour_error)) },
                     modifier = Modifier.weight(1f),
                 )
                 OutlinedTextField(
@@ -772,10 +833,13 @@ private fun ReminderEditor(
                     label = { Text(stringResource(R.string.reminders_minute_label)) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     isError = parsedMinute !in 0..59,
+                    supportingText = { if (parsedMinute !in 0..59) Text(stringResource(R.string.reminders_minute_error)) },
                     modifier = Modifier.weight(1f),
                 )
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            // FilterChips in a FlowRow: selection carries real semantics (no width-jumping
+            // "selected" suffix) and the options wrap instead of clipping on narrow phones.
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), modifier = Modifier.fillMaxWidth()) {
                 ReminderFrequency.entries.forEach { option ->
                     val label = when (option) {
                         ReminderFrequency.DAILY -> stringResource(R.string.reminders_frequency_daily)
@@ -783,9 +847,12 @@ private fun ReminderEditor(
                         ReminderFrequency.WEEKENDS -> stringResource(R.string.reminders_frequency_weekends)
                         ReminderFrequency.CUSTOM_DAYS -> stringResource(R.string.reminders_frequency_custom)
                     }
-                    TextButton(onClick = { selectedFrequency = option }, enabled = option != ReminderFrequency.CUSTOM_DAYS) {
-                        Text(if (selectedFrequency == option) stringResource(R.string.reminders_frequency_selected, label) else label)
-                    }
+                    FilterChip(
+                        selected = selectedFrequency == option,
+                        onClick = { selectedFrequency = option },
+                        enabled = option != ReminderFrequency.CUSTOM_DAYS,
+                        label = { Text(label) },
+                    )
                 }
             }
             Button(
@@ -804,6 +871,10 @@ private fun ReminderEditor(
 
 private fun formatTrendValue(value: Double): String =
     if (value % 1.0 == 0.0) value.toInt().toString() else "%.1f".format(value)
+
+/** "ZONE_2" → "Zone 2": enum names never appear raw in user copy. */
+private fun workoutTypeLabel(type: WorkoutType): String =
+    type.name.replace('_', ' ').lowercase().replaceFirstChar { it.uppercase() }
 
 private fun daysMaskFor(frequency: ReminderFrequency, customMask: Int): Int = when (frequency) {
     ReminderFrequency.DAILY -> 127

@@ -106,6 +106,8 @@ data class MainUiState(
     val whoopIsMock: Boolean = true,
     val whoopConnected: Boolean = false,
     val calendarConnected: Boolean = false,
+    /** True when the calendar integration is the offline stub — its data is sample, not the user's. */
+    val calendarIsStub: Boolean = true,
     val syncFailed: Boolean = false,
     /** Days with ≥1 completed activity in the trailing week — calm consistency, not gamification. */
     val consistencyDays7: Int = 0,
@@ -392,6 +394,7 @@ class MainViewModel @Inject constructor(
             whoopIsMock = checkIn.plan?.isMock ?: whoopClient.isMock,
             whoopConnected = checkIn.whoopConnected,
             calendarConnected = checkIn.calendarConnected,
+            calendarIsStub = calendarClient.isStub,
             syncFailed = syncDidFail,
             consistencyDays7 = checkIn.consistencyDays7,
             requestReview = reviewWanted,
@@ -759,9 +762,10 @@ class MainViewModel @Inject constructor(
                 body = "~${activity.estimatedMinutes} min. ${activity.whyItMatters}",
                 triggerAtMillis = slot.startEpochMinute * 60_000L,
             )
-            if (uiState.value.calendarConnected) {
-                calendarClient.createEvent(activity.title, slot.startEpochMinute, activity.estimatedMinutes)
-            }
+            // No calendar write here: the consent copy promises event creation is "a separate,
+            // optional step you confirm each time" (PRD CR-3). Until an opt-in + per-event
+            // confirmation flow exists, "Find a time" only reads free/busy and schedules the
+            // local reminder above.
         }
     }
 

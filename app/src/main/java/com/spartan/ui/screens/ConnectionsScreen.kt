@@ -8,10 +8,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedCard
@@ -25,6 +27,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.spartan.R
+import com.spartan.ui.theme.Spacing
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -46,7 +49,11 @@ fun ConnectionsScreen(
 ) {
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+    Column(
+        modifier = Modifier.widthIn(max = 600.dp).fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         Text(stringResource(R.string.connections_title), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold)
         Text(
@@ -70,6 +77,8 @@ fun ConnectionsScreen(
             onDisconnect = onDisconnectWhoop,
             secondaryActionLabel = stringResource(R.string.connections_import_whoop_csv),
             onSecondaryAction = onImportWhoopCsv,
+            // Disabled mid-import: a re-pick would be silently discarded by the one-at-a-time guard.
+            secondaryActionEnabled = state.whoopImport?.inProgress != true,
             secondaryActionHint = stringResource(R.string.connections_import_whoop_hint),
         )
 
@@ -80,13 +89,14 @@ fun ConnectionsScreen(
         IntegrationCard(
             title = stringResource(R.string.connections_calendar_title),
             connected = state.calendarConnected,
-            isSample = true,
+            isSample = state.calendarIsStub,
             body = stringResource(R.string.connections_calendar_body),
             scopes = listOf(
                 stringResource(R.string.connections_calendar_scope_freebusy),
                 stringResource(R.string.connections_calendar_scope_events),
             ),
-            connectLabel = stringResource(R.string.connections_connect_calendar),
+            // A stub build must not offer a button labeled "Connect" that connects nothing.
+            connectLabel = if (state.calendarIsStub) stringResource(R.string.connections_use_sample_calendar) else stringResource(R.string.connections_connect_calendar),
             onConnect = onConnectCalendar,
             onDisconnect = onDisconnectCalendar,
         )
@@ -100,6 +110,7 @@ fun ConnectionsScreen(
             Text(stringResource(R.string.connections_privacy_button))
         }
         Spacer(Modifier.height(8.dp))
+    }
     }
 }
 
@@ -115,6 +126,7 @@ private fun IntegrationCard(
     onDisconnect: () -> Unit,
     secondaryActionLabel: String? = null,
     onSecondaryAction: (() -> Unit)? = null,
+    secondaryActionEnabled: Boolean = true,
     secondaryActionHint: String? = null,
 ) {
     OutlinedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
@@ -122,11 +134,16 @@ private fun IntegrationCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
                 if (connected) {
-                    Surface(shape = RoundedCornerShape(6.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)) {
-                        Text(
-                            stringResource(R.string.connections_connected_chip), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                        )
+                    // Honest provenance: sample/stub integrations never wear the CONNECTED chip.
+                    if (isSample) {
+                        SampleDataChip()
+                    } else {
+                        Surface(shape = RoundedCornerShape(6.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)) {
+                            Text(
+                                stringResource(R.string.connections_connected_chip), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                            )
+                        }
                     }
                 }
             }
@@ -140,7 +157,7 @@ private fun IntegrationCard(
                 Button(onClick = onConnect, modifier = Modifier.fillMaxWidth()) { Text(connectLabel) }
             }
             if (secondaryActionLabel != null && onSecondaryAction != null) {
-                OutlinedButton(onClick = onSecondaryAction, modifier = Modifier.fillMaxWidth()) { Text(secondaryActionLabel) }
+                OutlinedButton(onClick = onSecondaryAction, enabled = secondaryActionEnabled, modifier = Modifier.fillMaxWidth()) { Text(secondaryActionLabel) }
                 secondaryActionHint?.let {
                     Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -160,6 +177,8 @@ private fun WhoopImportResultCard(import: WhoopImportUiState, onDismiss: () -> U
                         stringResource(R.string.connections_import_in_progress),
                         style = MaterialTheme.typography.bodyMedium,
                     )
+                    // Visible progress: a multi-second import must not be indistinguishable from a hang.
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 }
                 import.failed -> {
                     Text(
