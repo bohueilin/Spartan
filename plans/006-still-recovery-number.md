@@ -1,6 +1,6 @@
 # 006 — Recovery number renders still; only the ring animates
 
-- **Status**: TODO
+- **Status**: DONE
 - **Commit**: 91c0816
 - **Severity**: Tier 2 (integrity)
 - **Scope**: 1 file, 1 line
@@ -39,3 +39,10 @@ The number renders its final value on first frame; the arc sweep (420ms `tween(M
 - **Mechanical**: `JAVA_HOME=$(/usr/libexec/java_home -v 17) ./gradlew :app:compileDebugKotlin` passes.
 - **Feel check**: launch → number shows final recovery immediately while the arc sweeps up to it; switching tabs and back does not replay.
 - **Done when**: both requirements confirmed with file:line evidence.
+
+## Closing self-audit (2026-08-12)
+
+1. **done** — `CheckInScreen.kt:306`: `val shown = recovery?.toString() ?: "--"` — matches the iOS expression shape (`CheckInView.swift` `recovery.map(String.init) ?? "--"`); no interpolation. (Cited `:297` at 91c0816; line shifted after plans 001–004.)
+2. **done** — stale comment simplified at `CheckInScreen.kt:292-294`: no longer claims the number counts up; the `rememberSaveable(recovery)` guard stays (`:295`) and still prevents sweep replay; the arc sweep (`revealAnim`, `tween(Motion.slow)` at `:297`, consumed at `:302`) is untouched.
+
+Boundaries respected: ring sweep and `rememberSaveable` guard intact; iOS untouched by this plan. Verification: `./gradlew :app:compileDebugKotlin` (Homebrew JDK 17) → exit 0, `BUILD SUCCESSFUL in 16s`.

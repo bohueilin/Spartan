@@ -9,7 +9,7 @@ Executor-proofed plans for all Tier 1–2 findings from the full design review. 
 | 003 | [Non-text contrast: required signal, outlines, track, skeleton](003-nontext-contrast.md) | 1 | Android + iOS | DONE |
 | 004 | [Complete sample-data provenance](004-complete-provenance.md) | 2 | Android + iOS | DONE |
 | 005 | [Review tab: no confident zeros](005-review-fake-zeros.md) | 2 | Android | DONE |
-| 006 | [Recovery number renders still](006-still-recovery-number.md) | 2 | Android | TODO |
+| 006 | [Recovery number renders still](006-still-recovery-number.md) | 2 | Android | DONE |
 
 Build note (from project memory): Android compiles need `JAVA_HOME=$(/usr/libexec/java_home -v 17)`; don't pipe gradle output in a way that masks exit codes. iOS app targets cannot be compiled on this machine (Command Line Tools only) — self-review Swift diffs against the cited lines.
 

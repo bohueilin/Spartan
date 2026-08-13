@@ -289,9 +289,9 @@ private fun ReadinessRing(recovery: Int?, bandName: String, state: MainUiState) 
         Modifier.size(ringSize).semantics(mergeDescendants = true) { contentDescription = a11y },
         contentAlignment = Alignment.Center,
     ) {
-        // The morning ritual: ring sweeps in and the number counts up — once per fresh reading.
-        // rememberSaveable survives tab switches and back-navigation, so returning to Today never
-        // replays the sweep (which would transiently show wrong recovery numbers).
+        // The morning ritual: the arc sweeps in once per fresh reading while the number renders
+        // its final value from the first frame. rememberSaveable survives tab switches and
+        // back-navigation, so returning to Today never replays the sweep.
         var revealed by rememberSaveable(recovery) { mutableStateOf(false) }
         val reducedMotion = rememberReducedMotion()
         val revealAnim by animateFloatAsState(if (revealed) 1f else 0f, if (reducedMotion) snap() else tween(Motion.slow), label = "ringReveal")
@@ -303,7 +303,7 @@ private fun ReadinessRing(recovery: Int?, bandName: String, state: MainUiState) 
             drawArc(color, -90f, sweep, false, style = Stroke(width = stroke, cap = StrokeCap.Round))
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            val shown = recovery?.let { (it * revealAnim).toInt().toString() } ?: "--"
+            val shown = recovery?.toString() ?: "--"
             Text(shown, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             Text(stringResource(R.string.checkin_recovery_caption), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
