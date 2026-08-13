@@ -273,7 +273,8 @@ private fun ReadinessHeader(state: MainUiState, onOpenRecoveryExplainer: () -> U
 @Composable
 private fun ReadinessRing(recovery: Int?, bandName: String, state: MainUiState) {
     val color = bandColor(state.readinessBand)
-    val track = MaterialTheme.colorScheme.surfaceVariant
+    // Outline, not surfaceVariant: a low score must read as a partial ring, not a broken one.
+    val track = MaterialTheme.colorScheme.outline
     val a11y = stringResource(
         R.string.checkin_recovery_a11y,
         recovery?.let { stringResource(R.string.checkin_recovery_percent, it) }
@@ -353,10 +354,16 @@ private fun ActivityCard(
     val borderColor = when {
         // An incomplete plan item escalates its border as the day passes (amber, then red).
         urgencyColor != null -> urgencyColor.copy(alpha = if (urgency == PlanUrgency.OVERDUE) 0.9f else 0.6f)
-        activity.priority == ActivityPriority.REQUIRED -> MaterialTheme.colorScheme.primary.copy(alpha = 0.28f)
+        activity.priority == ActivityPriority.REQUIRED -> MaterialTheme.colorScheme.primary
         else -> MaterialTheme.colorScheme.outline
     }
-    val borderWidth = if (urgency == PlanUrgency.OVERDUE) 2.dp else 1.dp
+    // REQUIRED is a state signal, so its border must clear 3:1 non-text contrast (full accent,
+    // 1.5dp); the 2dp overdue escalation wins when both apply.
+    val borderWidth = when {
+        urgency == PlanUrgency.OVERDUE -> 2.dp
+        activity.priority == ActivityPriority.REQUIRED -> 1.5.dp
+        else -> 1.dp
+    }
 
     OutlinedCard(
         modifier = modifier.fillMaxWidth(),

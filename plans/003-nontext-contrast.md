@@ -1,6 +1,6 @@
 # 003 — Fix non-text contrast: required-card signal, outlines, ring track, skeleton
 
-- **Status**: TODO
+- **Status**: DONE
 - **Commit**: 91c0816
 - **Severity**: Tier 1 (required-signal invisible) + Tier 3 (light-mode states near-blank)
 - **Scope**: 4 files (Theme.kt, CheckInScreen.kt, SpartanApp.swift, CheckInView.swift)
@@ -63,3 +63,17 @@ If code at a cited line doesn't match, STOP and report the requirement number.
 - **Measured**: recompute ratios (WebAIM contrast checker or the python snippet in the review): `#9BADAA`/`#FFFFFF` = 2.35, `#3D4F48`/`#121817` = 2.06, `#0B685C`/`#FFFFFF` = 6.67.
 - **Feel check**: light mode — a REQUIRED card is instantly distinguishable at arm's length; dark mode — card edges legible; light mode loading — skeleton blocks visible.
 - **Done when**: all 7 requirements confirmed with file:line evidence; both platforms' hex values match exactly.
+
+## Closing self-audit (2026-08-12)
+
+Line numbers are post-edit (CheckInScreen.kt/CheckInView.swift shifted after plans 001–002; all cited code matched at commit 91c0816 before editing).
+
+1. **done** — `Theme.kt:31`: `outline = Color(0xFF9BADAA)`.
+2. **done** — `Theme.kt:44`: `outline = Color(0xFF3D4F48)`.
+3. **done** — `SpartanApp.swift:84`: `spartanDynamic(light: 0x9BADAA, dark: 0x3D4F48)` — hex-identical to Android (parity grep in verification below).
+4. **done** — `CheckInScreen.kt:357`: REQUIRED branch now full `MaterialTheme.colorScheme.primary`; width via when-chain at `:362-366`: OVERDUE → 2dp (escalation kept, wins over required), REQUIRED → 1.5dp, else 1dp.
+5. **done** — `CheckInView.swift:292-293`: required branch `Color.spartanAccent` (full) with `lineWidth: activity.priority == .required ? 1.5 : 1` — required branch only.
+6. **done** — ring tracks: Android `CheckInScreen.kt:277` `val track = MaterialTheme.colorScheme.outline` (the plan's `:293` cite pointed at the drawArc consuming this value; the color is defined here); iOS `CheckInView.swift:159` `Circle().stroke(Color.spartanOutline, ...)`.
+7. **done** — iOS skeleton `LoadingPlan`: `.opacity(0.5)` removed from both skeleton fills (`CheckInView.swift:541, :545`) — the plan cited the first (`:532` at 91c0816); the three 76pt blocks share the same fill and the feel check ("skeleton blocks visible") requires both, so both were changed.
+
+Boundaries respected: no surface/background/text color changed; no shadows added; `Tokens.kt` urgency colors untouched. Verification: measured ratios (WCAG formula, python) — `9BADAA`/`FFFFFF` = **2.35**, `3D4F48`/`121817` = **2.06**, `0B685C`/`FFFFFF` = **6.67**, `3FE0C8`/`121817` = **10.87** — all match the target table. `./gradlew :app:compileDebugKotlin` (Homebrew JDK 17) → exit 0, `BUILD SUCCESSFUL in 16s`. iOS diff self-reviewed; no SpartanKit sources touched.

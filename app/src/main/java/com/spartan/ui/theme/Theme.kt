@@ -28,7 +28,7 @@ private val LightColors: ColorScheme = lightColorScheme(
     surfaceVariant = Color(0xFFE6ECEB),
     onSurface = Color(0xFF11201E),
     onSurfaceVariant = Color(0xFF4A5654),
-    outline = Color(0xFFC3CFCD),
+    outline = Color(0xFF9BADAA),
 )
 
 private val DarkColors: ColorScheme = darkColorScheme(
@@ -41,7 +41,7 @@ private val DarkColors: ColorScheme = darkColorScheme(
     surfaceVariant = Color(0xFF1E2A26),
     onSurface = Color(0xFFEAF1EF),
     onSurfaceVariant = Color(0xFF9DB0AB),
-    outline = Color(0xFF293630),
+    outline = Color(0xFF3D4F48),
 )
 
 @Suppress("unused")

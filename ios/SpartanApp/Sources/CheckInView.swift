@@ -156,7 +156,7 @@ private struct ReadinessRing: View {
         let sweep = Double(min(max(recovery ?? 0, 0), 100)) / 100.0
         ZStack {
             Circle()
-                .stroke(Color.spartanSurfaceVariant, style: StrokeStyle(lineWidth: 9, lineCap: .round))
+                .stroke(Color.spartanOutline, style: StrokeStyle(lineWidth: 9, lineCap: .round))
             Circle()
                 .trim(from: 0, to: revealed ? CGFloat(sweep) : 0)
                 .stroke(color, style: StrokeStyle(lineWidth: 9, lineCap: .round))
@@ -289,8 +289,8 @@ private struct ActivityCard: View {
         .overlay(
             RoundedRectangle(cornerRadius: SpartanRadius.card)
                 .strokeBorder(
-                    activity.priority == .required ? Color.spartanAccent.opacity(0.28) : Color.spartanOutline,
-                    lineWidth: 1
+                    activity.priority == .required ? Color.spartanAccent : Color.spartanOutline,
+                    lineWidth: activity.priority == .required ? 1.5 : 1
                 )
         )
         .contextMenu {
@@ -538,11 +538,11 @@ private struct LoadingPlan: View {
     var body: some View {
         VStack(alignment: .leading, spacing: SpartanSpacing.md) {
             RoundedRectangle(cornerRadius: 10)
-                .fill(Color.spartanSurfaceVariant.opacity(0.5))
+                .fill(Color.spartanSurfaceVariant)
                 .frame(width: 140, height: 14)
             ForEach(0..<3, id: \.self) { _ in
                 RoundedRectangle(cornerRadius: 10)
-                    .fill(Color.spartanSurfaceVariant.opacity(0.5))
+                    .fill(Color.spartanSurfaceVariant)
                     .frame(maxWidth: .infinity)
                     .frame(height: 76)
             }

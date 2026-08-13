@@ -81,7 +81,7 @@ extension Color {
     static let spartanTertiary = spartanDynamic(light: 0x7E5613, dark: 0xE7B25A)
     static let spartanOnSurface = spartanDynamic(light: 0x11201E, dark: 0xEAF1EF)
     static let spartanOnSurfaceVariant = spartanDynamic(light: 0x4A5654, dark: 0x9DB0AB)
-    static let spartanOutline = spartanDynamic(light: 0xC3CFCD, dark: 0x293630)
+    static let spartanOutline = spartanDynamic(light: 0x9BADAA, dark: 0x3D4F48)
 
     // Readiness band colors (Tokens.kt SpartanBands), incl. WCAG light-mode variants
     // (easy/rest darkened so band text passes 4.5:1 on 18%-alpha tinted chips too).
