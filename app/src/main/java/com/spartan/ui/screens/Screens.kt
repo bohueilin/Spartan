@@ -245,6 +245,7 @@ fun MetricDetailScreen(state: MainUiState, type: MetricType, onAdd: () -> Unit, 
     ScreenColumn {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(type.label, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f).semantics { heading() })
+            if (state.whoopIsMock) SampleDataChip()
             IconButton(onClick = onAdd) { Icon(Icons.Outlined.Edit, contentDescription = stringResource(R.string.metrics_add_entry)) }
         }
         assessment?.let {
@@ -400,7 +401,10 @@ fun AddMetricScreen(
 @Composable
 fun PlanScreen(state: MainUiState, onEditMinutes: (String, Int) -> Unit, onComplete: (PlannedWorkout) -> Unit) {
     ScreenColumn {
-        Text(stringResource(R.string.plan_title), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.semantics { heading() })
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.plan_title), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f).semantics { heading() })
+            if (state.whoopIsMock) SampleDataChip()
+        }
         WeeklyPlanSection(state, onEditMinutes, onComplete)
     }
 }

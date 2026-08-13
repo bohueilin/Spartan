@@ -31,12 +31,14 @@
     <string name="checkin_progress_done">%1$d of %2$d done</string>
     <string name="checkin_readiness">Readiness</string>
     <string name="checkin_recovery_a11y">Recovery %1$s, %2$s</string>
+    <string name="checkin_recovery_a11y_sample">%1$s, sample data</string>
     <string name="checkin_recovery_caption">recovery</string>
     <string name="checkin_recovery_not_available">not available</string>
     <string name="checkin_recovery_percent">%1$d percent</string>
     <string name="checkin_rescheduled">Rescheduled</string>
     <string name="checkin_sample_data">SAMPLE DATA</string>
     <string name="checkin_scheduled_for">Scheduled for %1$s</string>
+    <string name="checkin_scheduled_for_sample">Scheduled for %1$s (sample calendar)</string>
     <string name="checkin_skip_today">Skip today</string>
     <string name="checkin_skipped_today">Skipped for today</string>
     <string name="checkin_snooze_hour">Snooze 1 hour</string>
@@ -189,6 +191,7 @@
     <string name="privacy_delete_dialog_text">This deletes local health data on this device. This action cannot be undone.</string>
     <string name="privacy_delete_dialog_title">Delete local data?</string>
     <string name="privacy_export_preview">Local export preview</string>
+    <string name="privacy_export_sample_line">Includes sample (mock) data — not real WHOOP measurements.</string>
     <string name="privacy_share_export">Share local export</string>
     <string name="privacy_share_note">Sharing is user-directed and may send health data to the app you choose.</string>
     <string name="privacy_title">Privacy</string>

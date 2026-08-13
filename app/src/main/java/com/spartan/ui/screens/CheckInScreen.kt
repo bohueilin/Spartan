@@ -195,7 +195,7 @@ fun CheckInScreen(
                     compareBy({ it.priority.ordinal }, { it.bestTimeOfDay.ordinal }),
                 )
                 items(ordered, key = { it.id }) { activity ->
-                    ActivityCard(activity, nowMinuteOfDay, trainingProfile, completeWithDebrief, onUncomplete, onSnooze, onSkip, onSchedule, onOpenMetric, animatedItem(reducedMotion))
+                    ActivityCard(activity, nowMinuteOfDay, trainingProfile, state.calendarIsStub, completeWithDebrief, onUncomplete, onSnooze, onSkip, onSchedule, onOpenMetric, animatedItem(reducedMotion))
                 }
             }
         }
@@ -275,12 +275,14 @@ private fun ReadinessRing(recovery: Int?, bandName: String, state: MainUiState) 
     val color = bandColor(state.readinessBand)
     // Outline, not surfaceVariant: a low score must read as a partial ring, not a broken one.
     val track = MaterialTheme.colorScheme.outline
-    val a11y = stringResource(
+    val a11yBase = stringResource(
         R.string.checkin_recovery_a11y,
         recovery?.let { stringResource(R.string.checkin_recovery_percent, it) }
             ?: stringResource(R.string.checkin_recovery_not_available),
         bandName,
     )
+    // TalkBack must hear the same provenance the SAMPLE DATA chip shows sighted users.
+    val a11y = if (state.whoopIsMock) stringResource(R.string.checkin_recovery_a11y_sample, a11yBase) else a11yBase
     // The ring grows with the user's font scale so the score and caption never overflow it.
     val ringSize = 88.dp * LocalDensity.current.fontScale
     Box(
@@ -336,6 +338,7 @@ private fun ActivityCard(
     activity: DailyActivity,
     nowMinuteOfDay: Int,
     trainingProfile: TrainingProfile,
+    calendarIsStub: Boolean,
     onComplete: (String) -> Unit,
     onUncomplete: (String) -> Unit,
     onSnooze: (String) -> Unit,
@@ -408,7 +411,7 @@ private fun ActivityCard(
                     activity.relatedMetric?.let { metric ->
                         ImprovesChip(metric, dimmed) { onOpenMetric(metric) }
                     }
-                    StatusLine(activity)
+                    StatusLine(activity, calendarIsStub)
                 }
                 Box {
                     IconButton(onClick = { menuOpen = true }) {
@@ -510,11 +513,16 @@ private fun SpartanCheck(done: Boolean, label: String, onToggle: () -> Unit) {
 }
 
 @Composable
-private fun StatusLine(activity: DailyActivity) {
+private fun StatusLine(activity: DailyActivity, calendarIsStub: Boolean) {
     val text = when (activity.status) {
         ActivityStatus.SNOOZED -> activity.snoozedUntilMillis?.let { stringResource(R.string.checkin_snoozed_until, clockTime(it)) } ?: stringResource(R.string.checkin_snoozed)
         ActivityStatus.SKIPPED -> stringResource(R.string.checkin_skipped_today)
-        ActivityStatus.RESCHEDULED -> activity.scheduledEpochMinute?.let { stringResource(R.string.checkin_scheduled_for, clockTime(it * 60_000)) } ?: stringResource(R.string.checkin_rescheduled)
+        // A slot found against stub free/busy must say so — real-feeling artifacts from fake
+        // availability are exactly what the provenance system exists to prevent.
+        ActivityStatus.RESCHEDULED -> activity.scheduledEpochMinute?.let {
+            if (calendarIsStub) stringResource(R.string.checkin_scheduled_for_sample, clockTime(it * 60_000))
+            else stringResource(R.string.checkin_scheduled_for, clockTime(it * 60_000))
+        } ?: stringResource(R.string.checkin_rescheduled)
         ActivityStatus.DONE -> stringResource(R.string.checkin_completed)
         else -> null
     } ?: return

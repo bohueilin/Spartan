@@ -110,7 +110,8 @@ private struct ReadinessHeader: View {
             HStack(alignment: .center, spacing: SpartanSpacing.xl) {
                 ReadinessRing(
                     recovery: viewModel.recoveryScore,
-                    band: viewModel.readinessBand
+                    band: viewModel.readinessBand,
+                    isMock: viewModel.whoopIsMock
                 )
                 VStack(alignment: .leading, spacing: SpartanSpacing.xs) {
                     Text(bandName)
@@ -143,6 +144,7 @@ private struct ReadinessHeader: View {
 private struct ReadinessRing: View {
     let recovery: Int?
     let band: ReadinessBand?
+    let isMock: Bool
 
     // The ring grows with Dynamic Type so the score and caption never outgrow the circle.
     @ScaledMetric(relativeTo: .title2) private var ringSize: CGFloat = 88
@@ -178,10 +180,12 @@ private struct ReadinessRing: View {
     }
 
     // "Recovery %1$s, %2$s" with "%1$d percent" / "not available".
+    // VoiceOver must hear the same provenance the SAMPLE DATA chip shows sighted users.
     private var a11yLabel: String {
         let recoveryText = recovery.map { "\($0) percent" } ?? "not available"
         let bandName = band.map(spartanBandLabel) ?? "Readiness"
-        return "Recovery \(recoveryText), \(bandName)"
+        let base = "Recovery \(recoveryText), \(bandName)"
+        return isMock ? "\(base), sample data" : base
     }
 }
 
@@ -320,8 +324,10 @@ private struct ActivityCard: View {
         case .skipped:
             return "Skipped for today"
         case .rescheduled:
+            // This build's calendar client is always StubCalendarClient (CheckInViewModel), so a
+            // found slot always came from sample free/busy — the status must say so.
             if let minute = activity.scheduledEpochMinute {
-                return "Scheduled for \(clockTime(fromMillis: minute * 60_000))"
+                return "Scheduled for \(clockTime(fromMillis: minute * 60_000)) (sample calendar)"
             }
             return "Rescheduled"
         case .done:

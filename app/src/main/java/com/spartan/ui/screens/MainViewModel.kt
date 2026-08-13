@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.glance.appwidget.updateAll
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.spartan.R
 import com.spartan.ui.widget.NextActivityWidget
 import dagger.hilt.android.qualifiers.ApplicationContext
 import com.spartan.data.calendar.AvailabilityService
@@ -372,6 +373,7 @@ class MainViewModel @Inject constructor(
             a.clinicalStatus == ClinicalStatus.ABOVE_RANGE || a.clinicalStatus == ClinicalStatus.BELOW_RANGE ||
                 a.targetStatus == TargetStatus.ABOVE_PERSONAL_TARGET || a.targetStatus == TargetStatus.BELOW_PERSONAL_TARGET
         }.map { it.reading.type }.toSet()
+        val isMockData = checkIn.plan?.isMock ?: whoopClient.isMock
         MainUiState(
             onboardingComplete = onboardingComplete,
             notificationDenied = notificationDenied,
@@ -385,13 +387,18 @@ class MainViewModel @Inject constructor(
             weeklyPlan = plan,
             review = review,
             reminders = health.reminders,
-            exportText = health.exportText,
+            // Exported text must carry the same provenance as the screens that show it.
+            exportText = if (isMockData) {
+                appContext.getString(R.string.privacy_export_sample_line) + "\n" + health.exportText
+            } else {
+                health.exportText
+            },
             todayActivities = checkIn.activities,
             planHeadline = checkIn.plan?.headline ?: "",
             readinessBand = checkIn.readiness?.band,
             recoveryScore = checkIn.readiness?.recoveryScore,
             planSafetyBanner = checkIn.plan?.safetyBanner,
-            whoopIsMock = checkIn.plan?.isMock ?: whoopClient.isMock,
+            whoopIsMock = isMockData,
             whoopConnected = checkIn.whoopConnected,
             calendarConnected = checkIn.calendarConnected,
             calendarIsStub = calendarClient.isStub,
@@ -776,7 +783,7 @@ class MainViewModel @Inject constructor(
                 provider = IntegrationProvider.WHOOP,
                 status = ConnectionStatus.CONNECTED,
                 scopes = "read:recovery read:sleep read:workout read:cycles read:profile offline",
-                accountLabel = if (whoopClient.isMock) "Sample data" else null,
+                accountLabel = if (whoopClient.isMock) appContext.getString(R.string.sample_data_a11y) else null,
             )
         }
     }
@@ -800,7 +807,7 @@ class MainViewModel @Inject constructor(
                 provider = IntegrationProvider.GOOGLE_CALENDAR,
                 status = ConnectionStatus.CONNECTED,
                 scopes = "calendar.freebusy",
-                accountLabel = if (calendarClient.isStub) "Sample data" else null,
+                accountLabel = if (calendarClient.isStub) appContext.getString(R.string.sample_data_a11y) else null,
             )
         }
     }

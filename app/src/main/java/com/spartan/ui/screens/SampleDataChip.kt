@@ -18,8 +18,11 @@ import com.spartan.ui.theme.Spacing
 
 /**
  * The "SAMPLE DATA" provenance chip. Rendered on EVERY surface that shows WHOOP-derived numbers
- * while the app runs on sample data (check-in header, Metrics, Review, Coach, Connections) — a
- * user must never mistake fabricated readings for their own.
+ * while the app runs on sample data (check-in header, Metrics, Metric Detail, Plan, Review,
+ * Coach, Connections) — a user must never mistake fabricated readings for their own. Surfaces
+ * that can't host the chip carry the same provenance as text: the Privacy export prepends a
+ * sample-data line, the readiness ring's TalkBack label appends "sample data", and a stub-calendar
+ * "Find a time" result reads "(sample calendar)".
  */
 @Composable
 fun SampleDataChip(modifier: Modifier = Modifier) {
