@@ -1,9 +1,12 @@
 package com.spartan.ui.theme
 
+import android.provider.Settings
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.spartan.domain.engine.PlanUrgency
 import com.spartan.domain.model.ReadinessBand
@@ -31,6 +34,19 @@ object Motion {
     const val fast = 140      // micro-interactions (check-off)
     const val medium = 220    // card expand / state change
     const val slow = 420      // reveal moments (readiness ring sweep)
+}
+
+/**
+ * True when the user has disabled animations system-wide (animator duration scale 0).
+ * Movement animations (sweeps, expands, placements) must snap; opacity/color fades may stay.
+ */
+@Composable
+fun rememberReducedMotion(): Boolean {
+    val context = LocalContext.current
+    return remember {
+        Settings.Global.getFloat(context.contentResolver,
+            Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
+    }
 }
 
 /**

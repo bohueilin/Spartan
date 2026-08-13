@@ -189,6 +189,7 @@ private struct ReadinessRing: View {
 
 private struct PlanProgress: View {
     @EnvironmentObject private var viewModel: CheckInViewModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         let total = viewModel.activities.count
@@ -209,7 +210,7 @@ private struct PlanProgress: View {
             ProgressView(value: total == 0 ? 0 : Double(done) / Double(total))
                 .progressViewStyle(.linear)
                 .tint(.spartanAccent)
-                .animation(.easeInOut(duration: 0.22), value: done)
+                .animation(reduceMotion ? nil : .easeInOut(duration: 0.22), value: done)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(done) of \(total) activities done")
@@ -227,6 +228,7 @@ private struct ActivityCard: View {
     let onSchedule: (String) -> Void
 
     @State private var expanded = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var done: Bool { activity.status == .done }
     private var dimmed: Bool { done || activity.status == .skipped }
@@ -255,7 +257,13 @@ private struct ActivityCard: View {
                 }
                 .padding(.top, 6)
                 .contentShape(Rectangle())
-                .onTapGesture { withAnimation(.easeInOut(duration: 0.22)) { expanded.toggle() } }
+                .onTapGesture {
+                    if reduceMotion {
+                        expanded.toggle()
+                    } else {
+                        withAnimation(.easeInOut(duration: 0.22)) { expanded.toggle() }
+                    }
+                }
                 .accessibilityAddTraits(.isButton)
                 .accessibilityHint(expanded ? "Collapse \(activity.title)" : "Expand \(activity.title)")
                 Spacer(minLength: 0)

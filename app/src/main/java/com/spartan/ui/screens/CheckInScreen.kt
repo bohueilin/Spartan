@@ -4,6 +4,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -95,6 +96,7 @@ import com.spartan.ui.theme.Spacing
 import com.spartan.ui.theme.bandColor
 import com.spartan.ui.theme.bandLabel
 import com.spartan.ui.theme.planUrgencyColor
+import com.spartan.ui.theme.rememberReducedMotion
 import java.time.Instant
 import java.time.LocalTime
 import java.time.ZoneId
@@ -147,6 +149,7 @@ fun CheckInScreen(
     // the empty state + banner instead of looping the skeleton forever.
     val loading = state.planHeadline.isBlank() && state.todayActivities.isEmpty() &&
         state.readinessBand == null && !state.syncFailed
+    val reducedMotion = rememberReducedMotion()
     PullToRefreshBox(
         isRefreshing = state.isRefreshing,
         onRefresh = onRefresh,
@@ -173,14 +176,14 @@ fun CheckInScreen(
                 item(key = "consistency") { ConsistencyStrip(state.consistencyFlags) }
             }
             if (planFinished(state)) {
-                item(key = "day-complete") { DayCompleteCard(state, animatedItem()) }
+                item(key = "day-complete") { DayCompleteCard(state, animatedItem(reducedMotion)) }
             }
             if (state.syncFailed) {
-                item(key = "sync-banner") { SafetyBanner(stringResource(R.string.checkin_sync_failed), animatedItem()) }
+                item(key = "sync-banner") { SafetyBanner(stringResource(R.string.checkin_sync_failed), animatedItem(reducedMotion)) }
             }
-            state.planSafetyBanner?.let { banner -> item(key = "safety-banner") { SafetyBanner(banner, animatedItem()) } }
+            state.planSafetyBanner?.let { banner -> item(key = "safety-banner") { SafetyBanner(banner, animatedItem(reducedMotion)) } }
             if (!state.whoopConnected) {
-                item(key = "connect-prompt") { ConnectPrompt(isMock = state.whoopIsMock, onManageConnections = onManageConnections, modifier = animatedItem()) }
+                item(key = "connect-prompt") { ConnectPrompt(isMock = state.whoopIsMock, onManageConnections = onManageConnections, modifier = animatedItem(reducedMotion)) }
             }
             item(key = "plan-label") { SectionLabel(stringResource(R.string.checkin_todays_plan)) }
             if (state.todayActivities.isEmpty()) {
@@ -191,7 +194,7 @@ fun CheckInScreen(
                     compareBy({ it.priority.ordinal }, { it.bestTimeOfDay.ordinal }),
                 )
                 items(ordered, key = { it.id }) { activity ->
-                    ActivityCard(activity, nowMinuteOfDay, trainingProfile, completeWithDebrief, onUncomplete, onSnooze, onSkip, onSchedule, onOpenMetric, animatedItem())
+                    ActivityCard(activity, nowMinuteOfDay, trainingProfile, completeWithDebrief, onUncomplete, onSnooze, onSkip, onSchedule, onOpenMetric, animatedItem(reducedMotion))
                 }
             }
         }
@@ -214,10 +217,11 @@ fun CheckInScreen(
 /**
  * Placement/appearance animation for list items that insert, leave, or shift (day-complete card,
  * banners, reordered activities) — Motion.medium so the list settles instead of jumping.
+ * Reduced motion drops the placement (movement) animation; the opacity fades stay.
  */
-private fun LazyItemScope.animatedItem(): Modifier = Modifier.animateItem(
+private fun LazyItemScope.animatedItem(reducedMotion: Boolean): Modifier = Modifier.animateItem(
     fadeInSpec = tween(Motion.medium),
-    placementSpec = tween(Motion.medium),
+    placementSpec = if (reducedMotion) null else tween(Motion.medium),
     fadeOutSpec = tween(Motion.medium),
 )
 
@@ -285,7 +289,8 @@ private fun ReadinessRing(recovery: Int?, bandName: String, state: MainUiState) 
         // rememberSaveable survives tab switches and back-navigation, so returning to Today never
         // replays the sweep (which would transiently show wrong recovery numbers).
         var revealed by rememberSaveable(recovery) { mutableStateOf(false) }
-        val revealAnim by animateFloatAsState(if (revealed) 1f else 0f, tween(Motion.slow), label = "ringReveal")
+        val reducedMotion = rememberReducedMotion()
+        val revealAnim by animateFloatAsState(if (revealed) 1f else 0f, if (reducedMotion) snap() else tween(Motion.slow), label = "ringReveal")
         LaunchedEffect(recovery) { revealed = true }
         Canvas(Modifier.size(ringSize)) {
             val stroke = 9.dp.toPx()
@@ -306,7 +311,8 @@ private fun PlanProgress(state: MainUiState) {
     val total = state.todayActivities.size
     val done = state.todayActivities.count { it.status == ActivityStatus.DONE }
     val minutes = state.todayActivities.filter { it.status != ActivityStatus.SKIPPED }.sumOf { it.estimatedMinutes }
-    val target by animateFloatAsState(if (total == 0) 0f else done.toFloat() / total, tween(Motion.medium), label = "progress")
+    val reducedMotion = rememberReducedMotion()
+    val target by animateFloatAsState(if (total == 0) 0f else done.toFloat() / total, if (reducedMotion) snap() else tween(Motion.medium), label = "progress")
     val progressDescription = stringResource(R.string.checkin_progress_a11y, done, total)
     Column(Modifier.semantics(mergeDescendants = true) { stateDescription = progressDescription }) {
         Row {
@@ -338,6 +344,7 @@ private fun ActivityCard(
 ) {
     var expanded by remember(activity.id) { mutableStateOf(false) }
     var menuOpen by remember(activity.id) { mutableStateOf(false) }
+    val reducedMotion = rememberReducedMotion()
     val done = activity.status == ActivityStatus.DONE
     val dimmed = done || activity.status == ActivityStatus.SKIPPED
     val urgency = PlanClock.urgencyFor(activity.priority, activity.status, nowMinuteOfDay)
@@ -361,7 +368,7 @@ private fun ActivityCard(
                     onClickLabel = if (expanded) stringResource(R.string.checkin_collapse_activity, activity.title) else stringResource(R.string.checkin_expand_activity, activity.title),
                 ) { expanded = !expanded }
                 .padding(Spacing.md)
-                .animateContentSize(tween(Motion.medium)),
+                .then(if (reducedMotion) Modifier else Modifier.animateContentSize(tween(Motion.medium))),
         ) {
             Row(verticalAlignment = Alignment.Top) {
                 SpartanCheck(
