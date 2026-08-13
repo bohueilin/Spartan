@@ -5,7 +5,7 @@ Executor-proofed plans for all Tier 1–2 findings from the full design review. 
 | # | Plan | Tier | Platforms | Status |
 |---|---|---|---|---|
 | 001 | [Honor reduced-motion](001-reduced-motion.md) | 1 | Android + iOS | DONE |
-| 002 | [Heading semantics for screen readers](002-heading-semantics.md) | 1 | Android + iOS | TODO |
+| 002 | [Heading semantics for screen readers](002-heading-semantics.md) | 1 | Android + iOS | DONE |
 | 003 | [Non-text contrast: required signal, outlines, track, skeleton](003-nontext-contrast.md) | 1 | Android + iOS | TODO |
 | 004 | [Complete sample-data provenance](004-complete-provenance.md) | 2 | Android + iOS | TODO |
 | 005 | [Review tab: no confident zeros](005-review-fake-zeros.md) | 2 | Android | TODO |

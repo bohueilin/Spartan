@@ -74,6 +74,7 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -185,7 +186,7 @@ fun MetricsScreen(state: MainUiState, onAdd: () -> Unit, onMetricClick: (MetricT
     ) {
         item {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.metrics_title), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                Text(stringResource(R.string.metrics_title), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f).semantics { heading() })
                 if (state.whoopIsMock) SampleDataChip()
                 IconButton(onClick = onAdd) { Icon(Icons.Outlined.Add, contentDescription = stringResource(R.string.metrics_add_metric)) }
             }
@@ -243,7 +244,7 @@ fun MetricDetailScreen(state: MainUiState, type: MetricType, onAdd: () -> Unit, 
     val history = state.readings.filter { it.type == type }
     ScreenColumn {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(type.label, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            Text(type.label, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f).semantics { heading() })
             IconButton(onClick = onAdd) { Icon(Icons.Outlined.Edit, contentDescription = stringResource(R.string.metrics_add_entry)) }
         }
         assessment?.let {
@@ -356,7 +357,7 @@ fun AddMetricScreen(
     var showError by rememberSaveable { mutableStateOf(false) }
     val pendingAllowed = type in setOf(MetricType.APOB, MetricType.LPA, MetricType.CAC)
     ScreenColumn {
-        Text(if (initialReading == null) stringResource(R.string.metrics_add_metric) else stringResource(R.string.metrics_edit_metric), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold)
+        Text(if (initialReading == null) stringResource(R.string.metrics_add_metric) else stringResource(R.string.metrics_edit_metric), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.semantics { heading() })
         Box {
             FilledTonalButton(onClick = { expanded = true }) { Text(type.label) }
             DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
@@ -399,7 +400,7 @@ fun AddMetricScreen(
 @Composable
 fun PlanScreen(state: MainUiState, onEditMinutes: (String, Int) -> Unit, onComplete: (PlannedWorkout) -> Unit) {
     ScreenColumn {
-        Text(stringResource(R.string.plan_title), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold)
+        Text(stringResource(R.string.plan_title), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.semantics { heading() })
         WeeklyPlanSection(state, onEditMinutes, onComplete)
     }
 }
@@ -445,7 +446,7 @@ fun WorkoutCompletionScreen(
     var rpe by rememberSaveable { mutableStateOf(5f) }
     var pain by rememberSaveable { mutableStateOf(false) }
     ScreenColumn {
-        Text(stringResource(R.string.workout_title), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold)
+        Text(stringResource(R.string.workout_title), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.semantics { heading() })
         Text(workoutTypeLabel(type))
         OutlinedTextField(
             completed,
@@ -489,7 +490,7 @@ fun ReviewScreen(state: MainUiState) {
     val review = state.review
     ScreenColumn {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.review_title), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            Text(stringResource(R.string.review_title), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f).semantics { heading() })
             if (state.whoopIsMock) SampleDataChip()
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
@@ -532,7 +533,7 @@ fun SettingsScreen(
     onDiagnostics: (() -> Unit)? = null,
 ) {
     ScreenColumn {
-        Text(stringResource(R.string.settings_title), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold)
+        Text(stringResource(R.string.settings_title), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.semantics { heading() })
         SettingsCard(stringResource(R.string.settings_connections), stringResource(R.string.settings_connections_subtitle), Icons.Outlined.Link, onConnections)
         SettingsCard(stringResource(R.string.settings_reminders), stringResource(R.string.settings_reminders_subtitle), Icons.Outlined.Notifications, onReminders)
         SettingsCard(stringResource(R.string.settings_privacy), stringResource(R.string.settings_privacy_subtitle), Icons.Outlined.PrivacyTip, onPrivacy)
@@ -566,7 +567,7 @@ fun ReminderSettingsScreen(
     onSave: (String, String, String, Int, Int, Boolean, ReminderFrequency, Int) -> Unit,
 ) {
     ScreenColumn {
-        Text(stringResource(R.string.reminders_title), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold)
+        Text(stringResource(R.string.reminders_title), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.semantics { heading() })
         if (state.notificationDenied) Text(stringResource(R.string.reminders_notifications_denied))
         val exerciseReminder = state.reminders.firstOrNull { it.id == "exercise" }
         ReminderEditor(
@@ -601,7 +602,7 @@ fun ReminderSettingsScreen(
 fun PrivacyScreen(state: MainUiState, onShare: (String) -> Unit, onDelete: () -> Unit) {
     var confirmDelete by rememberSaveable { mutableStateOf(false) }
     ScreenColumn {
-        Text(stringResource(R.string.privacy_title), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold)
+        Text(stringResource(R.string.privacy_title), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.semantics { heading() })
         Text(stringResource(R.string.privacy_body))
         OutlinedCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp)) {

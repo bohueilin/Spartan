@@ -8,6 +8,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.spartan.R
@@ -26,12 +28,15 @@ fun SampleDataChip(modifier: Modifier = Modifier) {
         color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.16f),
         modifier = modifier,
     ) {
+        val a11y = stringResource(R.string.sample_data_a11y)
         Text(
             stringResource(R.string.checkin_sample_data),
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.tertiary,
-            modifier = Modifier.padding(horizontal = Spacing.sm, vertical = 3.dp),
+            // Spoken label: all-caps "SAMPLE DATA" can be spelled out letter-by-letter by TalkBack.
+            modifier = Modifier.padding(horizontal = Spacing.sm, vertical = 3.dp)
+                .semantics { contentDescription = a11y },
         )
     }
 }

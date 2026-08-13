@@ -474,6 +474,7 @@ private struct SampleDataChip: View {
                 RoundedRectangle(cornerRadius: SpartanRadius.chip)
                     .fill(Color.spartanTertiary.opacity(0.16))
             )
+            .accessibilityLabel("Sample data")
     }
 }
 
@@ -578,6 +579,7 @@ private struct SectionLabel: View {
             .kerning(1.4)
             .foregroundColor(.spartanOnSurfaceVariant)
             .padding(.top, SpartanSpacing.xs)
+            .accessibilityAddTraits(.isHeader)
     }
 }
 

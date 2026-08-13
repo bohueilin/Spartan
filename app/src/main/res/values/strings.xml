@@ -227,6 +227,9 @@
     <string name="review_title">Weekly review</string>
     <string name="review_what_improved">What improved</string>
 
+    <!-- Sample-data provenance -->
+    <string name="sample_data_a11y">Sample data</string>
+
     <!-- Settings -->
     <string name="settings_about">About Spartan</string>
     <string name="settings_connections">Connections</string>

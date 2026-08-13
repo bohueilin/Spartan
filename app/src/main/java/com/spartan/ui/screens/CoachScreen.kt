@@ -35,6 +35,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -83,7 +85,7 @@ fun CoachScreen(
                     stringResource(R.string.coach_title),
                     style = MaterialTheme.typography.headlineLarge,
                     fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).semantics { heading() },
                 )
                 if (state.whoopIsMock) SampleDataChip()
             }
@@ -185,7 +187,7 @@ private fun CoachSectionLabel(text: String) {
         fontWeight = FontWeight.Bold,
         letterSpacing = 1.4.sp,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(top = Spacing.sm),
+        modifier = Modifier.padding(top = Spacing.sm).semantics { heading() },
     )
 }
 
