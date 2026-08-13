@@ -217,6 +217,7 @@
     <string name="review_adherence">Adherence</string>
     <string name="review_consistency">Consistency</string>
     <string name="review_consistency_value">Active on %1$d of the last 7 days</string>
+    <string name="review_empty_body">Your weekly review appears after your first full week of activity. Check back Sunday.</string>
     <string name="review_hrv_trend">HRV trend</string>
     <string name="review_needs_attention">Needs attention</string>
     <string name="review_next_week_focus">Next week focus</string>

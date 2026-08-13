@@ -497,28 +497,40 @@ fun ReviewScreen(state: MainUiState) {
             Text(stringResource(R.string.review_title), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f).semantics { heading() })
             if (state.whoopIsMock) SampleDataChip()
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-            SummaryCard(stringResource(R.string.review_adherence), stringResource(R.string.review_percent_value, review?.adherencePercent ?: 0), Modifier.weight(1f))
-            SummaryCard(stringResource(R.string.review_strength), "${review?.strengthSessions ?: 0}", Modifier.weight(1f))
+        if (review == null) {
+            // No confident zeros: an absent review renders a designed empty state, never "0%".
+            OutlinedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(Radius.card)) {
+                Text(
+                    stringResource(R.string.review_empty_body),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(Spacing.lg),
+                )
+            }
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                SummaryCard(stringResource(R.string.review_adherence), stringResource(R.string.review_percent_value, review.adherencePercent), Modifier.weight(1f))
+                SummaryCard(stringResource(R.string.review_strength), "${review.strengthSessions}", Modifier.weight(1f))
+            }
+            // Calm consistency — descriptive, no streak-loss anxiety.
+            SummaryCard(stringResource(R.string.review_consistency), stringResource(R.string.review_consistency_value, state.consistencyDays7), Modifier.fillMaxWidth())
+            // Expected-improvement ranges at the current consistency (honest ranges, not promises).
+            TrajectoryCard(state.projections)
+            // Longitudinal readiness trends from the WHOOP-normalized metric history.
+            TrendCard(stringResource(R.string.review_recovery_trend), recentValues(state, MetricType.RECOVERY_SCORE))
+            TrendCard(stringResource(R.string.review_hrv_trend), recentValues(state, MetricType.HRV_RMSSD))
+            TrendCard(stringResource(R.string.review_sleep_trend), recentValues(state, MetricType.SLEEP_PERFORMANCE))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                SummaryCard(stringResource(R.string.review_seven_day_weight), review.sevenDayWeightAverage?.let { "%.1f".format(it) } ?: stringResource(R.string.review_no_entry), Modifier.weight(1f))
+                SummaryCard(stringResource(R.string.review_seven_day_rhr), review.sevenDayRhrAverage?.let { "%.0f".format(it) } ?: stringResource(R.string.review_no_entry), Modifier.weight(1f))
+            }
+            Text(stringResource(R.string.review_what_improved), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            review.improved.forEach { Text("•  $it", style = MaterialTheme.typography.bodyMedium) }
+            Text(stringResource(R.string.review_needs_attention), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            review.needsAttention.forEach { Text("•  $it", style = MaterialTheme.typography.bodyMedium) }
+            Text(stringResource(R.string.review_next_week_focus), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(review.nextWeekFocus)
         }
-        // Calm consistency — descriptive, no streak-loss anxiety.
-        SummaryCard(stringResource(R.string.review_consistency), stringResource(R.string.review_consistency_value, state.consistencyDays7), Modifier.fillMaxWidth())
-        // Expected-improvement ranges at the current consistency (honest ranges, not promises).
-        TrajectoryCard(state.projections)
-        // Longitudinal readiness trends from the WHOOP-normalized metric history.
-        TrendCard(stringResource(R.string.review_recovery_trend), recentValues(state, MetricType.RECOVERY_SCORE))
-        TrendCard(stringResource(R.string.review_hrv_trend), recentValues(state, MetricType.HRV_RMSSD))
-        TrendCard(stringResource(R.string.review_sleep_trend), recentValues(state, MetricType.SLEEP_PERFORMANCE))
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-            SummaryCard(stringResource(R.string.review_seven_day_weight), review?.sevenDayWeightAverage?.let { "%.1f".format(it) } ?: stringResource(R.string.review_no_entry), Modifier.weight(1f))
-            SummaryCard(stringResource(R.string.review_seven_day_rhr), review?.sevenDayRhrAverage?.let { "%.0f".format(it) } ?: stringResource(R.string.review_no_entry), Modifier.weight(1f))
-        }
-        Text(stringResource(R.string.review_what_improved), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-        review?.improved.orEmpty().forEach { Text("•  $it", style = MaterialTheme.typography.bodyMedium) }
-        Text(stringResource(R.string.review_needs_attention), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-        review?.needsAttention.orEmpty().forEach { Text("•  $it", style = MaterialTheme.typography.bodyMedium) }
-        Text(stringResource(R.string.review_next_week_focus), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-        Text(review?.nextWeekFocus.orEmpty())
     }
 }
 

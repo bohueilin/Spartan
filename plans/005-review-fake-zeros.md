@@ -1,6 +1,6 @@
 # 005 — Review tab: never render confident zeros for absent data
 
-- **Status**: TODO
+- **Status**: DONE
 - **Commit**: 91c0816
 - **Severity**: Tier 2 (trust)
 - **Scope**: 2 files (Screens.kt, strings.xml)
@@ -47,3 +47,14 @@ If code at a cited line doesn't match, STOP and report the requirement number.
 - **Mechanical**: `JAVA_HOME=$(/usr/libexec/java_home -v 17) ./gradlew :app:compileDebugKotlin` passes.
 - **Feel check**: fresh install (or cleared data) → Review tab shows the empty-state card, no "0%" anywhere; after a week of mock data → summary grid as before.
 - **Done when**: all 4 requirements confirmed; grep for `?: 0` in the Review composable returns nothing.
+
+## Closing self-audit (2026-08-12)
+
+Line numbers are post-edit (Screens.kt shifted after plans 002/004; cited code matched at commit 91c0816 before editing).
+
+1. **done** — `ReviewScreen` branches on `review == null` at `Screens.kt:500` (title row stays above the branch).
+2. **done** — null branch renders one `OutlinedCard(RoundedCornerShape(Radius.card))` containing `review_empty_body` ("Your weekly review appears after your first full week of activity. Check back Sunday.", `strings.xml:220`) in `bodyMedium`/`onSurfaceVariant` with `Spacing.lg` padding (`Screens.kt:500-509`).
+3. **done** — non-null branch keeps the existing content with both `?: 0` fallbacks removed: `review.adherencePercent` (`:512`), `review.strengthSessions` (`:513`). The branch smart-casts `review` non-null, so the now-dead safe calls on `improved`/`needsAttention`/`nextWeekFocus`/`sevenDay*` became direct calls — all fields are non-null in `WeeklyReviewSummary` (`HealthModels.kt:96-109`); rendered output is byte-identical.
+4. **done** — `SampleDataChip` sits in the title row above the branch (`Screens.kt:498`), visible in both branches.
+
+Boundaries respected: no spinner/skeleton added; `TrajectoryCard`/`TrendCard` internals untouched; no other tabs touched. Verification: `./gradlew :app:compileDebugKotlin` (Homebrew JDK 17) → exit 0, `BUILD SUCCESSFUL in 17s`; `?: 0` grep over the `ReviewScreen` composable → 0 matches.
