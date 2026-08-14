@@ -10,8 +10,10 @@ import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.spartan.R
 import com.spartan.domain.engine.MetricExplainers
 import com.spartan.domain.model.MetricType
 import com.spartan.ui.theme.Radius
@@ -26,16 +28,16 @@ fun MetricExplainerSection(type: MetricType) {
     val explainer = MetricExplainers.forMetric(type) ?: return
     OutlinedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(Radius.card)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("Understanding ${explainer.title.lowercase()}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            ExplainerBlock("What it is", explainer.whatItIs)
+            Text(stringResource(R.string.explainer_title, explainer.title.lowercase()), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            ExplainerBlock(stringResource(R.string.explainer_what_it_is), explainer.whatItIs)
             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text("What moves it", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                Text(stringResource(R.string.explainer_what_moves_it), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
                 explainer.whatMovesIt.forEach {
                     Text("•  $it", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 2.dp))
                 }
             }
-            ExplainerBlock("What a good pattern looks like", explainer.whatGoodLooksLike)
-            ExplainerBlock("How Spartan uses it", explainer.howSpartanUsesIt)
+            ExplainerBlock(stringResource(R.string.explainer_good_pattern), explainer.whatGoodLooksLike)
+            ExplainerBlock(stringResource(R.string.explainer_how_used), explainer.howSpartanUsesIt)
         }
     }
 }

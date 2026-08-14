@@ -154,7 +154,7 @@ fun CoachScreen(
                 )
             }
 
-            item { CoachSectionLabel(stringResource(R.string.plan_title).uppercase()) }
+            item { CoachSectionLabel(stringResource(R.string.plan_title_caps)) }
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
                     WeeklyPlanSection(state, onEditMinutes, onComplete)

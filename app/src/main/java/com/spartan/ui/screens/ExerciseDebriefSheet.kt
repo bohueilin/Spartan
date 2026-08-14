@@ -59,7 +59,7 @@ fun ExerciseDebriefSheet(
             Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text("Nice work. How did it go?", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.debrief_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             Text(
                 activity.title,
                 style = MaterialTheme.typography.bodyMedium,
@@ -68,12 +68,12 @@ fun ExerciseDebriefSheet(
             OutlinedTextField(
                 value = minutesText,
                 onValueChange = { minutesText = it },
-                label = { Text("Minutes") },
+                label = { Text(stringResource(R.string.debrief_minutes)) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
-            Text("Effort ${rpe.roundToInt()} of 10", style = MaterialTheme.typography.labelLarge)
+            Text(stringResource(R.string.debrief_effort, rpe.roundToInt()), style = MaterialTheme.typography.labelLarge)
             val effortDescription = stringResource(R.string.a11y_effort_slider)
             Slider(
                 value = rpe,
@@ -90,7 +90,7 @@ fun ExerciseDebriefSheet(
                 // and makes the whole row the target — this is the safety-critical pain input.
                 modifier = Modifier.toggleable(value = pain, role = Role.Switch, onValueChange = { pain = it }),
             ) {
-                Text("Pain or concerning symptoms", Modifier.weight(1f))
+                Text(stringResource(R.string.workout_pain_label), Modifier.weight(1f))
                 Switch(checked = pain, onCheckedChange = null)
             }
             Button(
@@ -99,10 +99,10 @@ fun ExerciseDebriefSheet(
                 },
                 // heightIn, not height: the label must grow with font scale, not clip.
                 modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
-            ) { Text("Save session", fontWeight = FontWeight.SemiBold) }
-            TextButton(onClick = onSkip, modifier = Modifier.fillMaxWidth()) { Text("Skip") }
+            ) { Text(stringResource(R.string.debrief_save), fontWeight = FontWeight.SemiBold) }
+            TextButton(onClick = onSkip, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.debrief_skip)) }
             Text(
-                "Your effort and pain answers shape next week's plan. Pain means we go gentler — never push through it.",
+                stringResource(R.string.debrief_note),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

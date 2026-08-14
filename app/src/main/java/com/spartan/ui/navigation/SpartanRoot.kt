@@ -15,7 +15,7 @@ import androidx.core.util.Consumer
 import androidx.compose.material.icons.automirrored.outlined.EventNote
 import androidx.compose.material.icons.outlined.Assessment
 import androidx.compose.material.icons.outlined.FavoriteBorder
-import androidx.compose.material.icons.outlined.Flag
+import androidx.compose.material.icons.outlined.Insights
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -60,7 +60,7 @@ private val tabs = listOf(
     Tab("today", "Today", Icons.Outlined.FavoriteBorder),
     Tab("metrics", "Metrics", Icons.Outlined.Assessment),
     Tab("plan", "Coach", Icons.AutoMirrored.Outlined.EventNote),
-    Tab("review", "Review", Icons.Outlined.Flag),
+    Tab("review", "Review", Icons.Outlined.Insights),
     Tab("settings", "Settings", Icons.Outlined.Settings),
 )
 

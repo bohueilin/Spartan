@@ -15,7 +15,7 @@ import androidx.compose.ui.graphics.Color
  */
 
 // A crisp, athletic teal-cyan accent reads as "readiness" without feeling clinical.
-private val SpartanAccent = Color(0xFF15C9B0)
+// Light mode uses 0xFF0B685C (primary below); dark mode this brighter variant.
 private val SpartanAccentDark = Color(0xFF3FE0C8)
 
 private val LightColors: ColorScheme = lightColorScheme(
@@ -43,9 +43,6 @@ private val DarkColors: ColorScheme = darkColorScheme(
     onSurfaceVariant = Color(0xFF9DB0AB),
     outline = Color(0xFF3D4F48),
 )
-
-@Suppress("unused")
-val SpartanAccentColor = SpartanAccent
 
 @Composable
 fun SpartanTheme(content: @Composable () -> Unit) {

@@ -28,6 +28,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Edit
@@ -576,7 +577,7 @@ fun SettingsScreen(
         SettingsCard(stringResource(R.string.settings_reminders), stringResource(R.string.settings_reminders_subtitle), Icons.Outlined.Notifications, onReminders)
         SettingsCard(stringResource(R.string.settings_privacy), stringResource(R.string.settings_privacy_subtitle), Icons.Outlined.PrivacyTip, onPrivacy)
         if (onDiagnostics != null) {
-            SettingsCard(stringResource(R.string.settings_diagnostics), stringResource(R.string.settings_diagnostics_subtitle), Icons.Outlined.Edit, onDiagnostics)
+            SettingsCard(stringResource(R.string.settings_diagnostics), stringResource(R.string.settings_diagnostics_subtitle), Icons.Outlined.BugReport, onDiagnostics)
         }
         OutlinedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(Radius.card)) {
             Column(Modifier.padding(16.dp)) {
@@ -737,9 +738,9 @@ private fun MetricRow(assessment: MetricAssessment, onClick: (MetricType) -> Uni
 @Composable
 private fun StatusChips(assessment: MetricAssessment) {
     Column(horizontalAlignment = Alignment.End) {
-        StatusBadge(statusLabel(assessment.clinicalStatus))
+        StatusBadge(stringResource(statusLabelRes(assessment.clinicalStatus)))
         Spacer(Modifier.height(6.dp))
-        StatusBadge(targetLabel(assessment.targetStatus))
+        StatusBadge(stringResource(targetLabelRes(assessment.targetStatus)))
     }
 }
 
@@ -922,18 +923,18 @@ private fun daysMaskFor(frequency: ReminderFrequency, customMask: Int): Int = wh
     ReminderFrequency.CUSTOM_DAYS -> customMask
 }
 
-private fun statusLabel(status: ClinicalStatus): String = when (status) {
-    ClinicalStatus.BELOW_RANGE -> "Below range"
-    ClinicalStatus.NORMAL -> "Clinical normal"
-    ClinicalStatus.ABOVE_RANGE -> "Above range"
-    ClinicalStatus.PENDING -> "Pending"
-    ClinicalStatus.UNKNOWN -> "Reference hidden"
+private fun statusLabelRes(status: ClinicalStatus): Int = when (status) {
+    ClinicalStatus.BELOW_RANGE -> R.string.status_below_range
+    ClinicalStatus.NORMAL -> R.string.status_clinical_normal
+    ClinicalStatus.ABOVE_RANGE -> R.string.status_above_range
+    ClinicalStatus.PENDING -> R.string.status_pending
+    ClinicalStatus.UNKNOWN -> R.string.status_reference_hidden
 }
 
-private fun targetLabel(status: TargetStatus): String = when (status) {
-    TargetStatus.MEETS_TARGET -> "Meets personal target"
-    TargetStatus.ABOVE_PERSONAL_TARGET -> "Above personal target"
-    TargetStatus.BELOW_PERSONAL_TARGET -> "Below personal target"
-    TargetStatus.NO_TARGET -> "No target"
-    TargetStatus.PENDING -> "Pending"
+private fun targetLabelRes(status: TargetStatus): Int = when (status) {
+    TargetStatus.MEETS_TARGET -> R.string.target_meets
+    TargetStatus.ABOVE_PERSONAL_TARGET -> R.string.target_above
+    TargetStatus.BELOW_PERSONAL_TARGET -> R.string.target_below
+    TargetStatus.NO_TARGET -> R.string.target_none
+    TargetStatus.PENDING -> R.string.status_pending
 }

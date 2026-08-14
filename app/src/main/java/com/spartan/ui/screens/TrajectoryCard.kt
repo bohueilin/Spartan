@@ -11,14 +11,16 @@ import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.spartan.R
 import com.spartan.domain.engine.MetricProjection
 import com.spartan.domain.engine.ProjectionEngine
 import com.spartan.ui.theme.Radius
 
 /**
- * "Where this can take you" — the expected-improvement view. Shows, per metric, the typical range
+ * The trajectory card (title: R.string.trajectory_title) — the expected-improvement view. Shows, per metric, the typical range
  * after 8 weeks of following the plan at the user's current consistency. Deliberately framed as
  * ranges from general findings with an always-visible disclaimer: motivation without over-promising.
  */
@@ -27,7 +29,7 @@ fun TrajectoryCard(projections: List<MetricProjection>) {
     if (projections.isEmpty()) return
     OutlinedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(Radius.card)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("Where this can take you", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.trajectory_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Text(
                 projections.first().assumption,
                 style = MaterialTheme.typography.bodySmall,

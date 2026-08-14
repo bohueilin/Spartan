@@ -143,6 +143,32 @@
     <string name="diagnostics_subtitle">Debug builds only. Operational events, no health data.</string>
     <string name="diagnostics_title">Diagnostics</string>
 
+    <!-- Exercise debrief (pain toggle reuses workout_pain_label) -->
+    <string name="debrief_effort">Effort %1$d of 10</string>
+    <string name="debrief_minutes">Minutes</string>
+    <string name="debrief_note">Your effort and pain answers shape next week\'s plan. Pain means we go gentler — never push through it.</string>
+    <string name="debrief_save">Save session</string>
+    <string name="debrief_skip">Skip</string>
+    <string name="debrief_title">Nice work. How did it go?</string>
+
+    <!-- Metric explainers -->
+    <string name="explainer_good_pattern">What a good pattern looks like</string>
+    <string name="explainer_how_used">How Spartan uses it</string>
+    <string name="explainer_title">Understanding %1$s</string>
+    <string name="explainer_what_it_is">What it is</string>
+    <string name="explainer_what_moves_it">What moves it</string>
+
+    <!-- Metric status badges -->
+    <string name="status_above_range">Above range</string>
+    <string name="status_below_range">Below range</string>
+    <string name="status_clinical_normal">Clinical normal</string>
+    <string name="status_pending">Pending</string>
+    <string name="status_reference_hidden">Reference hidden</string>
+    <string name="target_above">Above personal target</string>
+    <string name="target_below">Below personal target</string>
+    <string name="target_meets">Meets personal target</string>
+    <string name="target_none">No target</string>
+
     <!-- Metrics -->
     <string name="metrics_add_entry">Add entry</string>
     <string name="metrics_import_banner_body">%1$d days imported · %2$s · everything below is your data</string>
@@ -183,6 +209,7 @@
     <string name="plan_minutes_intensity">%1$d min - %2$s</string>
     <string name="plan_plus_five">+5</string>
     <string name="plan_title">Weekly plan</string>
+    <string name="plan_title_caps">WEEKLY PLAN</string>
 
     <!-- Privacy -->
     <string name="privacy_body">Your data is stored on this device. Spartan has no cloud backend, no accounts, and no analytics, telemetry, or advertising SDKs. The only network connections are the WHOOP and Google Calendar syncs you explicitly connect — in sample-data mode, the app makes no network calls at all.</string>
@@ -248,10 +275,19 @@
     <string name="settings_title">Settings</string>
     <string name="settings_version">Version %1$s</string>
 
+    <!-- Trajectory -->
+    <string name="trajectory_title">Where this can take you</string>
+
     <!-- Workout -->
     <string name="workout_completed_minutes">Completed minutes</string>
     <string name="workout_pain_label">Pain or concerning symptoms</string>
     <string name="workout_rpe">RPE %1$d</string>
     <string name="workout_save">Save workout</string>
     <string name="workout_title">Workout completion</string>
+
+    <!-- Home-screen widget (wordmark reuses common_brand) -->
+    <string name="widget_all_done">All done for today</string>
+    <string name="widget_minutes">~%1$d min</string>
+    <string name="widget_no_plan">No plan yet</string>
+    <string name="widget_none_left">No activities left today</string>
 </resources>

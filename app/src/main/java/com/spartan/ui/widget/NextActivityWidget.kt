@@ -22,6 +22,7 @@ import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
+import com.spartan.R
 import com.spartan.data.local.HealthDao
 import com.spartan.data.local.toDomain
 import com.spartan.domain.model.ActivityStatus
@@ -83,7 +84,7 @@ class NextActivityWidget : GlanceAppWidget() {
                     .clickable(openToday),
             ) {
                 Text(
-                    text = "SPARTAN",
+                    text = context.getString(R.string.common_brand),
                     style = TextStyle(
                         color = ColorProvider(Color(0xFF3FE0C8)),
                         fontSize = 10.sp,
@@ -102,16 +103,16 @@ class NextActivityWidget : GlanceAppWidget() {
                         modifier = GlanceModifier.padding(top = 4.dp),
                     )
                     Text(
-                        text = "~${next.estimatedMinutes} min",
+                        text = context.getString(R.string.widget_minutes, next.estimatedMinutes),
                         style = TextStyle(color = ColorProvider(Color(0xFF9DB0AB)), fontSize = 12.sp),
                         modifier = GlanceModifier.padding(top = 2.dp),
                     )
                 } else {
                     Text(
                         text = when {
-                            activities.isEmpty() -> "No plan yet"
-                            anyDone -> "All done for today"
-                            else -> "No activities left today"
+                            activities.isEmpty() -> context.getString(R.string.widget_no_plan)
+                            anyDone -> context.getString(R.string.widget_all_done)
+                            else -> context.getString(R.string.widget_none_left)
                         },
                         style = TextStyle(color = ColorProvider(Color(0xFFEAF1EF)), fontSize = 14.sp),
                         modifier = GlanceModifier.padding(top = 4.dp),

@@ -21,7 +21,7 @@ Round 2 (written after re-review of round 1 at commit cad6100 — Tier 3–5 rem
 | 010 | [iOS pressed + disabled states](010-ios-pressed-disabled.md) | 4 | iOS | DONE |
 | 011 | [One card radius](011-radius-unification.md) | 5 | Android + iOS | DONE |
 | 012 | [Wordmark tracking + iOS motion tokens](012-tracking-and-motion-tokens.md) | 5 | Android + iOS | DONE |
-| 013 | [Icons, dead token, hardcoded strings](013-icons-strings-dead-token.md) | 5 | Android | TODO |
+| 013 | [Icons, dead token, hardcoded strings](013-icons-strings-dead-token.md) | 5 | Android | DONE |
 
 Round-2 ordering note: run 008 before 009 (009 edits the skeleton composable 008 may relocate); run 010 before 012 (012 tokenizes the duration 010 introduces). Line numbers cite commit cad6100; the drift rule applies as before.
 
