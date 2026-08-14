@@ -139,6 +139,13 @@ enum SpartanRadius {
     static let card: CGFloat = 18
 }
 
+/// Motion durations in seconds (Tokens.kt Motion: fast 140ms / medium 220ms / slow 420ms).
+enum SpartanMotion {
+    static let fast: Double = 0.14   // state fades, press feedback
+    static let medium: Double = 0.22 // progress, card expand
+    static let slow: Double = 0.42   // readiness ring reveal
+}
+
 /// Shared press feedback (Android's Material ripple equivalent): 0.96 scale + slight dim while
 /// pressed, opacity-only under reduced motion, and dimmed when disabled — the explicit brand
 /// colors on these buttons opt out of the system's automatic disabled tint.
@@ -149,6 +156,6 @@ struct SpartanPressStyle: ButtonStyle {
         configuration.label
             .scaleEffect(reduceMotion ? 1 : (configuration.isPressed ? 0.96 : 1))
             .opacity(isEnabled ? (configuration.isPressed ? 0.85 : 1) : 0.5)
-            .animation(.easeOut(duration: 0.14), value: configuration.isPressed)
+            .animation(.easeOut(duration: SpartanMotion.fast), value: configuration.isPressed)
     }
 }

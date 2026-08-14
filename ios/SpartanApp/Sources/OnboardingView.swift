@@ -23,7 +23,7 @@ struct OnboardingView: View {
                 Spacer().frame(height: 64)
                 Text("SPARTAN")
                     .font(.headline.weight(.bold))
-                    .kerning(4)
+                    .kerning(3)
                     .foregroundColor(.spartanAccent)
                 Spacer().frame(height: SpartanSpacing.xl)
                 Text("Your daily readiness, decided.")

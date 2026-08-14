@@ -118,7 +118,7 @@ fun OnboardingScreen(onComplete: (String, Double?, Int?) -> Unit) {
             stringResource(R.string.common_brand),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
-            letterSpacing = 4.sp,
+            letterSpacing = 3.sp,
             color = MaterialTheme.colorScheme.primary,
         )
         Spacer(Modifier.height(20.dp))

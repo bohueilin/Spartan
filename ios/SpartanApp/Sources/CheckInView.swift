@@ -163,7 +163,7 @@ private struct ReadinessRing: View {
                 .trim(from: 0, to: revealed ? CGFloat(sweep) : 0)
                 .stroke(color, style: StrokeStyle(lineWidth: 9, lineCap: .round))
                 .rotationEffect(.degrees(-90))
-                .animation(reduceMotion ? nil : .easeOut(duration: 0.42), value: revealed)
+                .animation(reduceMotion ? nil : .easeOut(duration: SpartanMotion.slow), value: revealed)
             VStack(spacing: 0) {
                 Text(recovery.map(String.init) ?? "--")
                     .font(.title2.weight(.bold))
@@ -214,7 +214,7 @@ private struct PlanProgress: View {
             ProgressView(value: total == 0 ? 0 : Double(done) / Double(total))
                 .progressViewStyle(.linear)
                 .tint(.spartanAccent)
-                .animation(reduceMotion ? nil : .easeInOut(duration: 0.22), value: done)
+                .animation(reduceMotion ? nil : .easeInOut(duration: SpartanMotion.medium), value: done)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(done) of \(total) activities done")
@@ -265,7 +265,7 @@ private struct ActivityCard: View {
                     if reduceMotion {
                         expanded.toggle()
                     } else {
-                        withAnimation(.easeInOut(duration: 0.22)) { expanded.toggle() }
+                        withAnimation(.easeInOut(duration: SpartanMotion.medium)) { expanded.toggle() }
                     }
                 }
                 .accessibilityAddTraits(.isButton)
@@ -429,7 +429,7 @@ private struct SpartanCheck: View {
                     .opacity(done ? 1 : 0)
             }
             .frame(width: 26, height: 26)
-            .animation(.easeInOut(duration: 0.14), value: done)
+            .animation(.easeInOut(duration: SpartanMotion.fast), value: done)
             .scaleEffect(done ? 1.0 : 0.96)
             .animation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.5), value: done)
             .frame(width: 48, height: 48)

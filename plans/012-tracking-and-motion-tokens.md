@@ -1,6 +1,6 @@
 # 012 — Unify wordmark tracking; give iOS motion tokens
 
-- **Status**: TODO
+- **Status**: DONE
 - **Commit**: cad6100
 - **Severity**: Tier 5 (cohesion)
 - **Scope**: 4 files (CheckInScreen.kt, Screens.kt, OnboardingView.swift, CheckInView.swift, SpartanApp.swift)
@@ -43,3 +43,13 @@ If a cited line doesn't match, STOP and report the requirement number.
 - **Mechanical**: `JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew :app:compileDebugKotlin` → exit 0; iOS diff self-reviewed; requirement-5 grep clean.
 - **Feel check**: onboarding wordmark now matches Today's; no motion feels different.
 - **Done when**: all 5 requirements confirmed with file:line evidence.
+
+## Closing self-audit (2026-08-13)
+
+1. **done** — `Screens.kt:121`: onboarding wordmark `letterSpacing = 4.sp` → `3.sp` (Today's `CheckInScreen.kt` value, unchanged at 3.sp).
+2. **done** — `OnboardingView.swift:26`: `.kerning(4)` → `.kerning(3)` (matches `CheckInView.swift:104`).
+3. **done** — `SpartanMotion` enum added at `SpartanApp.swift:141-146`, next to `SpartanSpacing`/`SpartanRadius`, values verbatim from the plan (fast 0.14 / medium 0.22 / slow 0.42, comments included).
+4. **done** — every duration literal replaced with its token, values identical: `CheckInView.swift:166` 0.42 → `.slow`; `:217` and `:268` 0.22 → `.medium`; `:432` 0.14 → `.fast`; `SpartanPressStyle` (`SpartanApp.swift:159`) 0.14 → `.fast` (plan 010 had landed).
+5. **done** — sweep: `grep -n "duration: 0\." ios/SpartanApp/Sources/*.swift` → zero hits; the five sites now all read `duration: SpartanMotion.*`.
+
+Boundaries respected: no duration or easing value changed (rendered motion identical); section-label kernings 1.4 / 0.8 untouched (`CheckInView.swift:585, :598`); no font changes. Verification: `./gradlew :app:compileDebugKotlin` → exit 0, `BUILD SUCCESSFUL in 17s`; iOS diff self-reviewed; SpartanKit untouched.
