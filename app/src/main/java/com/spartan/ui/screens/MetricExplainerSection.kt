@@ -28,7 +28,7 @@ fun MetricExplainerSection(type: MetricType) {
     val explainer = MetricExplainers.forMetric(type) ?: return
     OutlinedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(Radius.card)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(stringResource(R.string.explainer_title, explainer.title.lowercase()), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.explainer_title, explainer.title.lowercase(java.util.Locale.getDefault())), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             ExplainerBlock(stringResource(R.string.explainer_what_it_is), explainer.whatItIs)
             Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(stringResource(R.string.explainer_what_moves_it), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)

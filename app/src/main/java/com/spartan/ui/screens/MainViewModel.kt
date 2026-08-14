@@ -414,7 +414,9 @@ class MainViewModel @Inject constructor(
             goalNotice = goalNoticeText,
             pressureWindows = health.coach.windows,
             weekdayEffects = health.coach.weekdayEffects,
-            userSexAtBirth = when (health.profile?.sexAtBirth?.uppercase()) {
+            // Locale-invariant: parsing a stored value into an enum must not vary with the
+            // device locale (Turkish dotted/dotless i would break default-locale mapping).
+            userSexAtBirth = when (health.profile?.sexAtBirth?.uppercase(java.util.Locale.ROOT)) {
                 "FEMALE" -> SexAtBirth.FEMALE
                 "MALE" -> SexAtBirth.MALE
                 else -> SexAtBirth.UNSPECIFIED

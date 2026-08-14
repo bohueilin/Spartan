@@ -273,7 +273,7 @@ private fun PressureWindowsCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(
-                            w.label.ifBlank { stringResource(R.string.coach_windows_section).lowercase() },
+                            w.label.ifBlank { stringResource(R.string.coach_windows_section_lower) },
                             style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold,
                         )
                         Text(
@@ -406,8 +406,8 @@ private fun HealthyRangesCard(
 private fun bracketNoun(age: Int?, sex: SexAtBirth): String {
     val bracket = ReferenceRanges.bracketLabel(age)
     val noun = when (sex) {
-        SexAtBirth.FEMALE -> stringResource(R.string.coach_sex_female).lowercase()
-        SexAtBirth.MALE -> stringResource(R.string.coach_sex_male).lowercase()
+        SexAtBirth.FEMALE -> stringResource(R.string.coach_sex_female_lower)
+        SexAtBirth.MALE -> stringResource(R.string.coach_sex_male_lower)
         SexAtBirth.UNSPECIFIED -> "adult"
     }
     return if (age == null) noun else "$bracket $noun"

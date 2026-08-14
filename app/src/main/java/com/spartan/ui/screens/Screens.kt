@@ -96,6 +96,7 @@ import com.spartan.domain.model.MetricType
 import com.spartan.domain.model.PlannedWorkout
 import com.spartan.domain.model.TargetStatus
 import com.spartan.domain.model.WorkoutType
+import java.util.Locale
 import kotlin.math.roundToInt
 
 @Composable
@@ -921,7 +922,8 @@ private fun formatTrendValue(value: Double): String =
 
 /** "ZONE_2" → "Zone 2": enum names never appear raw in user copy. */
 private fun workoutTypeLabel(type: WorkoutType): String =
-    type.name.replace('_', ' ').lowercase().replaceFirstChar { it.uppercase() }
+    // ROOT for the ASCII enum constant; default locale only for the display titlecase.
+    type.name.replace('_', ' ').lowercase(Locale.ROOT).replaceFirstChar { it.titlecase(Locale.getDefault()) }
 
 private fun daysMaskFor(frequency: ReminderFrequency, customMask: Int): Int = when (frequency) {
     ReminderFrequency.DAILY -> 127

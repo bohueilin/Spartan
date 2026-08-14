@@ -1,6 +1,6 @@
 # 017 — Locale-safe case operations; tab labels into resources
 
-- **Status**: TODO
+- **Status**: DONE
 - **Commit**: 0a20c32
 - **Severity**: Tier 5
 - **Scope**: ~6 files, mechanical
@@ -46,3 +46,17 @@ If code at a cited line doesn't match, STOP and report the requirement number.
 - **Mechanical**: `JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew :app:compileDebugKotlin test` → exit 0; `grep -rn "\.lowercase()\|\.uppercase()" app/src/main/java/com/spartan/ui app/src/main/java/com/spartan/ui/screens/MainViewModel.kt` → every remaining hit carries an explicit `Locale` argument.
 - **Feel check**: tab labels render identically; Coach/Metric Detail copy unchanged.
 - **Done when**: all 5 requirements confirmed; the grep in Mechanical is clean.
+
+## Closing self-audit (2026-08-13)
+
+Cited lines had drifted a few lines from `0a20c32` (plans 014/016 edited the same files earlier in round 3); code at every site matched the plan's quoted content exactly before editing.
+
+1. **done** — `MainViewModel.kt:419` (cited `:417`): `sexAtBirth?.uppercase(java.util.Locale.ROOT)` with a locale-invariance comment; enum parsing no longer varies with device locale.
+2. **done** — `CheckInScreen.kt:641` (cited `:653`): `bestTimeOfDay.name.lowercase(Locale.ROOT).replaceFirstChar { it.titlecase(Locale.getDefault()) }` (`java.util.Locale` imported); `Screens.kt:926` (cited `:917`): same pattern on `workoutTypeLabel`.
+3. **done** — `MetricExplainerSection.kt:31`: `explainer.title.lowercase(java.util.Locale.getDefault())`.
+4. **done** — per-site choices, all pre-cased resources (the cased forms are fixed copy — the plan's stated preference): `CoachScreen.kt:276` (cited `:274`) → `coach_windows_section_lower` = "high-pressure windows" (`strings.xml:77`); `CoachScreen.kt:409-410` (cited `:407-408`) → `coach_sex_female_lower` = "female" / `coach_sex_male_lower` = "male" (`strings.xml:97, :99`). Copy byte-identical to the previous runtime lowercase in en.
+5. **done** — `SpartanRoot.kt:59` `Tab(..., labelRes: Int, ...)`; tabs list at `:62-66` uses `R.string.tab_*`; resolved via `stringResource(tab.labelRes)` at the `NavigationBarItem` (`:109-110`, both the icon contentDescription and the label). Five `tab_*` strings at `strings.xml:270-274`, copy byte-identical ("Today", "Metrics", "Coach", "Review", "Settings"). Imports `androidx.compose.ui.res.stringResource` + `com.spartan.R` added.
+
+Boundaries respected: no copy reworded; `MetricExplainers` long-form corpus untouched; iOS untouched. Verification: `./gradlew :app:compileDebugKotlin :app:test` → exit 0, `BUILD SUCCESSFUL in 40s`; `grep -rn "\.lowercase()\|\.uppercase()" app/src/main/java/com/spartan/ui` → **0 bare hits** (every case operation now carries an explicit `Locale` or moved into a pre-cased resource).
+
+Observation for re-review (out of scope, not changed): `bracketNoun`'s `SexAtBirth.UNSPECIFIED -> "adult"` branch (`CoachScreen.kt:411`) is still a hardcoded literal — the plan cited only the two `.lowercase()` lines; flagging it as a residual for a future strings pass.

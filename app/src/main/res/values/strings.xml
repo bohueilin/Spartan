@@ -73,6 +73,8 @@
     <string name="coach_goal_on_track">On track</string>
     <string name="coach_goal_behind">Keep going</string>
     <string name="coach_windows_section">HIGH-PRESSURE WINDOWS</string>
+    <!-- Pre-cased fallback label for an unnamed window (locale-safe: no runtime lowercase). -->
+    <string name="coach_windows_section_lower">high-pressure windows</string>
     <string name="coach_windows_intro">Tell Spartan when your week gets tense — recurring meetings, reviews. It schedules a five-minute breathing reset just before each one.</string>
     <string name="coach_window_add">Add window</string>
     <string name="coach_window_label">Label (e.g. Standup)</string>
@@ -91,7 +93,10 @@
     <string name="coach_profile_age">Age</string>
     <string name="coach_profile_save">Save</string>
     <string name="coach_sex_female">Female</string>
+    <!-- Pre-cased mid-sentence noun forms (locale-safe: no runtime lowercase). -->
+    <string name="coach_sex_female_lower">female</string>
     <string name="coach_sex_male">Male</string>
+    <string name="coach_sex_male_lower">male</string>
     <string name="coach_sex_unspecified">Prefer not to say</string>
 
     <!-- Common -->
@@ -260,6 +265,13 @@
 
     <!-- Sample-data provenance -->
     <string name="sample_data_a11y">Sample data</string>
+
+    <!-- Bottom navigation tabs -->
+    <string name="tab_coach">Coach</string>
+    <string name="tab_metrics">Metrics</string>
+    <string name="tab_review">Review</string>
+    <string name="tab_settings">Settings</string>
+    <string name="tab_today">Today</string>
 
     <!-- Settings -->
     <string name="settings_about">About Spartan</string>

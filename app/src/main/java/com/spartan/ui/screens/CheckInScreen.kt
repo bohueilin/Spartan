@@ -102,6 +102,7 @@ import java.time.Instant
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 /**
  * The Spartan daily check-in — the hero screen. Frontier-lab intent: one calm column, a single
@@ -636,7 +637,8 @@ private fun Footer() {
 }
 
 private fun timeOfDayLabel(activity: DailyActivity): String =
-    activity.bestTimeOfDay.name.lowercase().replaceFirstChar { it.uppercase() }
+    // ROOT for the ASCII enum constant; default locale only for the display titlecase.
+    activity.bestTimeOfDay.name.lowercase(Locale.ROOT).replaceFirstChar { it.titlecase(Locale.getDefault()) }
 
 
 /** The whole plan is resolved and at least one thing was actually done. */

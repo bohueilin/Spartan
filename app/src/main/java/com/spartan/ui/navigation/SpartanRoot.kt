@@ -27,6 +27,8 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import com.spartan.R
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -54,14 +56,14 @@ import com.spartan.ui.screens.WorkoutCompletionScreen
 import com.spartan.ui.screens.MainViewModel
 import com.spartan.ui.theme.Motion
 
-private data class Tab(val route: String, val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector)
+private data class Tab(val route: String, val labelRes: Int, val icon: androidx.compose.ui.graphics.vector.ImageVector)
 
 private val tabs = listOf(
-    Tab("today", "Today", Icons.Outlined.FavoriteBorder),
-    Tab("metrics", "Metrics", Icons.Outlined.Assessment),
-    Tab("plan", "Coach", Icons.AutoMirrored.Outlined.EventNote),
-    Tab("review", "Review", Icons.Outlined.Insights),
-    Tab("settings", "Settings", Icons.Outlined.Settings),
+    Tab("today", R.string.tab_today, Icons.Outlined.FavoriteBorder),
+    Tab("metrics", R.string.tab_metrics, Icons.Outlined.Assessment),
+    Tab("plan", R.string.tab_coach, Icons.AutoMirrored.Outlined.EventNote),
+    Tab("review", R.string.tab_review, Icons.Outlined.Insights),
+    Tab("settings", R.string.tab_settings, Icons.Outlined.Settings),
 )
 
 @Composable
@@ -104,8 +106,8 @@ fun SpartanRoot(
                                 restoreState = true
                             }
                         },
-                        icon = { Icon(tab.icon, contentDescription = tab.label) },
-                        label = { Text(tab.label) },
+                        icon = { Icon(tab.icon, contentDescription = stringResource(tab.labelRes)) },
+                        label = { Text(stringResource(tab.labelRes)) },
                     )
                 }
             }
