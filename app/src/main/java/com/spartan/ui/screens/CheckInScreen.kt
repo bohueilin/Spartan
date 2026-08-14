@@ -356,7 +356,7 @@ private fun ActivityCard(
     val urgencyColor = planUrgencyColor(urgency)
     val borderColor = when {
         // An incomplete plan item escalates its border as the day passes (amber, then red).
-        urgencyColor != null -> urgencyColor.copy(alpha = if (urgency == PlanUrgency.OVERDUE) 0.9f else 0.6f)
+        urgencyColor != null -> urgencyColor.copy(alpha = if (urgency == PlanUrgency.OVERDUE) 0.9f else 0.7f)
         activity.priority == ActivityPriority.REQUIRED -> MaterialTheme.colorScheme.primary
         else -> MaterialTheme.colorScheme.outline
     }
