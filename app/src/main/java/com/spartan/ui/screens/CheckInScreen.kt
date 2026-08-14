@@ -169,7 +169,7 @@ fun CheckInScreen(
         item(key = "readiness") { ReadinessHeader(state, onOpenRecoveryExplainer) }
 
         if (loading) {
-            item(key = "loading") { LoadingPlan() }
+            item(key = "loading") { TabLoadingSkeleton() }
         } else {
             item(key = "greeting") { Greeting(state) }
             item(key = "progress") { PlanProgress(state) }
@@ -585,13 +585,6 @@ private fun ImprovesChip(metric: MetricType, dimmed: Boolean, onClick: () -> Uni
 }
 
 @Composable
-private fun SafetyBanner(text: String, modifier: Modifier = Modifier) {
-    Surface(shape = RoundedCornerShape(Radius.card), color = MaterialTheme.colorScheme.surfaceVariant, modifier = modifier.fillMaxWidth()) {
-        Text(text, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(Spacing.md), color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
-@Composable
 private fun ConnectPrompt(isMock: Boolean, onManageConnections: () -> Unit, modifier: Modifier = Modifier) {
     OutlinedCard(modifier.fillMaxWidth().clickable(onClick = onManageConnections), shape = RoundedCornerShape(Radius.card)) {
         Row(Modifier.padding(Spacing.lg), verticalAlignment = Alignment.CenterVertically) {
@@ -607,14 +600,6 @@ private fun ConnectPrompt(isMock: Boolean, onManageConnections: () -> Unit, modi
             }
             TextButton(onClick = onManageConnections) { Text(stringResource(R.string.checkin_connect)) }
         }
-    }
-}
-
-@Composable
-private fun LoadingPlan() {
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-        SkeletonRow(0.4f)
-        repeat(3) { Skeleton(Modifier.fillMaxWidth().height(76.dp)) }
     }
 }
 

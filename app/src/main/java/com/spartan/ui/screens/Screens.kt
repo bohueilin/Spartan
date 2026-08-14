@@ -194,10 +194,12 @@ fun MetricsScreen(state: MainUiState, onAdd: () -> Unit, onMetricClick: (MetricT
         }
         // Skeleton only on first load: post-onboarding a profile always exists once the health
         // bundle emits, so a null profile means data is still streaming in — a loaded-but-empty
-        // metric list never re-triggers the skeleton. Never shown on sync failure.
+        // metric list never re-triggers the skeleton. Never shown on sync failure; a failed sync
+        // with nothing to show gets Today's banner instead of a bare title.
         if (state.assessments.isEmpty() && state.profile == null && !state.syncFailed) {
-            item { SkeletonRow(0.4f) }
-            items(3) { Skeleton(Modifier.fillMaxWidth().height(76.dp)) }
+            item { TabLoadingSkeleton() }
+        } else if (state.syncFailed && state.assessments.isEmpty()) {
+            item { SafetyBanner(stringResource(R.string.checkin_sync_failed)) }
         } else {
             state.whoopImportInfo?.let { info -> item { WhoopImportBanner(info) } }
             items(state.insights.take(2)) { InsightCardView(it) }
@@ -416,10 +418,12 @@ fun PlanScreen(state: MainUiState, onEditMinutes: (String, Int) -> Unit, onCompl
             if (state.whoopIsMock) SampleDataChip()
         }
         // The plan engine always yields a weekly plan once the health bundle emits, so a null
-        // plan means the first load is still in flight. Never a skeleton on sync failure.
+        // plan means the first load is still in flight. Never a skeleton on sync failure; a
+        // failed sync with no plan gets Today's banner instead of nothing.
         if (state.weeklyPlan == null && !state.syncFailed) {
-            SkeletonRow(0.4f)
-            repeat(3) { Skeleton(Modifier.fillMaxWidth().height(76.dp)) }
+            TabLoadingSkeleton()
+        } else if (state.weeklyPlan == null && state.syncFailed) {
+            SafetyBanner(stringResource(R.string.checkin_sync_failed))
         } else {
             WeeklyPlanSection(state, onEditMinutes, onComplete)
         }
@@ -517,9 +521,12 @@ fun ReviewScreen(state: MainUiState) {
         // Skeleton only on first load: post-onboarding a profile always exists once the health
         // bundle emits, so a null profile means data is still streaming in — the plan-005 empty
         // card renders only after loading has finished, never as a flash before data arrives.
+        // A failed sync with no review gets Today's banner, never the misleading "Check back
+        // Sunday" copy.
         if (state.profile == null && !state.syncFailed) {
-            SkeletonRow(0.4f)
-            repeat(3) { Skeleton(Modifier.fillMaxWidth().height(76.dp)) }
+            TabLoadingSkeleton()
+        } else if (state.syncFailed && review == null) {
+            SafetyBanner(stringResource(R.string.checkin_sync_failed))
         } else if (review == null) {
             // No confident zeros: an absent review renders a designed empty state, never "0%".
             OutlinedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(Radius.card)) {

@@ -92,10 +92,12 @@ fun CoachScreen(
         }
 
         // Skeleton only on first load: post-onboarding a profile always exists once the health
-        // bundle emits, so a null profile means data is still streaming in. Never on sync failure.
+        // bundle emits, so a null profile means data is still streaming in. Never on sync failure;
+        // a failed sync with no data gets Today's banner instead of a bare title.
         if (state.profile == null && !state.syncFailed) {
-            item { SkeletonRow(0.4f) }
-            items(3) { Skeleton(Modifier.fillMaxWidth().height(76.dp)) }
+            item { TabLoadingSkeleton() }
+        } else if (state.syncFailed && state.profile == null) {
+            item { SafetyBanner(stringResource(R.string.checkin_sync_failed)) }
         } else {
             state.goalNotice?.let { notice ->
                 item {
