@@ -1,6 +1,6 @@
 # 009 — Fix the dead skeleton pulse (and its light-mode invisibility)
 
-- **Status**: TODO
+- **Status**: DONE
 - **Commit**: cad6100
 - **Severity**: Tier 4
 - **Scope**: 1 file (the skeleton composable — CheckInScreen.kt, or SkeletonComponents.kt if plan 008 ran first)
@@ -53,3 +53,9 @@ Light-mode worst case `#E6ECEB @ 55%` on `#F6F8F8` is still subtle but visible; 
 - **Mechanical**: `JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew :app:compileDebugKotlin` → exit 0.
 - **Feel check**: cold start in light mode → skeleton blocks clearly visible and breathing (~0.84s full cycle); `adb shell settings put global animator_duration_scale 0` → blocks static at the brighter value.
 - **Done when**: requirement 1 confirmed; no `tween(600)` remains in the file (grep).
+
+## Closing self-audit (2026-08-13)
+
+1. **done** — `Skeleton` now lives in [SkeletonComponents.kt:29-41](../app/src/main/java/com/spartan/ui/screens/SkeletonComponents.kt) (plan 008 moved it there first, per the README ordering note); its body is the Target code verbatim: `rememberInfiniteTransition` → `animateFloat(0.55f → 0.9f, infiniteRepeatable(tween(Motion.slow), RepeatMode.Reverse))`, `shown = if (rememberReducedMotion()) 0.9f else alpha`, background `surfaceVariant.copy(alpha = shown)`. Imports added: `RepeatMode`, `animateFloat`, `infiniteRepeatable`, `rememberInfiniteTransition`; `animateFloatAsState` removed (now unused); `Motion` + `rememberReducedMotion` from `com.spartan.ui.theme`.
+
+Boundaries respected: block sizes, 10dp corner radius, and layout untouched; alpha pulse only, no shimmer. Verification: `./gradlew :app:compileDebugKotlin` → exit 0, `BUILD SUCCESSFUL in 16s`; `grep -rn "tween(600)" app/src/main/java/com/spartan/ui/screens/` → 0 hits.
