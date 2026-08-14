@@ -1,6 +1,6 @@
 # 016 — DUE border margin: 0.7 → 0.75
 
-- **Status**: TODO
+- **Status**: DONE
 - **Commit**: 0a20c32
 - **Severity**: Tier 6 (margin hardening; current value passes)
 - **Scope**: 1 file, 1 value
@@ -29,3 +29,17 @@ If the line doesn't match, STOP and report.
 - **Mechanical**: `JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew :app:compileDebugKotlin` → exit 0.
 - **Measured**: `#7C570E` blended at 0.75 over `#FFFFFF`, ratio vs `#F6F8F8` ≥ 3.4:1.
 - **Done when**: both requirements confirmed with the new lines quoted.
+
+## Closing self-audit (2026-08-13)
+
+1. **done** — `CheckInScreen.kt:361` (was `:359`; the guard comment above shifted it) now reads:
+   ```kotlin
+   urgencyColor != null -> urgencyColor.copy(alpha = if (urgency == PlanUrgency.OVERDUE) 0.9f else 0.75f)
+   ```
+   OVERDUE `0.9f` unchanged.
+2. **done** — guard comment added directly above, `CheckInScreen.kt:360`:
+   ```kotlin
+   // DUE alpha ≥ 0.75: keeps ≥3:1 against both #FFFFFF cards and the #F6F8F8 background — re-measure if easyLight changes.
+   ```
+
+Boundaries respected: OVERDUE alpha, width logic, `Tokens.planUrgencyColor`, and iOS untouched. Measured (WCAG, alpha-composited): `#7C570E @ 0.75` = **3.70:1** vs `#FFFFFF` and **3.56:1** vs `#F6F8F8` (≥3.4 target); dark `#E7B25A @ 0.75` on `#121817` = **5.74:1**. Verification: `./gradlew :app:compileDebugKotlin` → exit 0, `BUILD SUCCESSFUL in 17s`.
