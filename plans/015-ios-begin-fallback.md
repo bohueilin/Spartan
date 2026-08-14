@@ -1,6 +1,6 @@
 # 015 — Re-enable Begin: the name is optional by design
 
-- **Status**: TODO
+- **Status**: DONE
 - **Commit**: 0a20c32
 - **Severity**: Tier 4 (product-behavior divergence introduced by plan 010)
 - **Scope**: 1 file, 1 line
@@ -36,3 +36,9 @@ If the line doesn't match, STOP and report.
 - **Mechanical**: no Xcode on this machine — self-review the one-line diff; SpartanKit untouched.
 - **Feel check** (deferred to a Mac with Xcode): Begin tappable with all fields empty; completing onboarding without a name shows no "You," greeting oddity on Today (greeting simply omits the name).
 - **Done when**: requirement 1 confirmed; `grep -c "disabled(name" OnboardingView.swift` returns 0.
+
+## Closing self-audit (2026-08-13)
+
+1. **done** — the `.disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)` line (cited at `OnboardingView.swift:62`, matched verbatim) is deleted; the diff is exactly one removed line. `.buttonStyle(SpartanPressStyle())` and the in-label chrome from plan 010 are untouched (`OnboardingView.swift:61` still ends the chain with the style). `grep -c "disabled(name" ios/SpartanApp/Sources/OnboardingView.swift` → **0**.
+
+Boundaries respected: the Connections import button's `.disabled` (plan 010 req 5) untouched — `grep -n "disabled(" ios/SpartanApp/Sources/` shows only the ConnectionsView site; no Android changes; SpartanKit untouched. Verification: no Xcode on this machine — the one-line diff was self-reviewed against the cited line; the feel check (Begin tappable with empty fields, Today greeting omits the "You" fallback name) is honestly deferred to a Mac with Xcode.

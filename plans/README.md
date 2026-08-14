@@ -30,7 +30,7 @@ Round 3 (written after final re-review of round 2 at commit 0a20c32 — verifier
 | # | Plan | Tier | Platforms | Status |
 |---|---|---|---|---|
 | 014 | [Sync-failure states for the four tabs](014-tab-sync-failure-states.md) | 3 | Android | DONE |
-| 015 | [Re-enable Begin: name optional by design](015-ios-begin-fallback.md) | 4 | iOS | TODO |
+| 015 | [Re-enable Begin: name optional by design](015-ios-begin-fallback.md) | 4 | iOS | DONE |
 | 016 | [DUE border margin 0.7 → 0.75](016-due-alpha-margin.md) | 6 | Android | TODO |
 | 017 | [Locale-safe casing + tab labels](017-locale-case-and-tab-labels.md) | 5 | Android | TODO |
 | 018 | [OutlinedCardButton full tap target](018-ios-outlined-button-hit-target.md) | 3 | iOS | TODO |

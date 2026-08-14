@@ -59,7 +59,6 @@ struct OnboardingView: View {
                         )
                 }
                 .buttonStyle(SpartanPressStyle())
-                .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
 
                 Text("Wellness and fitness guidance, not medical advice. You control your data and can delete it anytime.")
                     .font(.caption)
