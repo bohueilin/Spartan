@@ -191,9 +191,17 @@ fun MetricsScreen(state: MainUiState, onAdd: () -> Unit, onMetricClick: (MetricT
                 IconButton(onClick = onAdd) { Icon(Icons.Outlined.Add, contentDescription = stringResource(R.string.metrics_add_metric)) }
             }
         }
-        state.whoopImportInfo?.let { info -> item { WhoopImportBanner(info) } }
-        items(state.insights.take(2)) { InsightCardView(it) }
-        items(state.assessments) { MetricRow(it, onMetricClick) }
+        // Skeleton only on first load: post-onboarding a profile always exists once the health
+        // bundle emits, so a null profile means data is still streaming in — a loaded-but-empty
+        // metric list never re-triggers the skeleton. Never shown on sync failure.
+        if (state.assessments.isEmpty() && state.profile == null && !state.syncFailed) {
+            item { SkeletonRow(0.4f) }
+            items(3) { Skeleton(Modifier.fillMaxWidth().height(76.dp)) }
+        } else {
+            state.whoopImportInfo?.let { info -> item { WhoopImportBanner(info) } }
+            items(state.insights.take(2)) { InsightCardView(it) }
+            items(state.assessments) { MetricRow(it, onMetricClick) }
+        }
     }
     }
 }
@@ -405,7 +413,14 @@ fun PlanScreen(state: MainUiState, onEditMinutes: (String, Int) -> Unit, onCompl
             Text(stringResource(R.string.plan_title), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f).semantics { heading() })
             if (state.whoopIsMock) SampleDataChip()
         }
-        WeeklyPlanSection(state, onEditMinutes, onComplete)
+        // The plan engine always yields a weekly plan once the health bundle emits, so a null
+        // plan means the first load is still in flight. Never a skeleton on sync failure.
+        if (state.weeklyPlan == null && !state.syncFailed) {
+            SkeletonRow(0.4f)
+            repeat(3) { Skeleton(Modifier.fillMaxWidth().height(76.dp)) }
+        } else {
+            WeeklyPlanSection(state, onEditMinutes, onComplete)
+        }
     }
 }
 
@@ -497,7 +512,13 @@ fun ReviewScreen(state: MainUiState) {
             Text(stringResource(R.string.review_title), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f).semantics { heading() })
             if (state.whoopIsMock) SampleDataChip()
         }
-        if (review == null) {
+        // Skeleton only on first load: post-onboarding a profile always exists once the health
+        // bundle emits, so a null profile means data is still streaming in — the plan-005 empty
+        // card renders only after loading has finished, never as a flash before data arrives.
+        if (state.profile == null && !state.syncFailed) {
+            SkeletonRow(0.4f)
+            repeat(3) { Skeleton(Modifier.fillMaxWidth().height(76.dp)) }
+        } else if (review == null) {
             // No confident zeros: an absent review renders a designed empty state, never "0%".
             OutlinedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(Radius.card)) {
                 Text(

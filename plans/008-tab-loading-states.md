@@ -1,6 +1,6 @@
 # 008 — Loading states for Metrics, Coach, Plan, Review
 
-- **Status**: TODO
+- **Status**: DONE
 - **Commit**: cad6100
 - **Severity**: Tier 3
 - **Scope**: 3 files (Screens.kt, CoachScreen.kt, CheckInScreen.kt — to export the skeleton)
@@ -39,3 +39,15 @@ If the code found doesn't match, STOP and report the requirement number.
 - **Mechanical**: `JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew :app:compileDebugKotlin test` → exit 0.
 - **Feel check**: cold start → switch to each tab immediately: skeletons, then content, no zero-value flash, no layout jump on resolve; with sync failure simulated, no infinite skeleton.
 - **Done when**: all 5 requirements confirmed with file:line evidence.
+
+## Closing self-audit (2026-08-13)
+
+**Loading predicate note (requirement 2's STOP clause, resolved with existing state):** `MainUiState` has no `metrics` field — the list backing `MetricRow` is `state.assessments` (the plan's own parenthetical). Loading IS distinguishable from genuinely-zero data without any new flag: the main tabs render only when `onboardingComplete` (`SpartanRoot.kt:74`), onboarding always writes a profile, and `deleteAllLocalData()` clears preferences (back to onboarding) — so `state.profile == null` occurs exactly while the health bundle's first emission is in flight. Each tab conjoins that with `!state.syncFailed` (and its primary collection where the plan named one), Today-style. Zero `MainViewModel` changes (boundary: "at most one boolean flag" — none needed).
+
+1. **done** — `Skeleton` + `SkeletonRow` moved verbatim (no visual change) from CheckInScreen.kt to new [SkeletonComponents.kt:22-29](../app/src/main/java/com/spartan/ui/screens/SkeletonComponents.kt) as `internal`; CheckInScreen's `LoadingPlan` (`CheckInScreen.kt:613-618`) still compiles against them unchanged (same package, no import edits needed).
+2. **done** — Metrics: `Screens.kt:197-199` — `if (state.assessments.isEmpty() && state.profile == null && !state.syncFailed)` renders `SkeletonRow(0.4f)` + `items(3) { Skeleton(...76.dp) }`; banner/insights/rows in the else branch.
+3. **done** — Coach: `CoachScreen.kt:96-98` — same skeleton block replaces the card stack (goal notice through weekly-plan section moved into the else branch, re-indented; trailing spacer outside).
+4. **done** — Plan: `Screens.kt:417-422` — `state.weeklyPlan == null && !state.syncFailed` (the engine always yields a plan once the bundle emits) → skeleton, else `WeeklyPlanSection`.
+5. **done** — Review: `Screens.kt:518-520` — skeleton branch precedes the plan-005 `review == null` empty card, which now renders only after loading finishes; `SampleDataChip` stays in the title row above all branches.
+
+Boundaries respected: no spinners; skeleton body untouched (plan 009's pulse comes next); no `MainViewModel` data-flow changes. Verification: `./gradlew :app:compileDebugKotlin :app:test` → exit 0, `BUILD SUCCESSFUL in 36s` (all unit tests pass).

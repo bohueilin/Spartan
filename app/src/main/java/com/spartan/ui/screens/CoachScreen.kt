@@ -91,67 +91,74 @@ fun CoachScreen(
             }
         }
 
-        state.goalNotice?.let { notice ->
-            item {
-                Surface(
-                    shape = RoundedCornerShape(Radius.card),
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Column(Modifier.padding(Spacing.md)) {
-                        Text(notice, style = MaterialTheme.typography.bodyMedium)
-                        TextButton(onClick = onDismissGoalNotice) {
-                            Text(stringResource(R.string.connections_import_dismiss))
+        // Skeleton only on first load: post-onboarding a profile always exists once the health
+        // bundle emits, so a null profile means data is still streaming in. Never on sync failure.
+        if (state.profile == null && !state.syncFailed) {
+            item { SkeletonRow(0.4f) }
+            items(3) { Skeleton(Modifier.fillMaxWidth().height(76.dp)) }
+        } else {
+            state.goalNotice?.let { notice ->
+                item {
+                    Surface(
+                        shape = RoundedCornerShape(Radius.card),
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Column(Modifier.padding(Spacing.md)) {
+                            Text(notice, style = MaterialTheme.typography.bodyMedium)
+                            TextButton(onClick = onDismissGoalNotice) {
+                                Text(stringResource(R.string.connections_import_dismiss))
+                            }
                         }
                     }
                 }
             }
-        }
 
-        item { CoachSectionLabel(stringResource(R.string.coach_goal_section)) }
-        item {
-            GoalCard(
-                state = state,
-                onSetGoal = { showGoalSheet = true },
-                onAbandon = onAbandonGoal,
-            )
-        }
+            item { CoachSectionLabel(stringResource(R.string.coach_goal_section)) }
+            item {
+                GoalCard(
+                    state = state,
+                    onSetGoal = { showGoalSheet = true },
+                    onAbandon = onAbandonGoal,
+                )
+            }
 
-        item { CoachSectionLabel(stringResource(R.string.coach_windows_section)) }
-        item {
-            PressureWindowsCard(
-                windows = state.pressureWindows,
-                onAddWindow = onAddWindow,
-                onRemoveWindow = onRemoveWindow,
-            )
-        }
+            item { CoachSectionLabel(stringResource(R.string.coach_windows_section)) }
+            item {
+                PressureWindowsCard(
+                    windows = state.pressureWindows,
+                    onAddWindow = onAddWindow,
+                    onRemoveWindow = onRemoveWindow,
+                )
+            }
 
-        if (state.weekdayEffects.isNotEmpty()) {
-            item { CoachSectionLabel(stringResource(R.string.coach_stress_section)) }
-            items(state.weekdayEffects.size) { i ->
-                OutlinedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(Radius.card)) {
-                    Text(
-                        state.weekdayEffects[i].insight,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(Spacing.md),
-                    )
+            if (state.weekdayEffects.isNotEmpty()) {
+                item { CoachSectionLabel(stringResource(R.string.coach_stress_section)) }
+                items(state.weekdayEffects.size) { i ->
+                    OutlinedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(Radius.card)) {
+                        Text(
+                            state.weekdayEffects[i].insight,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(Spacing.md),
+                        )
+                    }
                 }
             }
-        }
 
-        item { CoachSectionLabel(stringResource(R.string.coach_ranges_section)) }
-        item {
-            HealthyRangesCard(
-                state = state,
-                onEditProfile = { showProfileSheet = true },
-                onMetricClick = onMetricClick,
-            )
-        }
+            item { CoachSectionLabel(stringResource(R.string.coach_ranges_section)) }
+            item {
+                HealthyRangesCard(
+                    state = state,
+                    onEditProfile = { showProfileSheet = true },
+                    onMetricClick = onMetricClick,
+                )
+            }
 
-        item { CoachSectionLabel(stringResource(R.string.plan_title).uppercase()) }
-        item {
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-                WeeklyPlanSection(state, onEditMinutes, onComplete)
+            item { CoachSectionLabel(stringResource(R.string.plan_title).uppercase()) }
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+                    WeeklyPlanSection(state, onEditMinutes, onComplete)
+                }
             }
         }
         item { Spacer(Modifier.height(Spacing.lg)) }

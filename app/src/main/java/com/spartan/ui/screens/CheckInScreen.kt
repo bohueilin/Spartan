@@ -619,17 +619,6 @@ private fun LoadingPlan() {
 }
 
 @Composable
-private fun SkeletonRow(widthFraction: Float) {
-    Skeleton(Modifier.fillMaxWidth(widthFraction).height(14.dp))
-}
-
-@Composable
-private fun Skeleton(modifier: Modifier) {
-    val alpha by animateFloatAsState(0.9f, tween(600), label = "sk")
-    Box(modifier.clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f * alpha)))
-}
-
-@Composable
 private fun EmptyPlan() {
     OutlinedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(Radius.card)) {
         Text(
