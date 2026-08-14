@@ -15,6 +15,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.spartan.domain.engine.MetricProjection
 import com.spartan.domain.engine.ProjectionEngine
+import com.spartan.ui.theme.Radius
 
 /**
  * "Where this can take you" — the expected-improvement view. Shows, per metric, the typical range
@@ -24,7 +25,7 @@ import com.spartan.domain.engine.ProjectionEngine
 @Composable
 fun TrajectoryCard(projections: List<MetricProjection>) {
     if (projections.isEmpty()) return
-    OutlinedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+    OutlinedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(Radius.card)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("Where this can take you", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Text(

@@ -217,7 +217,7 @@ private fun WhoopImportBanner(info: WhoopImportInfo) {
     val range = "${fmt.format(java.time.LocalDate.ofEpochDay(info.firstDayEpoch))} – " +
         fmt.format(java.time.LocalDate.ofEpochDay(info.lastDayEpoch))
     Surface(
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(Radius.card),
         color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
         modifier = Modifier.fillMaxWidth(),
     ) {
@@ -271,7 +271,7 @@ fun MetricDetailScreen(state: MainUiState, type: MetricType, onAdd: () -> Unit, 
         )
         Text(stringResource(R.string.metrics_entries), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         history.forEach {
-            OutlinedCard(Modifier.fillMaxWidth()) {
+            OutlinedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(Radius.card)) {
                 Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text("${it.recordedAt}: ${it.value ?: stringResource(R.string.common_pending)} ${type.unit}", modifier = Modifier.weight(1f))
                     IconButton(onClick = { onEdit(it) }) {
@@ -315,6 +315,7 @@ private fun TrainThisMetricSection(type: MetricType, assessment: MetricAssessmen
                 .clickable(onClickLabel = stringResource(R.string.metrics_train_open_video, guide.title)) {
                     uriHandler.openUri(guide.url)
                 },
+            shape = RoundedCornerShape(Radius.card),
         ) {
             Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(
@@ -431,7 +432,7 @@ fun WeeklyPlanSection(state: MainUiState, onEditMinutes: (String, Int) -> Unit, 
     state.weeklyPlan?.workouts.orEmpty().forEach { workout ->
         val key = "${workout.day}-${workout.type.name}"
         val minutes = workout.minutes
-        OutlinedCard(Modifier.fillMaxWidth()) {
+        OutlinedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(Radius.card)) {
             Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("${workout.day} - ${workoutTypeLabel(workout.type)}", fontWeight = FontWeight.SemiBold)
@@ -577,7 +578,7 @@ fun SettingsScreen(
         if (onDiagnostics != null) {
             SettingsCard(stringResource(R.string.settings_diagnostics), stringResource(R.string.settings_diagnostics_subtitle), Icons.Outlined.Edit, onDiagnostics)
         }
-        OutlinedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+        OutlinedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(Radius.card)) {
             Column(Modifier.padding(16.dp)) {
                 Text(stringResource(R.string.settings_about), fontWeight = FontWeight.SemiBold)
                 Text(
@@ -641,7 +642,7 @@ fun PrivacyScreen(state: MainUiState, onShare: (String) -> Unit, onDelete: () ->
     ScreenColumn {
         Text(stringResource(R.string.privacy_title), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.semantics { heading() })
         Text(stringResource(R.string.privacy_body))
-        OutlinedCard(Modifier.fillMaxWidth()) {
+        OutlinedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(Radius.card)) {
             Column(Modifier.padding(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Outlined.Download, contentDescription = null)
@@ -708,7 +709,7 @@ private fun ScreenColumn(content: @Composable ColumnScope.() -> Unit) {
 
 @Composable
 private fun SummaryCard(label: String, value: String, modifier: Modifier = Modifier) {
-    Card(modifier, shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+    Card(modifier, shape = RoundedCornerShape(Radius.card), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(Modifier.padding(16.dp)) {
             Text(label, style = MaterialTheme.typography.labelLarge)
             Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
@@ -745,7 +746,7 @@ private fun StatusChips(assessment: MetricAssessment) {
 @Composable
 private fun StatusBadge(label: String) {
     Surface(
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(Radius.chip),
         color = MaterialTheme.colorScheme.surfaceVariant,
         contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
@@ -768,7 +769,7 @@ private fun InsightCardView(card: InsightCard) {
 
 @Composable
 private fun TrendCard(title: String, values: List<Double>) {
-    OutlinedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+    OutlinedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(Radius.card)) {
         Column(Modifier.padding(16.dp)) {
             Text(title, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(8.dp))
@@ -804,7 +805,7 @@ private fun TrendCard(title: String, values: List<Double>) {
 
 @Composable
 private fun SettingsCard(title: String, subtitle: String, icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit) {
-    OutlinedCard(Modifier.fillMaxWidth().clickable(onClick = onClick), shape = RoundedCornerShape(16.dp)) {
+    OutlinedCard(Modifier.fillMaxWidth().clickable(onClick = onClick), shape = RoundedCornerShape(Radius.card)) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(icon, contentDescription = null)
             Spacer(Modifier.width(12.dp))
@@ -838,7 +839,7 @@ private fun ReminderEditor(
     val validTime = parsedHour in 0..23 && parsedMinute in 0..59
     val selectedDaysMask = daysMaskFor(selectedFrequency, daysOfWeekMask)
 
-    OutlinedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+    OutlinedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(Radius.card)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {

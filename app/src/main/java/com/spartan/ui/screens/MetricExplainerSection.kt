@@ -14,6 +14,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.spartan.domain.engine.MetricExplainers
 import com.spartan.domain.model.MetricType
+import com.spartan.ui.theme.Radius
 
 /**
  * Plain-language metric education, rendered on the metric detail screen: what the number is,
@@ -23,7 +24,7 @@ import com.spartan.domain.model.MetricType
 @Composable
 fun MetricExplainerSection(type: MetricType) {
     val explainer = MetricExplainers.forMetric(type) ?: return
-    OutlinedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+    OutlinedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(Radius.card)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("Understanding ${explainer.title.lowercase()}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             ExplainerBlock("What it is", explainer.whatItIs)

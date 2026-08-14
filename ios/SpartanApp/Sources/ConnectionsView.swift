@@ -228,11 +228,11 @@ private struct IntegrationCard: View {
         }
         .padding(SpartanSpacing.lg)
         .background(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: SpartanRadius.card)
                 .fill(Color.spartanSurface)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: SpartanRadius.card)
                 .strokeBorder(Color.spartanOutline, lineWidth: 1)
         )
     }
@@ -279,11 +279,11 @@ private struct WhoopImportResultCard: View {
         .padding(SpartanSpacing.lg)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: SpartanRadius.card)
                 .fill(Color.spartanSurface)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: SpartanRadius.card)
                 .strokeBorder(Color.spartanOutline, lineWidth: 1)
         )
     }
@@ -345,7 +345,7 @@ private struct ConnectedChip: View {
             .padding(.horizontal, SpartanSpacing.sm)
             .padding(.vertical, 3)
             .background(
-                RoundedRectangle(cornerRadius: 6)
+                RoundedRectangle(cornerRadius: SpartanRadius.chip)
                     .fill(Color.spartanAccent.opacity(0.16))
             )
     }

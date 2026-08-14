@@ -29,6 +29,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.spartan.R
+import com.spartan.ui.theme.Radius
 import com.spartan.ui.theme.Spacing
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -131,7 +132,7 @@ private fun IntegrationCard(
     secondaryActionEnabled: Boolean = true,
     secondaryActionHint: String? = null,
 ) {
-    OutlinedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+    OutlinedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(Radius.card)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
@@ -140,7 +141,7 @@ private fun IntegrationCard(
                     if (isSample) {
                         SampleDataChip()
                     } else {
-                        Surface(shape = RoundedCornerShape(6.dp), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)) {
+                        Surface(shape = RoundedCornerShape(Radius.chip), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)) {
                             Text(
                                 stringResource(R.string.connections_connected_chip), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
@@ -171,7 +172,7 @@ private fun IntegrationCard(
 /** Outcome of a WHOOP CSV import: progress, a summary of what landed, or a gentle failure. */
 @Composable
 private fun WhoopImportResultCard(import: WhoopImportUiState, onDismiss: () -> Unit) {
-    OutlinedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+    OutlinedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(Radius.card)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             when {
                 import.inProgress -> {

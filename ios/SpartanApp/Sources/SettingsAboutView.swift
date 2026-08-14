@@ -46,11 +46,11 @@ struct SettingsAboutView: View {
                 .padding(SpartanSpacing.lg)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(
-                    RoundedRectangle(cornerRadius: 16)
+                    RoundedRectangle(cornerRadius: SpartanRadius.card)
                         .fill(Color.spartanSurface)
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 16)
+                    RoundedRectangle(cornerRadius: SpartanRadius.card)
                         .strokeBorder(Color.spartanOutline, lineWidth: 1)
                 )
 
@@ -67,11 +67,11 @@ struct SettingsAboutView: View {
                 .padding(SpartanSpacing.lg)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(
-                    RoundedRectangle(cornerRadius: 16)
+                    RoundedRectangle(cornerRadius: SpartanRadius.card)
                         .fill(Color.spartanSurface)
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 16)
+                    RoundedRectangle(cornerRadius: SpartanRadius.card)
                         .strokeBorder(Color.spartanOutline, lineWidth: 1)
                 )
 

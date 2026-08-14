@@ -1,6 +1,6 @@
 # 011 — One card radius
 
-- **Status**: TODO
+- **Status**: DONE
 - **Commit**: cad6100
 - **Severity**: Tier 5 (token drift with Tier 3 consequences)
 - **Scope**: ~4 files (Screens.kt, ConnectionsScreen.kt, and the two iOS Connections/Settings views)
@@ -39,3 +39,15 @@ If a cited site doesn't match, STOP and report the requirement number.
 - **Mechanical**: `JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home ./gradlew :app:compileDebugKotlin` → exit 0; iOS diff self-reviewed.
 - **Feel check**: Settings, Connections, Plan, Review cards visually match Today's corner rounding.
 - **Done when**: the requirement-5 grep output is clean or fully justified, listed in the self-audit.
+
+## Closing self-audit (2026-08-13)
+
+Line numbers are current-tree (Screens.kt shifted ~+15 vs the cad6100 cites after plans 008/010; each cited site was matched by content).
+
+1. **done** — all six `RoundedCornerShape(16.dp)` sites in `Screens.kt` → `Radius.card`: `:220` (WhoopImportBanner), `:580` (Settings about), `:711` (SummaryCard), `:771` (TrendCard), `:807` (SettingsCard), `:841` (ReminderEditor); both `ConnectionsScreen.kt` sites (`:135`, `:175`; `Radius` import added).
+2. **done** — all four shape-absent card sites in `Screens.kt` got `shape = RoundedCornerShape(Radius.card)`: `:274` (Metric Detail history entry), `:312-319` (TrainThisMetric video card), `:434` (WeeklyPlanSection workout card), `:644` (Privacy export card). Full `grep -n "OutlinedCard(\| Card("` re-run confirms every card in the file now passes an explicit `Radius.card` shape.
+3. **done** — all eight iOS `cornerRadius: 16` → `SpartanRadius.card`: `ConnectionsView.swift:231, :235` (IntegrationCard), `:282, :286` (WhoopImportResultCard); `SettingsAboutView.swift:49, :53, :70, :74`.
+4. **done** — iOS `ConnectedChip` `cornerRadius: 6` → `SpartanRadius.chip` (`ConnectionsView.swift:348`).
+5. **done** — sweep grep found four hits beyond the cited list; per this requirement's own rule (remaining hits justified or eliminated — a 16dp `OutlinedCard` is a card, not a deliberate component shape) they were fixed, not excused: `TrajectoryCard.kt:28` 16dp → `Radius.card`; `MetricExplainerSection.kt:27` 16dp → `Radius.card`; Android CONNECTED chip `ConnectionsScreen.kt:144` 6dp → `Radius.chip` (the exact Android twin of requirement 4's iOS chip — cross-platform parity); `StatusBadge` `Screens.kt:749` 8dp literal → `Radius.chip` (same value, now tokenized). Final sweep output — every remaining hit is a plan-sanctioned component shape: skeleton 10dp (`SkeletonComponents.kt:42`; iOS `CheckInView.swift:546, :550`), check glyph 9dp/9 (`CheckInScreen.kt:507`; `CheckInView.swift:422, :424`), progress clip 5dp (`CheckInScreen.kt:330`).
+
+Boundaries respected: token values unchanged (chip 8 / card 18); `NextActivityWidget.kt` untouched; glyph/skeleton/progress shapes untouched. Note: the ConnectedChip changes (6 → 8, both platforms) and the two extra 16dp cards are the only visually observable deltas beyond the cited list — all are the Target's own definition of correct. Verification: `./gradlew :app:compileDebugKotlin` → exit 0, `BUILD SUCCESSFUL in 16s`; iOS diff self-reviewed; SpartanKit untouched.
