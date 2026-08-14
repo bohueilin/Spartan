@@ -34,7 +34,7 @@ Round 3 (written after final re-review of round 2 at commit 0a20c32 — verifier
 | 016 | [DUE border margin 0.7 → 0.75](016-due-alpha-margin.md) | 6 | Android | DONE |
 | 017 | [Locale-safe casing + tab labels](017-locale-case-and-tab-labels.md) | 5 | Android | DONE |
 | 018 | [OutlinedCardButton full tap target](018-ios-outlined-button-hit-target.md) | 3 | iOS | DONE |
-| 019 | [Skeleton pulse parity](019-ios-skeleton-pulse-parity.md) | 5 | iOS | TODO |
+| 019 | [Skeleton pulse parity](019-ios-skeleton-pulse-parity.md) | 5 | iOS | DONE |
 
 Round-3 ordering note: 014 before nothing in particular; 015 and 018 both touch iOS view files edited by plan 010 — run them in numeric order. 018/019 came out of the adversarial cross-plan sweep of round 2 (8-agent verification, 2026-08-13), which confirmed all 68 round-2 requirements and flagged exactly these residuals.
 

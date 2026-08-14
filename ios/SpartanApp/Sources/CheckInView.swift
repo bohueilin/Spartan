@@ -541,19 +541,30 @@ private struct ConnectPrompt: View {
 }
 
 private struct LoadingPlan: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    // One shared pulse phase for every block (Android parity: a single
+    // rememberInfiniteTransition drives all skeletons in phase).
+    @State private var dim = false
+
     var body: some View {
         VStack(alignment: .leading, spacing: SpartanSpacing.md) {
             RoundedRectangle(cornerRadius: 10)
                 .fill(Color.spartanSurfaceVariant)
+                .opacity(reduceMotion ? 0.9 : (dim ? 0.55 : 0.9))
                 .frame(width: 140, height: 14)
             ForEach(0..<3, id: \.self) { _ in
                 RoundedRectangle(cornerRadius: 10)
                     .fill(Color.spartanSurfaceVariant)
+                    .opacity(reduceMotion ? 0.9 : (dim ? 0.55 : 0.9))
                     .frame(maxWidth: .infinity)
                     .frame(height: 76)
             }
         }
         .accessibilityLabel("Building today's plan...")
+        .onAppear {
+            guard !reduceMotion else { return }
+            withAnimation(.easeInOut(duration: SpartanMotion.slow).repeatForever(autoreverses: true)) { dim = true }
+        }
     }
 }
 
