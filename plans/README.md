@@ -18,7 +18,7 @@ Round 2 (written after re-review of round 1 at commit cad6100 — Tier 3–5 rem
 | 007 | [DUE border alpha clears 3:1](007-due-border-alpha.md) | 3 | Android | DONE |
 | 008 | [Loading states for the other four tabs](008-tab-loading-states.md) | 3 | Android | DONE |
 | 009 | [Working skeleton pulse](009-skeleton-pulse.md) | 4 | Android | DONE |
-| 010 | [iOS pressed + disabled states](010-ios-pressed-disabled.md) | 4 | iOS | TODO |
+| 010 | [iOS pressed + disabled states](010-ios-pressed-disabled.md) | 4 | iOS | DONE |
 | 011 | [One card radius](011-radius-unification.md) | 5 | Android + iOS | TODO |
 | 012 | [Wordmark tracking + iOS motion tokens](012-tracking-and-motion-tokens.md) | 5 | Android + iOS | TODO |
 | 013 | [Icons, dead token, hardcoded strings](013-icons-strings-dead-token.md) | 5 | Android | TODO |

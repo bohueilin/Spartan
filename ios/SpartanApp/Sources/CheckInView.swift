@@ -435,7 +435,7 @@ private struct SpartanCheck: View {
             .frame(width: 48, height: 48)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(SpartanPressStyle())
         .accessibilityLabel(label)
         .accessibilityValue(done ? "Completed" : "Not completed")
         .accessibilityAddTraits(done ? [.isSelected] : [])

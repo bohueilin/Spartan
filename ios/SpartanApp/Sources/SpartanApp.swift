@@ -138,3 +138,17 @@ enum SpartanRadius {
     static let chip: CGFloat = 8
     static let card: CGFloat = 18
 }
+
+/// Shared press feedback (Android's Material ripple equivalent): 0.96 scale + slight dim while
+/// pressed, opacity-only under reduced motion, and dimmed when disabled — the explicit brand
+/// colors on these buttons opt out of the system's automatic disabled tint.
+struct SpartanPressStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.isEnabled) private var isEnabled
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(reduceMotion ? 1 : (configuration.isPressed ? 0.96 : 1))
+            .opacity(isEnabled ? (configuration.isPressed ? 0.85 : 1) : 0.5)
+            .animation(.easeOut(duration: 0.14), value: configuration.isPressed)
+    }
+}

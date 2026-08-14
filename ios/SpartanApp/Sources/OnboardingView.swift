@@ -51,12 +51,15 @@ struct OnboardingView: View {
                     Text("Begin")
                         .font(.body.weight(.semibold))
                         .frame(maxWidth: .infinity, minHeight: 52)
+                        // Chrome inside the label so SpartanPressStyle scales/dims the whole pill.
+                        .foregroundColor(.spartanOnAccent)
+                        .background(
+                            RoundedRectangle(cornerRadius: SpartanRadius.card)
+                                .fill(Color.spartanAccent)
+                        )
                 }
-                .foregroundColor(.spartanOnAccent)
-                .background(
-                    RoundedRectangle(cornerRadius: SpartanRadius.card)
-                        .fill(Color.spartanAccent)
-                )
+                .buttonStyle(SpartanPressStyle())
+                .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
 
                 Text("Wellness and fitness guidance, not medical advice. You control your data and can delete it anytime.")
                     .font(.caption)

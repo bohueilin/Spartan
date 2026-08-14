@@ -51,6 +51,7 @@ struct ConnectionsView: View {
                     onDisconnect: { viewModel.disconnectWhoop() },
                     secondaryActionLabel: "Import WHOOP export (.csv)",
                     onSecondaryAction: { showWhoopImporter = true },
+                    secondaryActionEnabled: viewModel.whoopImport?.inProgress != true,
                     secondaryActionHint: "No developer credentials needed: in the WHOOP app go to App Settings → Data Export, then pick the exported CSV files here. Your data stays on this device."
                 )
 
@@ -139,6 +140,9 @@ private struct IntegrationCard: View {
     let onDisconnect: () -> Void
     let secondaryActionLabel: String?
     let onSecondaryAction: (() -> Void)?
+    /// Android parity (secondaryActionEnabled): disabled mid-import so a re-pick can't be
+    /// silently discarded by the VM's one-at-a-time guard.
+    let secondaryActionEnabled: Bool
     let secondaryActionHint: String?
 
     init(
@@ -152,6 +156,7 @@ private struct IntegrationCard: View {
         onDisconnect: @escaping () -> Void,
         secondaryActionLabel: String? = nil,
         onSecondaryAction: (() -> Void)? = nil,
+        secondaryActionEnabled: Bool = true,
         secondaryActionHint: String? = nil
     ) {
         self.title = title
@@ -164,6 +169,7 @@ private struct IntegrationCard: View {
         self.onDisconnect = onDisconnect
         self.secondaryActionLabel = secondaryActionLabel
         self.onSecondaryAction = onSecondaryAction
+        self.secondaryActionEnabled = secondaryActionEnabled
         self.secondaryActionHint = secondaryActionHint
     }
 
@@ -200,15 +206,18 @@ private struct IntegrationCard: View {
                     Text(connectLabel)
                         .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity, minHeight: 48)
+                        // Chrome inside the label so SpartanPressStyle scales/dims the whole pill.
+                        .foregroundColor(.spartanOnAccent)
+                        .background(
+                            RoundedRectangle(cornerRadius: SpartanRadius.card)
+                                .fill(Color.spartanAccent)
+                        )
                 }
-                .foregroundColor(.spartanOnAccent)
-                .background(
-                    RoundedRectangle(cornerRadius: SpartanRadius.card)
-                        .fill(Color.spartanAccent)
-                )
+                .buttonStyle(SpartanPressStyle())
             }
             if let secondaryActionLabel, let onSecondaryAction {
                 OutlinedCardButton(label: secondaryActionLabel, action: onSecondaryAction)
+                    .disabled(!secondaryActionEnabled)
                 if let secondaryActionHint {
                     Text(secondaryActionHint)
                         .font(.caption)
@@ -317,12 +326,14 @@ private struct OutlinedCardButton: View {
             Text(label)
                 .font(.subheadline.weight(.semibold))
                 .frame(maxWidth: .infinity, minHeight: 48)
+                // Chrome inside the label so SpartanPressStyle scales/dims the whole button.
+                .foregroundColor(.spartanAccent)
+                .overlay(
+                    RoundedRectangle(cornerRadius: SpartanRadius.card)
+                        .strokeBorder(Color.spartanOutline, lineWidth: 1)
+                )
         }
-        .foregroundColor(.spartanAccent)
-        .overlay(
-            RoundedRectangle(cornerRadius: SpartanRadius.card)
-                .strokeBorder(Color.spartanOutline, lineWidth: 1)
-        )
+        .buttonStyle(SpartanPressStyle())
     }
 }
 
