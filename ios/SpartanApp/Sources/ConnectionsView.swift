@@ -332,6 +332,9 @@ private struct OutlinedCardButton: View {
                     RoundedRectangle(cornerRadius: SpartanRadius.card)
                         .strokeBorder(Color.spartanOutline, lineWidth: 1)
                 )
+                // No opaque fill, so hit-testing needs an explicit shape: keep the whole
+                // 48pt pill tappable (same guard as SpartanCheck's contentShape).
+                .contentShape(RoundedRectangle(cornerRadius: SpartanRadius.card))
         }
         .buttonStyle(SpartanPressStyle())
     }

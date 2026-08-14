@@ -1,6 +1,6 @@
 # 018 — Restore OutlinedCardButton's full tap target
 
-- **Status**: TODO
+- **Status**: DONE
 - **Commit**: 0a20c32
 - **Severity**: Tier 3 (touch target; regression risk introduced by plan 010)
 - **Scope**: 1 file, ~2 lines
@@ -34,3 +34,19 @@ If the composable doesn't match this description, STOP and report.
 - **Mechanical**: no Xcode here — self-review the diff; the pattern must match `CheckInView.swift:436`'s guard.
 - **Feel check** (deferred to a Mac with Xcode): tap the middle of a Disconnect/Import pill away from the text — it must register.
 - **Done when**: requirement 1 confirmed with the new modifier quoted in context.
+
+## Closing self-audit (2026-08-13)
+
+1. **done** — `ConnectionsView.swift:335-337`, in `OutlinedCardButton`'s label chain, after `.frame(maxWidth: .infinity, minHeight: 48)` and after the `.overlay(...strokeBorder...)`:
+   ```swift
+   .overlay(
+       RoundedRectangle(cornerRadius: SpartanRadius.card)
+           .strokeBorder(Color.spartanOutline, lineWidth: 1)
+   )
+   // No opaque fill, so hit-testing needs an explicit shape: keep the whole
+   // 48pt pill tappable (same guard as SpartanCheck's contentShape).
+   .contentShape(RoundedRectangle(cornerRadius: SpartanRadius.card))
+   ```
+   Pattern matches the codebase's existing guard (`CheckInView.swift:436` `.contentShape(Rectangle())`).
+
+Boundaries respected: chrome, colors, and `SpartanPressStyle` untouched (the diff is the one modifier plus its comment); filled buttons and Android untouched; SpartanKit untouched. Verification: no Xcode on this machine — the 3-line diff was self-reviewed against the plan's Target snippet; the feel check (tap a Disconnect/Import pill away from the text) is honestly deferred to a Mac with Xcode.
