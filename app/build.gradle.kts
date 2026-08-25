@@ -149,8 +149,11 @@ dependencies {
     testImplementation("androidx.work:work-testing:2.10.0")
 
     // Instrumentation (device/emulator; compiled in CI, run in the emulator job).
-    androidTestImplementation("androidx.test.ext:junit:1.2.1")
-    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test.ext:junit:1.3.0")
+    androidTestImplementation("androidx.test:runner:1.7.0")
+    // Espresso 3.7+: earlier releases reflect on InputManager.getInstance(), which no longer
+    // exists on Android 16+/API 36+, so every Compose UI test died in Espresso.onIdle().
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.7.0")
     androidTestImplementation("androidx.room:room-testing:2.6.1")
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
 }

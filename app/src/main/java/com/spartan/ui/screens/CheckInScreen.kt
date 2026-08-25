@@ -123,6 +123,8 @@ fun CheckInScreen(
     onOpenRecoveryExplainer: () -> Unit = {},
     onOpenMetric: (MetricType) -> Unit = {},
     onRefresh: () -> Unit = {},
+    onEnableReminders: () -> Unit = {},
+    onDismissRemindersOffer: () -> Unit = {},
 ) {
     // Device-local minute of day, re-read each minute so an untouched plan escalates to amber at
     // noon and red after 6pm live, without the user having to reopen the screen.
@@ -186,6 +188,15 @@ fun CheckInScreen(
             state.planSafetyBanner?.let { banner -> item(key = "safety-banner") { SafetyBanner(banner, animatedItem(reducedMotion)) } }
             if (!state.whoopConnected) {
                 item(key = "connect-prompt") { ConnectPrompt(isMock = state.whoopIsMock, onManageConnections = onManageConnections, modifier = animatedItem(reducedMotion)) }
+            }
+            if (state.showRemindersOffer) {
+                item(key = "reminders-offer") {
+                    RemindersOffer(
+                        onEnable = onEnableReminders,
+                        onDismiss = onDismissRemindersOffer,
+                        modifier = animatedItem(reducedMotion),
+                    )
+                }
             }
             item(key = "plan-label") { SectionLabel(stringResource(R.string.checkin_todays_plan)) }
             if (state.todayActivities.isEmpty()) {
@@ -463,9 +474,11 @@ private fun ActivityCard(
                     TextButton(onClick = { uriHandler.openUri(guide.url) }, modifier = Modifier.padding(top = Spacing.xs)) {
                         Icon(Icons.Outlined.PlayCircle, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(Spacing.sm))
+                        // Wraps rather than truncating: at larger font scales a one-line cap ate
+                        // the video title itself, leaving "Follow along: …".
                         Text(
                             stringResource(R.string.checkin_follow_along_video, guide.title, guide.minutes),
-                            maxLines = 1,
+                            maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
@@ -601,6 +614,33 @@ private fun ConnectPrompt(isMock: Boolean, onManageConnections: () -> Unit, modi
                 )
             }
             TextButton(onClick = onManageConnections) { Text(stringResource(R.string.checkin_connect)) }
+        }
+    }
+}
+
+/**
+ * The reminders offer, shown on Today only once the plan is on screen — the value arrives before
+ * the ask, and declining is a first-class answer that is never re-asked.
+ */
+@Composable
+private fun RemindersOffer(onEnable: () -> Unit, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
+    OutlinedCard(modifier.fillMaxWidth(), shape = RoundedCornerShape(Radius.card)) {
+        Column(Modifier.padding(Spacing.lg)) {
+            Text(stringResource(R.string.checkin_reminders_offer_title), fontWeight = FontWeight.SemiBold)
+            Text(
+                stringResource(R.string.checkin_reminders_offer_body),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = Spacing.xs),
+            )
+            Row(
+                Modifier.fillMaxWidth().padding(top = Spacing.sm),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.checkin_reminders_offer_dismiss)) }
+                Spacer(Modifier.width(Spacing.sm))
+                TextButton(onClick = onEnable) { Text(stringResource(R.string.checkin_reminders_offer_enable)) }
+            }
         }
     }
 }

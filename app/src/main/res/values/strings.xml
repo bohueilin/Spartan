@@ -36,6 +36,10 @@
     <string name="checkin_recovery_not_available">not available</string>
     <string name="checkin_recovery_percent">%1$d percent</string>
     <string name="checkin_rescheduled">Rescheduled</string>
+    <string name="checkin_reminders_offer_body">A quiet nudge when it is time for an activity. You choose the hours, and you can turn them off anytime.</string>
+    <string name="checkin_reminders_offer_dismiss">Not now</string>
+    <string name="checkin_reminders_offer_enable">Turn on</string>
+    <string name="checkin_reminders_offer_title">Want a reminder for your plan?</string>
     <string name="checkin_sample_data">SAMPLE DATA</string>
     <string name="checkin_scheduled_for">Scheduled for %1$s</string>
     <string name="checkin_scheduled_for_sample">Scheduled for %1$s (sample calendar)</string>
@@ -120,6 +124,8 @@
     <string name="connections_connect_whoop">Connect WHOOP</string>
     <string name="connections_connected_chip">CONNECTED</string>
     <string name="connections_disconnect">Disconnect</string>
+    <string name="connections_disconnect_dialog_title">Disconnect WHOOP?</string>
+    <string name="connections_disconnect_import_warning">This also removes the %1$d days you imported, and your plan returns to sample data. Your saved metric history stays.</string>
     <string name="connections_import_dismiss">Dismiss</string>
     <string name="connections_import_failed_body">None of the selected files looked like a WHOOP export. Pick the CSV files from your export (physiological_cycles, sleeps, workouts, journal_entries) and try again.</string>
     <string name="connections_import_failed_title">Import didn\'t work</string>
@@ -228,6 +234,18 @@
     <string name="privacy_share_note">Sharing is user-directed and may send health data to the app you choose.</string>
     <string name="privacy_title">Privacy</string>
 
+    <!-- End-of-day reflection (optional, self-reported, never a score) -->
+    <string name="reflection_body">One tap, just for you. It adds context to your weekly review.</string>
+    <string name="reflection_mood_okay">Okay</string>
+    <string name="reflection_mood_strong">Strong</string>
+    <string name="reflection_mood_tough">Tough</string>
+    <string name="reflection_not_tonight">Not tonight</string>
+    <string name="reflection_note_label">Anything worth remembering? (optional)</string>
+    <string name="reflection_save">Save</string>
+    <string name="reflection_title">How did today feel?</string>
+    <string name="review_reflections_observation">You logged %1$d reflections this week.</string>
+    <string name="review_reflections_title">How your days felt</string>
+
     <!-- Reminders -->
     <string name="reminders_exercise_body">Time for your planned movement.</string>
     <string name="reminders_exercise_title">Exercise</string>
@@ -265,6 +283,14 @@
 
     <!-- Sample-data provenance -->
     <string name="sample_data_a11y">Sample data</string>
+
+    <!-- Snackbars: every action confirms, and reversible ones offer Undo -->
+    <string name="snackbar_no_slot_found">No open gap long enough today. Your plan is unchanged.</string>
+    <string name="snackbar_scheduled_for">Scheduled for %1$s</string>
+    <string name="snackbar_scheduled_for_sample">Scheduled for %1$s (sample calendar)</string>
+    <string name="snackbar_skipped">Skipped %1$s for today</string>
+    <string name="snackbar_snoozed_until">Snoozed until %1$s</string>
+    <string name="snackbar_undo">Undo</string>
 
     <!-- Bottom navigation tabs -->
     <string name="tab_coach">Coach</string>

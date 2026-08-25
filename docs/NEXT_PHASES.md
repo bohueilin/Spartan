@@ -21,13 +21,17 @@ implemented + build-validated:
 | **Time-of-day flow** (cards ordered morning→evening within priority) | Morning-routine anchoring evidence |
 | **Warm deep-link fix** (`onNewIntent` → NavController) | Notification taps must never no-op — trust in the loop |
 
-## Phase R2 — next build night (prompts ready in UX_ROADMAP_PROMPTS.md)
+## Phase R2 — partially SHIPPED (2026-08-25; see [AUDIT_2026-08-25.md](AUDIT_2026-08-25.md))
 
-1. **Post-value notification permission ask** — request POST_NOTIFICATIONS right after the first
-   plan renders (not at launch): the research's #2 evidence-per-hour item; today the prompt only
-   appears from Reminder settings.
-2. **Evening reflection sheet** — the 19:00 nudge deep-links into a two-tap "how was today" that
-   feeds `ReviewEngine` (already has the fields).
+1. **Post-value notification permission ask** — **SHIPPED.** Today offers reminders once a plan is
+   on screen, once, never re-asked once answered; the system dialog is only launched from an
+   explicit tap, so the one-shot prompt is never spent at launch.
+2. **Evening reflection sheet** — **SHIPPED.** Optional Tough / Okay / Strong + optional note,
+   offered at most once a day after 18:00 and only when a plan existed; stored in
+   `daily_reflections` (DB v8), included in delete-all, in-app only (no notification nagging).
+   Not yet surfaced in `ReviewEngine` output — that remains open.
+   *Also shipped alongside these: action-feedback snackbars with **Undo** for snooze/skip/reschedule,
+   the app's first undo affordance.*
 3. **Interactive trend charts with projection overlay** — Vico charts where the "Where this can
    take you" band renders *on* the recovery trend; scrubbing reads values aloud (TalkBack).
 4. **Plan editor (swap an activity)** — same-category alternatives, honoring the safety rules;

@@ -104,11 +104,13 @@ fun OnboardingScreen(onComplete: (String, Double?, Int?) -> Unit) {
     var name by rememberSaveable { mutableStateOf("") }
     var height by rememberSaveable { mutableStateOf("") }
     var age by rememberSaveable { mutableStateOf("") }
+    // A Surface, not a background modifier: this screen renders outside the Scaffold, so nothing
+    // else provides LocalContentColor here and unstyled text would fall back to plain black —
+    // invisible against the dark theme's background (verified on-device).
+    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
     Column(
-        // Rendered outside the Scaffold, so it paints its own background (the window can show the
-        // wallpaper through on some devices) and handles its own edge-to-edge insets.
+        // Paints its own insets too (the window can show the wallpaper through on some devices).
         modifier = Modifier.fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
             .safeDrawingPadding()
             .verticalScroll(rememberScrollState())
             .padding(28.dp),
@@ -176,6 +178,7 @@ fun OnboardingScreen(onComplete: (String, Double?, Int?) -> Unit) {
             modifier = Modifier.padding(top = 20.dp),
         )
         }
+    }
     }
 }
 
@@ -265,7 +268,10 @@ fun MetricDetailScreen(state: MainUiState, type: MetricType, onAdd: () -> Unit, 
             Text(it.clinicalMessage, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(top = 12.dp))
             Text(it.targetMessage, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 8.dp))
         }
-        TrendCard(stringResource(R.string.metrics_history), history.mapNotNull { it.value })
+        // Oldest→newest: TrendCard reads values.last() as "Latest" and draws left-to-right, while
+        // `history` arrives newest-first for the entry list below. Without this sort the card
+        // labels the oldest reading "Latest" and renders every trend backwards.
+        TrendCard(stringResource(R.string.metrics_history), history.sortedBy { it.recordedAt }.mapNotNull { it.value })
         // Plain-language education for WHOOP metrics (renders nothing for lab metrics).
         MetricExplainerSection(type)
         TrainThisMetricSection(

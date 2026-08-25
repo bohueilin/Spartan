@@ -58,6 +58,7 @@ import com.spartan.domain.model.MetricReading
 import com.spartan.domain.model.MetricType
 import com.spartan.domain.model.PlannedWorkout
 import com.spartan.domain.model.ReadinessBand
+import com.spartan.domain.model.ReflectionMood
 import com.spartan.domain.model.ReadinessSnapshot
 import com.spartan.domain.model.TargetValue
 import com.spartan.domain.engine.MetricProjection
@@ -70,15 +71,23 @@ import com.spartan.domain.model.WorkoutLog
 import com.spartan.domain.model.WorkoutType
 import com.spartan.domain.usecase.DailyPlanSync
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.ZoneId
 import javax.inject.Inject
 
@@ -86,6 +95,11 @@ data class MainUiState(
     val onboardingComplete: Boolean = false,
     val notificationDenied: Boolean = false,
     val notificationsAvailable: Boolean = false,
+    /**
+     * True when Today should offer to turn on reminders: the plan is on screen (value delivered
+     * first), permission is not granted, and the user has not already answered the offer.
+     */
+    val showRemindersOffer: Boolean = false,
     val profile: UserProfileEntity? = null,
     /** From the profile's birth year; tailors follow-along video picks to the user's age. */
     val userAgeYears: Int? = null,
@@ -132,6 +146,52 @@ data class MainUiState(
     val pressureWindows: List<PressureWindow> = emptyList(),
     val weekdayEffects: List<WeekdayEffect> = emptyList(),
     val userSexAtBirth: SexAtBirth = SexAtBirth.UNSPECIFIED,
+)
+
+/**
+ * Whether Today should offer to turn on reminders. Value first: the offer appears only once a plan
+ * is actually on screen, never when permission is already granted, and never after the user has
+ * answered it once (the system dialog is one-shot per install — it must not be spent at launch).
+ */
+internal fun shouldOfferReminders(
+    hasActivities: Boolean,
+    offerSettled: Boolean,
+    permissionGranted: Boolean,
+): Boolean = hasActivities && !offerSettled && !permissionGranted
+
+/** The hour after which the day is done enough to reflect on it. */
+internal const val REFLECTION_HOUR = 18
+
+/**
+ * Whether to offer the end-of-day reflection. Evening only, only when there was a plan to reflect
+ * on, and never twice for the same day — an offer the user has already answered stays answered.
+ */
+internal fun shouldOfferReflection(
+    hourOfDay: Int,
+    hasActivities: Boolean,
+    alreadyAnsweredToday: Boolean,
+): Boolean = hourOfDay >= REFLECTION_HOUR && hasActivities && !alreadyAnsweredToday
+
+/**
+ * Everything needed to put an activity back exactly as it was before a snooze/skip/reschedule.
+ * Captured before the write so Undo is a true restore, not a guess at the prior state.
+ */
+data class UndoToken(
+    val activityId: String,
+    val previousStatus: ActivityStatus,
+    val previousSnoozedUntilMillis: Long? = null,
+    val previousScheduledEpochMinute: Long? = null,
+    val previousCompletedAtMillis: Long? = null,
+)
+
+/**
+ * A one-shot, user-facing message (snackbar). An event rather than UI state: it is delivered once
+ * and must not replay on rotation or tab switch. [undo] is present only for reversible actions.
+ */
+data class UserMessage(
+    val textRes: Int,
+    val formatArg: String? = null,
+    val undo: UndoToken? = null,
 )
 
 /** Persistent "your WHOOP data is in" summary derived from the imported cycle table. */
@@ -183,6 +243,7 @@ private data class CheckInBundle(
     val consistencyFlags: List<Boolean>,
 )
 
+@OptIn(ExperimentalCoroutinesApi::class) // flatMapLatest: day-scoped flows re-subscribe at midnight
 @HiltViewModel
 class MainViewModel @Inject constructor(
     private val repository: HealthRepository,
@@ -202,7 +263,18 @@ class MainViewModel @Inject constructor(
     private val whoopCycleDao: WhoopCycleDao,
     @param:ApplicationContext private val appContext: Context,
 ) : ViewModel() {
-    private val today = LocalDate.now().toEpochDay()
+    /**
+     * The day the app is currently planning. The process routinely outlives local midnight, so
+     * this is a flow that is re-read on a ticker rather than a value captured at construction —
+     * otherwise Today keeps showing yesterday's plan and check-offs are written to yesterday's row.
+     */
+    private val todayFlow = MutableStateFlow(LocalDate.now().toEpochDay())
+
+    /** The current day for imperative reads/writes; always the live value, never a stale capture. */
+    private val today: Long get() = todayFlow.value
+
+    /** Day-scoped activity flow that re-subscribes when the date rolls over. */
+    private val dailyActivitiesFlow = todayFlow.flatMapLatest { repository.dailyActivities(it) }
     private val projectionEngine = ProjectionEngine()
     private val generatedPlan = MutableStateFlow<DailyPlan?>(null)
     private val readinessState = MutableStateFlow<ReadinessSnapshot?>(null)
@@ -224,7 +296,10 @@ class MainViewModel @Inject constructor(
         repository.pressureWindows,
         whoopCycleDao.observeRecentCycles(),
         repository.metrics,
-    ) { goals, windows, cycles, metrics ->
+        // Completing a calm session must move a stress goal's progress immediately: a one-shot
+        // read here would only refresh when some other Coach input happened to change.
+        dailyActivitiesFlow,
+    ) { goals, windows, cycles, metrics, _ ->
         val activeGoal = goals.firstOrNull { it.status == GoalStatus.ACTIVE }?.toDomain()
         val readings = metrics.map {
             MetricReading(it.type, it.value, LocalDate.ofEpochDay(it.recordedAtEpochDay), it.note, it.id)
@@ -244,6 +319,41 @@ class MainViewModel @Inject constructor(
 
     /** Transient signals folded into one flow (combine caps at five inputs). */
     private val goalNotice = MutableStateFlow<String?>(null)
+
+    /**
+     * One-shot user messages (snackbars). A Channel, not UiState: a snackbar must fire once and
+     * never replay when the state flow re-emits on rotation or a tab switch.
+     */
+    private val _messages = Channel<UserMessage>(Channel.BUFFERED)
+    val messages: Flow<UserMessage> = _messages.receiveAsFlow()
+
+    /** The day the user waved off the reflection offer; keeps "not tonight" honest until tomorrow. */
+    private val reflectionDismissedDay = MutableStateFlow<Long?>(null)
+
+    /** Ticks the local hour so the evening offer can appear while the app is already open. */
+    private val hourTicker = flow {
+        while (true) {
+            emit(LocalTime.now().hour)
+            delay(60_000)
+        }
+    }
+
+    /**
+     * Whether Today should present the reflection sheet. Kept out of [MainUiState] so the offer
+     * rules stay readable and the uiState combine stays within its five inputs.
+     */
+    val showReflectionSheet: StateFlow<Boolean> = combine(
+        dailyActivitiesFlow,
+        repository.reflections,
+        reflectionDismissedDay,
+        hourTicker,
+    ) { activities, reflections, dismissedDay, hour ->
+        shouldOfferReflection(
+            hourOfDay = hour,
+            hasActivities = activities.isNotEmpty(),
+            alreadyAnsweredToday = reflections.any { it.dateEpochDay == today } || dismissedDay == today,
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     private data class Transients(
         val syncFailed: Boolean,
@@ -321,11 +431,13 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    private val consistencyFlow = repository.dailyActivities(today)
-        .map { repository.consistencyDays(7, today) to repository.consistencyFlags(7, today) }
+    private val consistencyFlow = todayFlow.flatMapLatest { day ->
+        repository.dailyActivities(day)
+            .map { repository.consistencyDays(7, day) to repository.consistencyFlags(7, day) }
+    }
 
     private val checkInBundle = combine(
-        repository.dailyActivities(today),
+        dailyActivitiesFlow,
         repository.connections,
         generatedPlan,
         readinessState,
@@ -346,13 +458,22 @@ class MainViewModel @Inject constructor(
         )
     }
 
+    /** The two notification preferences, paired so the uiState combine stays within its five inputs. */
+    private data class NotificationPrefs(val denied: Boolean, val offerSettled: Boolean)
+
+    private val notificationPrefs = combine(
+        preferencesStore.notificationPermissionDenied,
+        preferencesStore.remindersOfferSettled,
+    ) { denied, settled -> NotificationPrefs(denied, settled) }
+
     val uiState: StateFlow<MainUiState> = combine(
         preferencesStore.onboardingComplete,
-        preferencesStore.notificationPermissionDenied,
+        notificationPrefs,
         healthBundle,
         checkInBundle,
         transientFlags,
-    ) { onboardingComplete, notificationDenied, health, checkIn, transients ->
+    ) { onboardingComplete, notifPrefs, health, checkIn, transients ->
+        val notificationDenied = notifPrefs.denied
         val (syncDidFail, reviewWanted, whoopImport, goalNoticeText, refreshBusy) = transients
         val latest = latestReadings(health.readings)
         val targetMap = health.targets.associateBy(TargetValue::metricType)
@@ -368,7 +489,10 @@ class MainViewModel @Inject constructor(
             applyPlanOverrides(planEngine.defaultPlan(health.logs), health.planOverrides),
             modifiers,
         )
+        // No sessions logged yet means there is no week to review — hand the UI null so it shows
+        // the designed empty state instead of a fabricated "Adherence 0%" the user never earned.
         val review = reviewEngine.summarize(health.readings, health.logs)
+            .takeIf { health.logs.isNotEmpty() }
         val offTarget = assessments.filter { a ->
             a.clinicalStatus == ClinicalStatus.ABOVE_RANGE || a.clinicalStatus == ClinicalStatus.BELOW_RANGE ||
                 a.targetStatus == TargetStatus.ABOVE_PERSONAL_TARGET || a.targetStatus == TargetStatus.BELOW_PERSONAL_TARGET
@@ -378,6 +502,13 @@ class MainViewModel @Inject constructor(
             onboardingComplete = onboardingComplete,
             notificationDenied = notificationDenied,
             notificationsAvailable = reminderScheduler.hasNotificationPermission(),
+            // Ask for reminders only once the plan has proved its worth on screen — never at
+            // launch, and never again once the user has answered either way.
+            showRemindersOffer = shouldOfferReminders(
+                hasActivities = checkIn.activities.isNotEmpty(),
+                offerSettled = notifPrefs.offerSettled,
+                permissionGranted = reminderScheduler.hasNotificationPermission(),
+            ),
             profile = health.profile,
             userAgeYears = health.profile?.birthYear?.let { java.time.Year.now().value - it }?.takeIf { it in 13..100 },
             offTargetMetrics = offTarget,
@@ -437,6 +568,20 @@ class MainViewModel @Inject constructor(
 
     init {
         loadToday()
+        // Watch for local midnight while the app is alive: advance the day pointer so every
+        // day-scoped flow re-subscribes, then build the new day's plan. Without this the Today tab
+        // serves yesterday until the process is killed.
+        viewModelScope.launch {
+            while (true) {
+                delay(60_000)
+                val currentDay = LocalDate.now().toEpochDay()
+                if (currentDay != todayFlow.value) {
+                    todayFlow.value = currentDay
+                    reflectionDismissedDay.value = null
+                    loadToday()
+                }
+            }
+        }
     }
 
     /**
@@ -458,6 +603,9 @@ class MainViewModel @Inject constructor(
 
     private suspend fun refreshPlan(forceReseed: Boolean) {
         val outcome = dailyPlanSync.sync(today, forceReseed = forceReseed)
+        // Pressure-window nudges come from windows the user declared locally — they owe nothing to
+        // WHOOP, so an offline sync must not silently disarm them.
+        schedulePressureNudges()
         if (outcome.failed) {
             syncFailed.value = true
             return
@@ -466,7 +614,6 @@ class MainViewModel @Inject constructor(
         readinessState.value = outcome.readiness
         generatedPlan.value = outcome.plan
         latestSnapshot.value = outcome.latestSnapshot
-        schedulePressureNudges()
     }
 
     /**
@@ -638,6 +785,24 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch { preferencesStore.setNotificationPermissionDenied(denied) }
     }
 
+    /**
+     * The user answered Today's reminders offer. Settled either way — accepting hands off to the
+     * system dialog, declining must never re-ask; Reminder settings remains the way back in.
+     */
+    fun settleRemindersOffer() {
+        viewModelScope.launch { preferencesStore.setRemindersOfferSettled(true) }
+    }
+
+    /** Saves today's reflection. Overwrites any earlier answer for the same day. */
+    fun saveReflection(mood: ReflectionMood, note: String) {
+        viewModelScope.launch { repository.saveReflection(today, mood, note) }
+    }
+
+    /** "Not tonight" — no reflection is stored, and the offer stays away until tomorrow. */
+    fun dismissReflection() {
+        reflectionDismissedDay.value = today
+    }
+
     fun addMetric(type: MetricType, rawValue: String, note: String): Boolean {
         val value = rawValue.toDoubleOrNull()
         if (!metricEngine.validate(type, value)) return false
@@ -733,13 +898,64 @@ class MainViewModel @Inject constructor(
                     body = "~${activity.estimatedMinutes} min. ${activity.whyItMatters}",
                     triggerAtMillis = wakeAtMillis,
                 )
+                _messages.send(
+                    UserMessage(
+                        textRes = R.string.snackbar_snoozed_until,
+                        formatArg = clockLabel(wakeAtMillis),
+                        undo = activity.undoToken(),
+                    ),
+                )
             }
         }
     }
 
     fun skipActivity(id: String) {
-        viewModelScope.launch { repository.updateActivityStatus(id, ActivityStatus.SKIPPED) }
+        val activity = uiState.value.todayActivities.firstOrNull { it.id == id }
+        viewModelScope.launch {
+            repository.updateActivityStatus(id, ActivityStatus.SKIPPED)
+            if (activity != null) {
+                _messages.send(
+                    UserMessage(
+                        textRes = R.string.snackbar_skipped,
+                        formatArg = activity.title,
+                        undo = activity.undoToken(),
+                    ),
+                )
+            }
+        }
     }
+
+    /** The state an activity was in before the current action, for a true Undo restore. */
+    private fun DailyActivity.undoToken() = UndoToken(
+        activityId = id,
+        previousStatus = status,
+        previousSnoozedUntilMillis = snoozedUntilMillis,
+        previousScheduledEpochMinute = scheduledEpochMinute,
+        previousCompletedAtMillis = completedAtMillis,
+    )
+
+    /**
+     * Puts an activity back exactly as it was and disarms any reminder the undone action armed.
+     * Reversibility is a product requirement: snooze/skip/reschedule are one tap from a menu.
+     */
+    fun undoActivityAction(token: UndoToken) {
+        viewModelScope.launch {
+            reminderScheduler.cancelActivityReminder(token.activityId)
+            repository.updateActivityStatus(
+                id = token.activityId,
+                status = token.previousStatus,
+                completedAtMillis = token.previousCompletedAtMillis,
+                snoozedUntilMillis = token.previousSnoozedUntilMillis,
+                scheduledEpochMinute = token.previousScheduledEpochMinute,
+            )
+        }
+    }
+
+    private fun clockLabel(epochMillis: Long): String =
+        java.time.Instant.ofEpochMilli(epochMillis)
+            .atZone(ZoneId.systemDefault())
+            .toLocalTime()
+            .format(java.time.format.DateTimeFormatter.ofPattern("h:mm a", java.util.Locale.getDefault()))
 
     /**
      * Find the earliest calendar gap that fits the activity and reschedule it there. The window is
@@ -753,13 +969,29 @@ class MainViewModel @Inject constructor(
             val date = LocalDate.now()
             val snap = latestSnapshot.value
             val startMinuteOfDay = maxOf(8 * 60, (snap?.wakeMinuteOfDay ?: (8 * 60 - 30)) + 30)
+                // A very late imported wake time must not push the window start past the day's end;
+                // an inverted coerceIn range below would throw and take the process down.
+                .coerceAtMost(23 * 60 - 30)
             val endMinuteOfDay = ((snap?.bedMinuteOfDay ?: (22 * 60)) - 60)
                 .coerceIn(startMinuteOfDay + 30, 23 * 60)
             val dayStartEpochMinute = date.atStartOfDay(zone).toEpochSecond() / 60
-            val start = dayStartEpochMinute + startMinuteOfDay
+            // "Find a time" means a time still to come: searching from the wake window would
+            // happily book 8:00 AM at 7:00 PM, and the scheduler then drops the past trigger.
+            val nowEpochMinute = System.currentTimeMillis() / 60_000
+            val start = maxOf(dayStartEpochMinute + startMinuteOfDay, nowEpochMinute + 5)
             val end = dayStartEpochMinute + endMinuteOfDay
-            val busy = calendarClient.freeBusy(start, end)
-            val slot = availabilityService.suggestSlot(activity.estimatedMinutes, start, end, busy) ?: return@launch
+            val slot = if (end - start < activity.estimatedMinutes) {
+                null // No usable window left today.
+            } else {
+                val busy = calendarClient.freeBusy(start, end)
+                availabilityService.suggestSlot(activity.estimatedMinutes, start, end, busy)
+            }
+            if (slot == null) {
+                // A tap must never do nothing: say why no time was booked and leave the plan as-is.
+                _messages.send(UserMessage(textRes = R.string.snackbar_no_slot_found))
+                return@launch
+            }
+            val previous = activity.undoToken()
             repository.updateActivityStatus(
                 id,
                 ActivityStatus.RESCHEDULED,
@@ -770,6 +1002,17 @@ class MainViewModel @Inject constructor(
                 title = "Time for: ${activity.title}",
                 body = "~${activity.estimatedMinutes} min. ${activity.whyItMatters}",
                 triggerAtMillis = slot.startEpochMinute * 60_000L,
+            )
+            _messages.send(
+                UserMessage(
+                    textRes = if (calendarClient.isStub) {
+                        R.string.snackbar_scheduled_for_sample
+                    } else {
+                        R.string.snackbar_scheduled_for
+                    },
+                    formatArg = clockLabel(slot.startEpochMinute * 60_000L),
+                    undo = previous,
+                ),
             )
             // No calendar write here: the consent copy promises event creation is "a separate,
             // optional step you confirm each time" (PRD CR-3). Until an opt-in + per-event
@@ -860,10 +1103,28 @@ class MainViewModel @Inject constructor(
             repository.deleteAllLocalData()
             preferencesStore.clear()
             preferencesStore.setDemoSeedCompleted(true)
+            // The erased numbers must leave the screen too: these caches live in the ViewModel,
+            // not the database, so without this the readiness ring keeps drawing the recovery
+            // score the user just deleted.
+            resetTransientState()
+            // A shared export is the user's own copy, but the staging file we wrote into cacheDir
+            // is ours — erasure includes it.
+            runCatching { java.io.File(appContext.cacheDir, "exports").deleteRecursively() }
             // The home-screen widget must not keep rendering the deleted plan; with the DB empty
             // it falls back to its neutral state. Glance failure must never break erasure.
             runCatching { NextActivityWidget().updateAll(appContext) }
         }
+    }
+
+    /** Clears the in-memory plan/readiness caches so erased data cannot survive on screen. */
+    private fun resetTransientState() {
+        generatedPlan.value = null
+        readinessState.value = null
+        latestSnapshot.value = null
+        syncFailed.value = false
+        whoopImportState.value = null
+        goalNotice.value = null
+        reflectionDismissedDay.value = null
     }
 
     private fun latestReadings(readings: List<MetricReading>): List<MetricReading> =

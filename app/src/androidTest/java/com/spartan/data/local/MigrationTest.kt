@@ -12,9 +12,9 @@ import org.junit.runner.RunWith
 
 /**
  * Guards local health data across upgrades: a broken migration silently drops everything the user
- * has logged. Walks a database created at v3 through MIGRATION_3_4 and MIGRATION_4_5, validating
- * the migrated schema structurally against the committed schema history in app/schemas/ and
- * asserting pre-migration rows survive.
+ * has logged. Walks a database created at v3 through every migration to the current version,
+ * validating each migrated schema structurally against the committed schema history in
+ * app/schemas/ and asserting pre-migration rows survive the whole chain.
  */
 @RunWith(AndroidJUnit4::class)
 class MigrationTest {
@@ -62,10 +62,25 @@ class MigrationTest {
         }
 
         helper.runMigrationsAndValidate(dbName, 7, true, AppDatabase.MIGRATION_6_7).apply {
-            // Coach tables exist; pre-migration user data survived the whole chain.
+            // Coach tables exist.
             query("SELECT COUNT(*) FROM goals").use { c -> c.moveToFirst(); assertEquals(0, c.getInt(0)) }
             query("SELECT COUNT(*) FROM pressure_windows").use { c -> c.moveToFirst(); assertEquals(0, c.getInt(0)) }
             query("SELECT COUNT(*) FROM whoop_workouts").use { c -> c.moveToFirst(); assertEquals(0, c.getInt(0)) }
+            close()
+        }
+
+        helper.runMigrationsAndValidate(dbName, 8, true, AppDatabase.MIGRATION_7_8).apply {
+            // Reflections table exists and accepts a row.
+            query("SELECT COUNT(*) FROM daily_reflections").use { c -> c.moveToFirst(); assertEquals(0, c.getInt(0)) }
+            execSQL(
+                "INSERT INTO daily_reflections (dateEpochDay, mood, note, createdAtMillis) " +
+                    "VALUES (20000, 'STRONG', 'felt good', 1)",
+            )
+            query("SELECT mood FROM daily_reflections WHERE dateEpochDay = 20000").use { c ->
+                assertTrue(c.moveToFirst())
+                assertEquals("STRONG", c.getString(0))
+            }
+            // Pre-migration user data survived the whole 3→8 chain.
             query("SELECT value, note FROM metric_entries WHERE type = 'RESTING_HEART_RATE'").use { c ->
                 assertTrue(c.moveToFirst())
                 assertEquals(55.0, c.getDouble(0), 0.001)

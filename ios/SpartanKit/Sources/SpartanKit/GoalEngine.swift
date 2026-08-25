@@ -290,11 +290,19 @@ public enum GoalEngine {
         let summary: String
         switch goal.type {
         case .weightLoss:
-            let achievedStr: String = roundTo1(abs(achieved))
-            summary = "\(achievedStr) of \(targetInt) lb down, \(remainingWeeks) wk left"
+            // Report the direction the data actually moved: abs() here told a user who had gained
+            // weight that they had lost it. A wrong-signed number is worse than a blunt one.
+            if achieved < 0 {
+                summary = "\(roundTo1(-achieved)) lb up vs baseline, \(remainingWeeks) wk left"
+            } else {
+                summary = "\(roundTo1(achieved)) of \(targetInt) lb down, \(remainingWeeks) wk left"
+            }
         default:
-            let achievedStr: String = roundTo1(achieved)
-            summary = "\(achievedStr)% of \(targetInt)% gained, \(remainingWeeks) wk left"
+            if achieved < 0 {
+                summary = "\(roundTo1(-achieved))% below baseline, \(remainingWeeks) wk left"
+            } else {
+                summary = "\(roundTo1(achieved))% of \(targetInt)% gained, \(remainingWeeks) wk left"
+            }
         }
         return GoalProgress(fraction: fraction, timeFraction: timeFraction, onTrack: onTrack, summary: summary)
     }

@@ -151,6 +151,52 @@ class PlanReviewReminderTest {
     }
 
     @Test
+    fun weeklyPlan_deloadLiftsOnceThePainReportAgesOutOfTheWindow() {
+        val today = LocalDate.of(2026, 6, 1)
+        // A painful session from six months ago must not still be shaping this week's plan.
+        val old = WorkoutLog(
+            WorkoutType.STRENGTH,
+            plannedMinutes = 35,
+            completedMinutes = 35,
+            rpe = 8,
+            painFlag = true,
+            completedAt = today.minusDays(180),
+        )
+
+        val plan = PlanEngine().defaultPlan(listOf(old), referenceDate = today)
+
+        assertEquals(35, plan.workouts.first { it.type == WorkoutType.STRENGTH }.minutes)
+        assertFalse(plan.focus.contains("pain-free"))
+    }
+
+    @Test
+    fun weeklyPlan_stillDeloadsForPainInsideTheWindow() {
+        val today = LocalDate.of(2026, 6, 1)
+        val recent = WorkoutLog(
+            WorkoutType.STRENGTH,
+            plannedMinutes = 35,
+            completedMinutes = 35,
+            rpe = 8,
+            painFlag = true,
+            completedAt = today.minusDays(2),
+        )
+
+        val plan = PlanEngine().defaultPlan(listOf(recent), referenceDate = today)
+
+        assertEquals(25, plan.workouts.first { it.type == WorkoutType.STRENGTH }.minutes)
+        assertTrue(plan.focus.contains("pain-free"))
+    }
+
+    @Test
+    fun weeklyReview_doesNotScoreAdherenceWhenNoSessionsWereLogged() {
+        val summary = ReviewEngine().summarize(metrics = emptyList(), logs = emptyList())
+
+        // 0% out of nothing is the absence of data, not a shortfall to be reported back.
+        assertFalse(summary.needsAttention.any { it.contains("below 60%") })
+        assertFalse(summary.nextWeekFocus.contains("easier to complete"))
+    }
+
+    @Test
     fun reminderEngineRejectsInvalidTimesAndDisabledRequests() {
         val engine = ReminderEngine()
 

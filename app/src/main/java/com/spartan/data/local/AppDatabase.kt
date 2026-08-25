@@ -22,8 +22,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         WhoopWorkoutEntity::class,
         GoalEntity::class,
         PressureWindowEntity::class,
+        DailyReflectionEntity::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -195,6 +196,22 @@ abstract class AppDatabase : RoomDatabase() {
                         startMinuteOfDay INTEGER NOT NULL,
                         endMinuteOfDay INTEGER NOT NULL,
                         label TEXT NOT NULL,
+                        createdAtMillis INTEGER NOT NULL
+                    )
+                    """.trimIndent(),
+                )
+            }
+        }
+
+        // Optional end-of-day reflections. Additive: a new table only, no existing data touched.
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS daily_reflections (
+                        dateEpochDay INTEGER NOT NULL PRIMARY KEY,
+                        mood TEXT NOT NULL,
+                        note TEXT NOT NULL,
                         createdAtMillis INTEGER NOT NULL
                     )
                     """.trimIndent(),

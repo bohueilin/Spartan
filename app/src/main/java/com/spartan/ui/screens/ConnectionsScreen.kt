@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -19,8 +20,13 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -83,6 +89,10 @@ fun ConnectionsScreen(
             // Disabled mid-import: a re-pick would be silently discarded by the one-at-a-time guard.
             secondaryActionEnabled = state.whoopImport?.inProgress != true,
             secondaryActionHint = stringResource(R.string.connections_import_whoop_hint),
+            // Only warn when there is imported data to lose; a sample-only disconnect is harmless.
+            disconnectWarning = state.whoopImportInfo?.let {
+                stringResource(R.string.connections_disconnect_import_warning, it.days)
+            },
         )
 
         state.whoopImport?.let { import ->
@@ -131,7 +141,10 @@ private fun IntegrationCard(
     onSecondaryAction: (() -> Unit)? = null,
     secondaryActionEnabled: Boolean = true,
     secondaryActionHint: String? = null,
+    /** Copy for a confirm step when disconnecting also discards data the user imported. */
+    disconnectWarning: String? = null,
 ) {
+    var confirmDisconnect by rememberSaveable(title) { mutableStateOf(false) }
     OutlinedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(Radius.card)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -155,7 +168,12 @@ private fun IntegrationCard(
             scopes.forEach { Text("• $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             Spacer(Modifier.height(4.dp))
             if (connected) {
-                OutlinedButton(onClick = onDisconnect, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.connections_disconnect)) }
+                OutlinedButton(
+                    // Disconnecting also removes imported data, so it asks first when there is
+                    // something to lose. Nothing is destroyed on the way to the dialog.
+                    onClick = { if (disconnectWarning != null) confirmDisconnect = true else onDisconnect() },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(stringResource(R.string.connections_disconnect)) }
             } else {
                 Button(onClick = onConnect, modifier = Modifier.fillMaxWidth()) { Text(connectLabel) }
             }
@@ -166,6 +184,22 @@ private fun IntegrationCard(
                 }
             }
         }
+    }
+    if (confirmDisconnect && disconnectWarning != null) {
+        AlertDialog(
+            onDismissRequest = { confirmDisconnect = false },
+            title = { Text(stringResource(R.string.connections_disconnect_dialog_title)) },
+            text = { Text(disconnectWarning) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmDisconnect = false
+                    onDisconnect()
+                }) { Text(stringResource(R.string.connections_disconnect)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDisconnect = false }) { Text(stringResource(R.string.common_cancel)) }
+            },
+        )
     }
 }
 

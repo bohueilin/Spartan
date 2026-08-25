@@ -33,7 +33,9 @@ class ReviewEngine(
             if (sevenDayWeight.size >= 2 && sevenDayWeight.last() < sevenDayWeight.first()) add("Weight trend moved lower.")
         }
         val needsAttention = buildList {
-            if (adherence < 60) add("Adherence was below 60%; reduce friction next week.")
+            // Only score adherence when there were sessions to adhere to: 0% out of nothing is the
+            // absence of data, not a shortfall, and must never be reported back as one.
+            if (recentLogs.isNotEmpty() && adherence < 60) add("Adherence was below 60%; reduce friction next week.")
             if (glucose != null && glucose > 99.0) add("Fasting glucose remains worth tracking and discussing if repeated.")
             if (recentLogs.any { it.painFlag }) add("Pain was reported; avoid progression until resolved.")
         }
@@ -50,7 +52,11 @@ class ReviewEngine(
             latestFastingGlucose = glucose,
             improved = improved.ifEmpty { listOf("You collected data to make next week more informed.") },
             needsAttention = needsAttention.ifEmpty { listOf("No urgent trend flags from the current local data.") },
-            nextWeekFocus = if (adherence < 60) "Make the plan easier to complete." else "Hold steady and confirm improvement with repeat measurements.",
+            nextWeekFocus = if (recentLogs.isNotEmpty() && adherence < 60) {
+                "Make the plan easier to complete."
+            } else {
+                "Hold steady and confirm improvement with repeat measurements."
+            },
         ).also { summary ->
             listOf(
                 summary.improved,

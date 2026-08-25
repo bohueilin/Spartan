@@ -184,10 +184,18 @@ object GoalEngine {
         // On-track = progress keeping pace with time, with a small grace margin early on.
         val onTrack = fraction + 0.15 >= timeFraction
         val summary = when (goal.type) {
-            GoalType.WEIGHT_LOSS -> "${roundTo1(abs(achieved))} of ${goal.targetValue.toInt()} lb " +
-                "down, $remainingWeeks wk left"
-            else -> "${roundTo1(achieved)}% of ${goal.targetValue.toInt()}% " +
-                "gained, $remainingWeeks wk left"
+            // Report the direction the data actually moved: abs() here told a user who had gained
+            // weight that they had lost it. A wrong-signed number is worse than a blunt one.
+            GoalType.WEIGHT_LOSS -> if (achieved < 0) {
+                "${roundTo1(-achieved)} lb up vs baseline, $remainingWeeks wk left"
+            } else {
+                "${roundTo1(achieved)} of ${goal.targetValue.toInt()} lb down, $remainingWeeks wk left"
+            }
+            else -> if (achieved < 0) {
+                "${roundTo1(-achieved)}% below baseline, $remainingWeeks wk left"
+            } else {
+                "${roundTo1(achieved)}% of ${goal.targetValue.toInt()}% gained, $remainingWeeks wk left"
+            }
         }
         return GoalProgress(fraction = fraction, timeFraction = timeFraction, onTrack = onTrack, summary = summary)
     }

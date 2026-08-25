@@ -6,6 +6,7 @@ import com.spartan.data.local.AppDatabase
 import com.spartan.data.local.AuditEventEntity
 import com.spartan.data.local.ConnectionStatus
 import com.spartan.data.local.DailyActivityEntity
+import com.spartan.data.local.DailyReflectionEntity
 import com.spartan.data.local.HealthDao
 import com.spartan.data.local.IntegrationConnectionEntity
 import com.spartan.data.local.IntegrationProvider
@@ -24,6 +25,7 @@ import com.spartan.domain.model.ActivityStatus
 import com.spartan.domain.model.DailyPlan
 import com.spartan.domain.model.MetricReading
 import com.spartan.domain.model.MetricType
+import com.spartan.domain.model.ReflectionMood
 import com.spartan.domain.model.TargetValue
 import com.spartan.domain.model.WhoopSnapshot
 import com.spartan.domain.model.WorkoutLog
@@ -49,6 +51,7 @@ class HealthRepository @Inject constructor(
     val connections: Flow<List<IntegrationConnectionEntity>> = dao.observeConnections()
     val goals: Flow<List<GoalEntity>> = dao.observeGoals()
     val pressureWindows: Flow<List<PressureWindowEntity>> = dao.observePressureWindows()
+    val reflections: Flow<List<DailyReflectionEntity>> = dao.observeRecentReflections()
 
     fun dailyActivities(dateEpochDay: Long): Flow<List<DailyActivityEntity>> =
         dao.observeActivitiesForDay(dateEpochDay)
@@ -76,18 +79,29 @@ class HealthRepository @Inject constructor(
         }
     }
 
-    fun workoutLogs(): Flow<List<WorkoutLog>> = workouts.map { entries ->
-        entries.map {
-            WorkoutLog(
-                type = it.type,
-                plannedMinutes = it.plannedMinutes,
-                completedMinutes = it.completedMinutes,
-                rpe = it.rpe,
-                painFlag = it.painFlag,
-                completedAt = LocalDate.ofEpochDay(it.completedAtEpochDay),
-            )
-        }
-    }
+    fun workoutLogs(): Flow<List<WorkoutLog>> = workouts.map { entries -> entries.map(::toWorkoutLog) }
+
+    /**
+     * Sessions from the last [days] days, for the planning engines. Bounded on purpose: planning
+     * off the lifetime history latches a single pain report or one hard session into the plan
+     * forever, with no way to clear it short of deleting all data.
+     */
+    fun recentWorkoutLogs(days: Int, today: LocalDate = LocalDate.now()): Flow<List<WorkoutLog>> =
+        dao.observeWorkoutsSince(today.minusDays(days.toLong()).toEpochDay())
+            .map { entries -> entries.map(::toWorkoutLog) }
+
+    /** One-shot read of the same window, for the daily sync path. */
+    suspend fun workoutLogsSince(sinceEpochDay: Long): List<WorkoutLog> =
+        dao.workoutsSince(sinceEpochDay).map(::toWorkoutLog)
+
+    private fun toWorkoutLog(entity: WorkoutSessionEntity) = WorkoutLog(
+        type = entity.type,
+        plannedMinutes = entity.plannedMinutes,
+        completedMinutes = entity.completedMinutes,
+        rpe = entity.rpe,
+        painFlag = entity.painFlag,
+        completedAt = LocalDate.ofEpochDay(entity.completedAtEpochDay),
+    )
 
     suspend fun upsertProfile(profile: UserProfileEntity) = dao.upsertProfile(profile)
 
@@ -288,6 +302,19 @@ class HealthRepository @Inject constructor(
         dao.upsertConnection(existing.copy(lastSyncMillis = System.currentTimeMillis()))
     }
 
+    /** Saves (or overwrites) the reflection for a day. Never required; always the user's words. */
+    suspend fun saveReflection(dateEpochDay: Long, mood: ReflectionMood, note: String) {
+        dao.upsertReflection(
+            DailyReflectionEntity(
+                dateEpochDay = dateEpochDay,
+                mood = mood.name,
+                note = note.trim(),
+            ),
+        )
+    }
+
+    suspend fun reflectionForDay(dateEpochDay: Long): DailyReflectionEntity? = dao.reflectionForDay(dateEpochDay)
+
     suspend fun deleteAllLocalData() {
         dao.deleteProfiles()
         dao.deleteMetrics()
@@ -302,6 +329,7 @@ class HealthRepository @Inject constructor(
         dao.deleteWhoopWorkouts()
         dao.deleteGoals()
         dao.deletePressureWindows()
+        dao.deleteReflections()
         // The user's right to erase includes the audit trail itself; leave a single fresh marker.
         dao.deleteAuditEvents()
         logAudit("DATA", "ALL_DATA_DELETED")

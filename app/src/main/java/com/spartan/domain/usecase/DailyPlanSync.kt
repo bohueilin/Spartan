@@ -4,6 +4,7 @@ import com.spartan.data.repository.HealthRepository
 import com.spartan.data.whoop.WhoopClient
 import com.spartan.diagnostics.DebugLog
 import com.spartan.domain.engine.CoachingEngine
+import com.spartan.domain.engine.CoachingOptions
 import com.spartan.domain.model.DailyPlan
 import com.spartan.domain.model.ReadinessSnapshot
 import com.spartan.domain.model.WhoopSnapshot
@@ -50,7 +51,14 @@ class DailyPlanSync @Inject constructor(
             ReadinessSnapshot.from(snapshots.last(), snapshots.dropLast(1)),
             dateEpochDay,
         )
-        val plan = coachingEngine.buildPlan(readiness)
+        // Recent pain has to reach the engine here, at the production call site: without it the
+        // REQUIRED pain-deload card and the hard-training suppression are unreachable, and a user
+        // who reported pain yesterday can be handed a progression session this morning.
+        val recentLogs = repository.workoutLogsSince(dateEpochDay - PAIN_LOOKBACK_DAYS)
+        val plan = coachingEngine.buildPlan(
+            readiness,
+            CoachingOptions(painFlag = recentLogs.any { it.painFlag }),
+        )
         if (forceReseed) repository.reseedDailyPlan(plan) else repository.seedDailyPlanIfNeeded(plan)
         // Operational counts only — the readiness band is health-derived and stays out of logs.
         DebugLog.log("sync", "ok: activities=${plan.activities.size} stale=${readiness.isStale}")
@@ -58,6 +66,12 @@ class DailyPlanSync @Inject constructor(
     }
 
     companion object {
+        /**
+         * How far back a reported pain flag keeps easing the daily plan. Long enough to cover a
+         * sore weekend, short enough that it lifts on its own without the user hunting for a reset.
+         */
+        const val PAIN_LOOKBACK_DAYS = 3L
+
         /**
          * Imported (or lagging) wearable data may end before [targetEpochDay]. The plan still has
          * to land on the day being planned, so the newest readiness is carried forward and marked

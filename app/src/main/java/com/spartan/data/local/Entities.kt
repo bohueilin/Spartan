@@ -221,3 +221,16 @@ data class AuditEventEntity(
     val action: String,   // e.g. WHOOP_CONNECTED, SYNC_COMPLETED, ALL_DATA_DELETED
     val detail: String = "", // non-PHI context, e.g. "days=7"
 )
+
+/**
+ * How a day felt, in the user's own words — one optional row per day, keyed by the day itself so a
+ * second save overwrites rather than duplicating. Self-reported context for the weekly review;
+ * never a clinical signal and never used to grade the user.
+ */
+@Entity(tableName = "daily_reflections")
+data class DailyReflectionEntity(
+    @PrimaryKey val dateEpochDay: Long,
+    val mood: String, // TOUGH | OKAY | STRONG
+    val note: String = "",
+    val createdAtMillis: Long = System.currentTimeMillis(),
+)

@@ -4,14 +4,23 @@ import com.spartan.domain.model.PlannedWorkout
 import com.spartan.domain.model.WeeklyPlan
 import com.spartan.domain.model.WorkoutLog
 import com.spartan.domain.model.WorkoutType
+import java.time.LocalDate
 
 class PlanEngine(
     private val safetyEngine: SafetyEngine = SafetyEngine(),
 ) {
-    fun defaultPlan(previousLogs: List<WorkoutLog> = emptyList()): WeeklyPlan {
-        val painReported = previousLogs.any { it.painFlag }
-        val highRpeReported = previousLogs.any { it.rpe >= 8 }
-        val adherence = adherencePercent(previousLogs)
+    fun defaultPlan(
+        previousLogs: List<WorkoutLog> = emptyList(),
+        referenceDate: LocalDate = LocalDate.now(),
+    ): WeeklyPlan {
+        // Plan from a recent window, never the lifetime history: one pain report or a single
+        // RPE-8 session would otherwise latch the deload forever, and the only way a user could
+        // clear it would be deleting all of their data.
+        val windowStart = referenceDate.minusDays(PLANNING_WINDOW_DAYS)
+        val recentLogs = previousLogs.filter { it.completedAt in windowStart..referenceDate }
+        val painReported = recentLogs.any { it.painFlag }
+        val highRpeReported = recentLogs.any { it.rpe >= 8 }
+        val adherence = adherencePercent(recentLogs)
         val needsDeload = painReported || highRpeReported || adherence < 60
         val zone2Minutes = if (needsDeload) 30 else 35
         val strengthMinutes = if (painReported || highRpeReported) 25 else 35
@@ -50,5 +59,10 @@ class PlanEngine(
         val planned = logs.sumOf { it.plannedMinutes }.coerceAtLeast(1)
         val completed = logs.sumOf { it.completedMinutes.coerceAtMost(it.plannedMinutes) }
         return ((completed.toDouble() / planned.toDouble()) * 100.0).toInt().coerceIn(0, 100)
+    }
+
+    companion object {
+        /** How much history the weekly plan reacts to — two weeks, matching a training block. */
+        const val PLANNING_WINDOW_DAYS = 14L
     }
 }

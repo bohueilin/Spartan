@@ -351,6 +351,8 @@ private struct ConnectedChip: View {
                 RoundedRectangle(cornerRadius: SpartanRadius.chip)
                     .fill(Color.spartanAccent.opacity(0.16))
             )
+            // Without this VoiceOver spells the all-caps text out letter by letter.
+            .accessibilityLabel("Connected")
     }
 }
 
@@ -366,5 +368,7 @@ private struct SampleSourceChip: View {
                 RoundedRectangle(cornerRadius: SpartanRadius.chip)
                     .fill(Color.spartanTertiary.opacity(0.16))
             )
+            // Without this VoiceOver spells the all-caps text out letter by letter.
+            .accessibilityLabel("Sample data")
     }
 }

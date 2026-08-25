@@ -164,3 +164,16 @@ data class TimeWindow(
 ) {
     val durationMinutes: Long get() = (endEpochMinute - startEpochMinute).coerceAtLeast(0)
 }
+
+/**
+ * How a day felt, self-reported. Deliberately three neutral options with no ranking or score —
+ * this is context for the weekly review, never a grade and never a clinical signal.
+ */
+enum class ReflectionMood { TOUGH, OKAY, STRONG }
+
+/** One optional end-of-day reflection. [note] is always optional. */
+data class DailyReflection(
+    val dateEpochDay: Long,
+    val mood: ReflectionMood,
+    val note: String = "",
+)

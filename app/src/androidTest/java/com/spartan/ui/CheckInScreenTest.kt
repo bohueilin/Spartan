@@ -2,6 +2,7 @@ package com.spartan.ui
 
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertWidthIsAtLeast
+import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
@@ -28,7 +29,19 @@ class CheckInScreenTest {
     @get:Rule
     val composeRule = createAndroidComposeRule<MainActivity>()
 
+    /**
+     * A cold start shows the system splash before `setContent` attaches, so the very first test
+     * after an install can query the tree before any hierarchy exists. Wait it out.
+     */
+    private fun awaitComposeHierarchy() {
+        composeRule.waitUntil(20_000) {
+            runCatching { composeRule.onAllNodes(isRoot()).fetchSemanticsNodes().isNotEmpty() }
+                .getOrDefault(false)
+        }
+    }
+
     private fun completeOnboardingIfShown() {
+        awaitComposeHierarchy()
         // Fresh installs land on onboarding; subsequent runs land on the check-in.
         val onboarding = composeRule.onAllNodesWithText("Begin").fetchSemanticsNodes()
         if (onboarding.isNotEmpty()) {
@@ -49,6 +62,30 @@ class CheckInScreenTest {
         composeRule.waitUntil(10_000) {
             composeRule.onAllNodesWithContentDescription("Recovery", substring = true)
                 .fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
+    @Test
+    fun skippingAnActivity_confirmsWithAnUndoableSnackbar() {
+        completeOnboardingIfShown()
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithText("TODAY'S PLAN").fetchSemanticsNodes().isNotEmpty()
+        }
+        // Open the first activity's overflow menu and skip it.
+        composeRule.onAllNodesWithContentDescription("More options for", substring = true)
+            .onFirst()
+            .performClick()
+        composeRule.onNodeWithText("Skip today").performClick()
+
+        // Every reversible action must confirm itself and offer a way back.
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithText("Undo").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithText("Undo").performClick()
+
+        // After undo the activity is planned again, so its card no longer reads as skipped.
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithText("Skipped for today").fetchSemanticsNodes().isEmpty()
         }
     }
 

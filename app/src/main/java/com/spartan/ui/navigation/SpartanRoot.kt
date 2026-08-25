@@ -21,10 +21,16 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -49,6 +55,7 @@ import com.spartan.ui.screens.MetricsScreen
 import com.spartan.ui.screens.OnboardingScreen
 import com.spartan.ui.screens.CoachScreen
 import com.spartan.ui.screens.PrivacyScreen
+import com.spartan.ui.screens.ReflectionSheet
 import com.spartan.ui.screens.ReminderSettingsScreen
 import com.spartan.ui.screens.ReviewScreen
 import com.spartan.ui.screens.SettingsScreen
@@ -90,7 +97,40 @@ fun SpartanRoot(
     }
 
 
+    // The optional evening reflection: in-app only, never a notification, and "not tonight"
+    // keeps it away until tomorrow.
+    val showReflection by viewModel.showReflectionSheet.collectAsStateWithLifecycle()
+    if (showReflection) {
+        ReflectionSheet(
+            onSave = { mood, note -> viewModel.saveReflection(mood, note) },
+            onDismiss = viewModel::dismissReflection,
+        )
+    }
+
+    // One-shot action feedback for the whole app: every snooze/skip/reschedule confirms what
+    // happened, and the reversible ones carry Undo. Collected as an event so it never replays.
+    val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
+    LaunchedEffect(viewModel) {
+        viewModel.messages.collect { message ->
+            val text = message.formatArg
+                ?.let { context.getString(message.textRes, it) }
+                ?: context.getString(message.textRes)
+            val result = snackbarHostState.showSnackbar(
+                message = text,
+                actionLabel = message.undo?.let { context.getString(R.string.snackbar_undo) },
+                withDismissAction = message.undo == null,
+                duration = SnackbarDuration.Short,
+            )
+            val undo = message.undo
+            if (result == SnackbarResult.ActionPerformed && undo != null) {
+                viewModel.undoActivityAction(undo)
+            }
+        }
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
             val backStack by navController.currentBackStackEntryAsState()
             val currentDestination = backStack?.destination
@@ -106,7 +146,9 @@ fun SpartanRoot(
                                 restoreState = true
                             }
                         },
-                        icon = { Icon(tab.icon, contentDescription = stringResource(tab.labelRes)) },
+                        // Decorative: the visible label below already names the tab, and a
+                        // description here makes TalkBack announce every tab name twice.
+                        icon = { Icon(tab.icon, contentDescription = null) },
                         label = { Text(stringResource(tab.labelRes)) },
                     )
                 }
@@ -140,6 +182,12 @@ fun SpartanRoot(
                     onOpenRecoveryExplainer = { navController.navigate("detail/RECOVERY_SCORE") },
                     onOpenMetric = { navController.navigate("detail/${it.name}") },
                     onRefresh = viewModel::loadToday,
+                    onEnableReminders = {
+                        // Settle first so the offer never re-renders behind the system dialog.
+                        viewModel.settleRemindersOffer()
+                        onRequestNotifications()
+                    },
+                    onDismissRemindersOffer = viewModel::settleRemindersOffer,
                 )
             }
             composable("metrics") {

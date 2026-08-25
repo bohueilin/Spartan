@@ -40,6 +40,16 @@ interface HealthDao {
     @Query("SELECT * FROM workout_sessions ORDER BY completedAtEpochDay DESC")
     fun observeWorkouts(): Flow<List<WorkoutSessionEntity>>
 
+    /**
+     * Sessions on or after a day. Planning reads a bounded window so a single old pain report
+     * cannot deload the plan forever; the unbounded flow above stays for history and export.
+     */
+    @Query("SELECT * FROM workout_sessions WHERE completedAtEpochDay >= :sinceEpochDay ORDER BY completedAtEpochDay DESC")
+    suspend fun workoutsSince(sinceEpochDay: Long): List<WorkoutSessionEntity>
+
+    @Query("SELECT * FROM workout_sessions WHERE completedAtEpochDay >= :sinceEpochDay ORDER BY completedAtEpochDay DESC")
+    fun observeWorkoutsSince(sinceEpochDay: Long): Flow<List<WorkoutSessionEntity>>
+
     @Insert
     suspend fun insertWorkout(session: WorkoutSessionEntity)
 
@@ -209,6 +219,20 @@ interface HealthDao {
 
     @Query("DELETE FROM pressure_windows")
     suspend fun deletePressureWindows()
+
+    // --- Daily reflections (optional, self-reported) ---
+
+    @Query("SELECT * FROM daily_reflections ORDER BY dateEpochDay DESC LIMIT 30")
+    fun observeRecentReflections(): Flow<List<DailyReflectionEntity>>
+
+    @Query("SELECT * FROM daily_reflections WHERE dateEpochDay = :day")
+    suspend fun reflectionForDay(day: Long): DailyReflectionEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertReflection(reflection: DailyReflectionEntity)
+
+    @Query("DELETE FROM daily_reflections")
+    suspend fun deleteReflections()
 
     /** The distinct days that had a completed activity — powers the 7-day consistency strip. */
     @Query(

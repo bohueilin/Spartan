@@ -20,6 +20,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.spartan.ui.theme.Motion
 import com.spartan.ui.theme.Radius
@@ -62,7 +65,13 @@ internal fun TabLoadingSkeleton() {
 /** Calm failure banner (Today's sync-failed exemplar), shared so no tab fails as a bare title. */
 @Composable
 internal fun SafetyBanner(text: String, modifier: Modifier = Modifier) {
-    Surface(shape = RoundedCornerShape(Radius.card), color = MaterialTheme.colorScheme.surfaceVariant, modifier = modifier.fillMaxWidth()) {
+    Surface(
+        shape = RoundedCornerShape(Radius.card),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        // Polite live region: this banner appears in response to a background sync, so a screen
+        // reader user would otherwise never learn the data on screen is stale.
+        modifier = modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite },
+    ) {
         Text(text, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(Spacing.md), color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
