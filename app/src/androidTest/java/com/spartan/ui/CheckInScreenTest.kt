@@ -9,6 +9,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.compose.ui.unit.dp
@@ -45,8 +46,9 @@ class CheckInScreenTest {
         // Fresh installs land on onboarding; subsequent runs land on the check-in.
         val onboarding = composeRule.onAllNodesWithText("Begin").fetchSemanticsNodes()
         if (onboarding.isNotEmpty()) {
-            composeRule.onNodeWithText("What should we call you?").performTextInput("Tester")
-            composeRule.onNodeWithText("Begin").performClick()
+            composeRule.onNodeWithText("What should we call you?").performScrollTo().performTextInput("Tester")
+            // The onboarding form scrolls; Begin can sit below the fold on shorter screens.
+            composeRule.onNodeWithText("Begin").performScrollTo().performClick()
         }
     }
 

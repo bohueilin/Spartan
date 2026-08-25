@@ -94,3 +94,9 @@ Google Calendar OAuth integrations are built and flag-gated behind production re
 
 > Spartan offers wellness and fitness guidance, not medical advice, and is not a medical device.
 > For any health concern, talk with a qualified clinician.
+
+## Brand & marketing
+
+- [Visual & Video Guide](docs/VISUAL_AND_VIDEO_GUIDE.md) — palette, screenshot shot list,
+  app-preview storyboard, AI video-generation prompts, and the ffmpeg pipeline.
+- [Landing page](docs/brand/landing.html) — self-contained, uses the app's own tokens.

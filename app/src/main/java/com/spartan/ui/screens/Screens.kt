@@ -1,5 +1,9 @@
 package com.spartan.ui.screens
 
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -59,6 +63,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -68,6 +73,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -82,6 +89,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.spartan.R
+import com.spartan.ui.theme.Motion
+import com.spartan.ui.theme.SpartanBands
+import com.spartan.ui.theme.rememberReducedMotion
 import com.spartan.ui.theme.Radius
 import com.spartan.ui.theme.Spacing
 import com.spartan.data.local.ReminderFrequency
@@ -118,6 +128,8 @@ fun OnboardingScreen(onComplete: (String, Double?, Int?) -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Column(Modifier.widthIn(max = 600.dp).fillMaxWidth()) {
+        OnboardingHero()
+        Spacer(Modifier.height(20.dp))
         Text(
             stringResource(R.string.common_brand),
             style = MaterialTheme.typography.titleMedium,
@@ -179,6 +191,69 @@ fun OnboardingScreen(onComplete: (String, Double?, Int?) -> Unit) {
         )
         }
     }
+    }
+}
+
+
+/**
+ * The first thing a new user sees: three concentric arcs sweeping in, in the readiness palette.
+ *
+ * Deliberately abstract — no number, no percentage. A ring with a score on it would read as a
+ * health reading, and at this point in the flow Spartan has no data about this person; the
+ * provenance rules forbid anything that could be mistaken for one.
+ */
+@Composable
+private fun OnboardingHero() {
+    val reduced = rememberReducedMotion()
+    val primed = if (isSystemInDarkTheme()) SpartanBands.primedDark else SpartanBands.primedLight
+    val easy = if (isSystemInDarkTheme()) SpartanBands.easyDark else SpartanBands.easyLight
+    val accent = MaterialTheme.colorScheme.primary
+    val track = MaterialTheme.colorScheme.outline
+
+    var started by rememberSaveable { mutableStateOf(false) }
+    val sweep by animateFloatAsState(
+        targetValue = if (started) 1f else 0f,
+        animationSpec = if (reduced) snap() else tween(Motion.slow),
+        label = "heroSweep",
+    )
+    LaunchedEffect(Unit) { started = true }
+
+    Box(
+        Modifier.fillMaxWidth().height(104.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Canvas(Modifier.size(104.dp)) {
+            val stroke = 10.dp.toPx()
+            val rings = listOf(
+                Triple(accent, 0.72f, 0f),
+                Triple(primed, 0.48f, 1f),
+                Triple(easy, 0.30f, 2f),
+            )
+            rings.forEach { (ringColor, fraction, step) ->
+                val inset = stroke * 1.9f * step
+                val diameter = size.minDimension - inset * 2 - stroke
+                val topLeft = Offset(inset + stroke / 2, inset + stroke / 2)
+                val arcSize = androidx.compose.ui.geometry.Size(diameter, diameter)
+                drawArc(
+                    color = track,
+                    startAngle = 0f,
+                    sweepAngle = 360f,
+                    useCenter = false,
+                    topLeft = topLeft,
+                    size = arcSize,
+                    style = Stroke(width = stroke, cap = StrokeCap.Round),
+                )
+                drawArc(
+                    color = ringColor,
+                    startAngle = -90f,
+                    sweepAngle = 360f * fraction * sweep,
+                    useCenter = false,
+                    topLeft = topLeft,
+                    size = arcSize,
+                    style = Stroke(width = stroke, cap = StrokeCap.Round),
+                )
+            }
+        }
     }
 }
 
@@ -802,16 +877,49 @@ private fun TrendCard(title: String, values: List<Double>) {
                 }
                 Spacer(Modifier.height(8.dp))
                 val color = MaterialTheme.colorScheme.primary
-                Canvas(Modifier.fillMaxWidth().height(96.dp)) {
+                val gridColor = MaterialTheme.colorScheme.outline
+                // Inset so the 4dp end marker and the stroke cap are never clipped by the canvas.
+                Canvas(Modifier.fillMaxWidth().height(112.dp)) {
                     val span = (max - min).takeIf { it > 0.0 } ?: 1.0
-                    val path = Path()
-                    values.forEachIndexed { index, value ->
+                    val pad = 6.dp.toPx()
+                    val plotHeight = size.height - pad * 2
+                    fun pointAt(index: Int, value: Double): Offset {
                         val x = size.width * index / (values.lastIndex.coerceAtLeast(1)).toFloat()
-                        val y = size.height - (((value - min) / span).toFloat() * size.height)
-                        if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
-                        drawCircle(color, radius = 4.dp.toPx(), center = Offset(x, y))
+                        val y = pad + (plotHeight - (((value - min) / span).toFloat() * plotHeight))
+                        return Offset(x, y)
                     }
-                    drawPath(path, color, style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round))
+                    // A single baseline: enough structure to read the line against, no chart junk.
+                    drawLine(
+                        gridColor,
+                        start = Offset(0f, size.height - pad),
+                        end = Offset(size.width, size.height - pad),
+                        strokeWidth = 1.dp.toPx(),
+                    )
+                    val points = values.mapIndexed { index, value -> pointAt(index, value) }
+                    val line = Path().apply {
+                        points.forEachIndexed { index, p -> if (index == 0) moveTo(p.x, p.y) else lineTo(p.x, p.y) }
+                    }
+                    // Area fill: the depth that makes a sparkline read as a trend, not a scribble.
+                    val area = Path().apply {
+                        addPath(line)
+                        lineTo(points.last().x, size.height - pad)
+                        lineTo(points.first().x, size.height - pad)
+                        close()
+                    }
+                    drawPath(
+                        area,
+                        Brush.verticalGradient(
+                            listOf(color.copy(alpha = 0.28f), color.copy(alpha = 0f)),
+                            startY = pad,
+                            endY = size.height - pad,
+                        ),
+                    )
+                    drawPath(line, color, style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round))
+                    // Only the newest reading gets a dot — the eye should land on "where I am now".
+                    points.lastOrNull()?.let { end ->
+                        drawCircle(color, radius = 5.dp.toPx(), center = end)
+                        drawCircle(Color.Black.copy(alpha = 0.35f), radius = 2.dp.toPx(), center = end)
+                    }
                 }
             }
         }

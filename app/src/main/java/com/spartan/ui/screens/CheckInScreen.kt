@@ -62,6 +62,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -85,6 +86,7 @@ import com.spartan.domain.engine.MetricBenefits
 import com.spartan.domain.engine.PlanClock
 import com.spartan.domain.engine.TrainingProfile
 import com.spartan.domain.engine.PlanUrgency
+import com.spartan.domain.engine.VideoGuide
 import com.spartan.domain.engine.VideoLibrary
 import com.spartan.domain.model.ActivityCategory
 import com.spartan.domain.model.ActivityPriority
@@ -470,18 +472,7 @@ private fun ActivityCard(
                     Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary)
                 }
                 VideoLibrary.guideForActivity(activity.id, trainingProfile)?.let { guide ->
-                    val uriHandler = LocalUriHandler.current
-                    TextButton(onClick = { uriHandler.openUri(guide.url) }, modifier = Modifier.padding(top = Spacing.xs)) {
-                        Icon(Icons.Outlined.PlayCircle, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(Spacing.sm))
-                        // Wraps rather than truncating: at larger font scales a one-line cap ate
-                        // the video title itself, leaving "Follow along: …".
-                        Text(
-                            stringResource(R.string.checkin_follow_along_video, guide.title, guide.minutes),
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
+                    VideoGuideCard(guide, MaterialTheme.colorScheme.primary)
                 }
                 TextButton(onClick = { onSchedule(activity.id) }) {
                     Icon(Icons.Outlined.CalendarMonth, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -614,6 +605,89 @@ private fun ConnectPrompt(isMock: Boolean, onManageConnections: () -> Unit, modi
                 )
             }
             TextButton(onClick = onManageConnections) { Text(stringResource(R.string.checkin_connect)) }
+        }
+    }
+}
+
+/**
+ * A follow-along session, presented as media rather than a link. The thumbnail is drawn from the
+ * readiness band's own colour — Spartan makes no network calls, so there is no remote artwork to
+ * fetch, and a generated tile is honest about that instead of faking a video still.
+ *
+ * The whole card is one 48dp-plus target that leaves the app on tap, and it says so before you go.
+ */
+@Composable
+private fun VideoGuideCard(guide: VideoGuide, accent: Color) {
+    val uriHandler = LocalUriHandler.current
+    val openLabel = stringResource(R.string.checkin_video_opens_youtube)
+    val a11y = stringResource(
+        R.string.checkin_video_a11y,
+        guide.title,
+        guide.channel,
+        guide.minutes,
+    )
+    OutlinedCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = Spacing.sm)
+            .clickable(onClickLabel = openLabel) { uriHandler.openUri(guide.url) }
+            .semantics(mergeDescendants = true) { contentDescription = a11y },
+        shape = RoundedCornerShape(Radius.card),
+    ) {
+        Row(
+            Modifier.padding(Spacing.md),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // Generated tile: band colour → surface, with the play glyph centred.
+            Box(
+                Modifier
+                    .size(64.dp)
+                    .clip(RoundedCornerShape(Radius.chip))
+                    .background(
+                        Brush.linearGradient(
+                            listOf(accent.copy(alpha = 0.32f), accent.copy(alpha = 0.10f)),
+                        ),
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Outlined.PlayCircle,
+                    contentDescription = null,
+                    tint = accent,
+                    modifier = Modifier.size(28.dp),
+                )
+            }
+            Spacer(Modifier.width(Spacing.md))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    stringResource(R.string.checkin_video_eyebrow),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.2.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    guide.title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    stringResource(
+                        R.string.checkin_video_meta,
+                        guide.channel,
+                        guide.minutes,
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }

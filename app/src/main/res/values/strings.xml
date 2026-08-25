@@ -40,6 +40,10 @@
     <string name="checkin_reminders_offer_dismiss">Not now</string>
     <string name="checkin_reminders_offer_enable">Turn on</string>
     <string name="checkin_reminders_offer_title">Want a reminder for your plan?</string>
+    <string name="checkin_video_a11y">Follow along: %1$s by %2$s, %3$d minutes. Opens YouTube.</string>
+    <string name="checkin_video_eyebrow">FOLLOW ALONG</string>
+    <string name="checkin_video_meta">%1$s · %2$d min · Opens YouTube</string>
+    <string name="checkin_video_opens_youtube">Open in YouTube</string>
     <string name="checkin_sample_data">SAMPLE DATA</string>
     <string name="checkin_scheduled_for">Scheduled for %1$s</string>
     <string name="checkin_scheduled_for_sample">Scheduled for %1$s (sample calendar)</string>
