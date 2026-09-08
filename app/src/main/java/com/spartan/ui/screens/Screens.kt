@@ -492,27 +492,7 @@ fun AddMetricScreen(
     }
 }
 
-@Composable
-fun PlanScreen(state: MainUiState, onEditMinutes: (String, Int) -> Unit, onComplete: (PlannedWorkout) -> Unit) {
-    ScreenColumn {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.plan_title), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f).semantics { heading() })
-            if (state.whoopIsMock) SampleDataChip()
-        }
-        // The plan engine always yields a weekly plan once the health bundle emits, so a null
-        // plan means the first load is still in flight. Never a skeleton on sync failure; a
-        // failed sync with no plan gets Today's banner instead of nothing.
-        if (state.weeklyPlan == null && !state.syncFailed) {
-            TabLoadingSkeleton()
-        } else if (state.weeklyPlan == null && state.syncFailed) {
-            SafetyBanner(stringResource(R.string.checkin_sync_failed))
-        } else {
-            WeeklyPlanSection(state, onEditMinutes, onComplete)
-        }
-    }
-}
-
-/** The weekly-plan cards, shared by [PlanScreen] and the Coach hub. */
+/** The weekly-plan cards, rendered inside the Coach hub. */
 @Composable
 fun WeeklyPlanSection(state: MainUiState, onEditMinutes: (String, Int) -> Unit, onComplete: (PlannedWorkout) -> Unit) {
     Text(state.weeklyPlan?.focus.orEmpty(), style = MaterialTheme.typography.bodyLarge)

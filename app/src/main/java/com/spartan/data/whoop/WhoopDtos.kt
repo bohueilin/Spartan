@@ -16,7 +16,7 @@ data class WhoopCollection<T>(
     @SerialName("next_token") val nextToken: String? = null,
 )
 
-// --- /v1/recovery ---
+// --- /v2/recovery ---
 @Serializable
 data class WhoopRecoveryRecord(
     @SerialName("created_at") val createdAt: String? = null,
@@ -31,7 +31,7 @@ data class WhoopRecoveryScore(
     @SerialName("hrv_rmssd_milli") val hrvRmssdMilli: Double? = null,
 )
 
-// --- /v1/activity/sleep ---
+// --- /v2/activity/sleep ---
 @Serializable
 data class WhoopSleepRecord(
     val start: String? = null,
@@ -61,7 +61,7 @@ data class WhoopSleepNeeded(
     @SerialName("need_from_sleep_debt_milli") val needFromSleepDebtMilli: Long? = null,
 )
 
-// --- /v1/cycle ---
+// --- /v2/cycle ---
 @Serializable
 data class WhoopCycleRecord(
     val start: String? = null,

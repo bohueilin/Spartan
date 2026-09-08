@@ -117,6 +117,8 @@ data class MainUiState(
     val planHeadline: String = "",
     val readinessBand: ReadinessBand? = null,
     val recoveryScore: Int? = null,
+    /** Plain-language reasons the engine derived from the user's own baselines (may be empty). */
+    val readinessNotes: List<String> = emptyList(),
     val planSafetyBanner: String? = null,
     val whoopIsMock: Boolean = true,
     val whoopConnected: Boolean = false,
@@ -528,6 +530,7 @@ class MainViewModel @Inject constructor(
             planHeadline = checkIn.plan?.headline ?: "",
             readinessBand = checkIn.readiness?.band,
             recoveryScore = checkIn.readiness?.recoveryScore,
+            readinessNotes = checkIn.readiness?.trendNotes.orEmpty(),
             planSafetyBanner = checkIn.plan?.safetyBanner,
             whoopIsMock = isMockData,
             whoopConnected = checkIn.whoopConnected,

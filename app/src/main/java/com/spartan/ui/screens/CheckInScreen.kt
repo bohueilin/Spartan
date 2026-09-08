@@ -278,6 +278,16 @@ private fun ReadinessHeader(state: MainUiState, onOpenRecoveryExplainer: () -> U
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
+                    // The engine already derives these from the user's own baselines; showing them
+                    // is what makes the plan a derivation rather than a verdict.
+                    state.readinessNotes.forEach { note ->
+                        Text(
+                            note,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = Spacing.xs),
+                        )
+                    }
                 }
             }
         }
