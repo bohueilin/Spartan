@@ -29,8 +29,9 @@ your effort/pain debriefs.
   generated coaching copy on both platforms. Concerning vitals suppress intensity and produce a
   "talk to a clinician" nudge — never a diagnosis. Projections are capped ranges, never promises.
 - **Honest data provenance.** Ships in clearly-labeled SAMPLE DATA mode; **WHOOP CSV import** brings
-  real data with zero credentials; live WHOOP/Google OAuth is fully built but flag-gated
-  (`USE_MOCK_* = true`) until production app registration.
+  real data with zero credentials; WHOOP/Google API clients and OAuth managers are built but
+  flag-gated (`USE_MOCK_* = true`); the in-app sign-in flow is not wired yet, and production app
+  registration is still pending.
 - **Transparent coaching.** A rules engine (`CoachingEngine` + `RuleBasedRecommendationSource`),
   not a black box; a pluggable `RecommendationSource` seam exists for a future AI coach, and the
   **CoachingGym** (600+ gold scenarios, weighted reward: readiness 0.35 / safety hard-gate 0.25 /
@@ -53,9 +54,9 @@ repository → adapters (`WhoopClient`: mock/CSV/real · `CalendarClient`: stub/
 | Android unit + Robolectric | **161 tests / 0 failures** (23 classes) |
 | iOS SpartanKit checks | **89 tests / 30,895 assertions / 0 failures** (`swift run SpartanChecks`) |
 | Android lint | 0 errors |
-| R8 release build | green, ~3.2 MB APK |
+| R8 release build | green, ~4.0 MB APK (unsigned, 2026-09-25) |
 | Instrumentation (Room migration 3→4→5, Compose smoke + a11y) | compile-validated locally; **runs in the CI emulator job — has never executed on real hardware** |
-| CI | `.github/workflows/ci.yml`: unit+Kover, lint, assemble debug/release (+mapping artifact), emulator job · Dependabot on |
+| CI | `.github/workflows/ci.yml`: unit+Kover (+ `koverVerifyDomain` ≥ 95% domain-lines gate, added 2026-09), lint, assemble debug/release (+mapping artifact), emulator job, iOS `SpartanChecks` job on `macos-latest` (added 2026-09) · Dependabot on |
 
 ### Shipped feature inventory (Android — all on `master`, all tested)
 Daily check-in (readiness ring, greeting, haptic check-off, pull-to-refresh, consistency strip,
@@ -86,9 +87,11 @@ RELEASE_CHECKLIST §6.3 has not been formally executed.**
 1. Store presence requires human/account steps — Play Console + signing keystore + hosted privacy
    policy + real support email (placeholder `support@spartan.app` is in policy/listing/checklist) +
    store art. All scripted in [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md).
-2. Live OAuth needs production app registration (WHOOP developer app; Google sensitive-scope review
-   for `calendar.freebusy` — has lead time). `WHOOP_CLIENT_SECRET` currently flows via BuildConfig —
-   must move to PKCE-only/backend before real WHOOP ships (flagged in checklist).
+2. Live OAuth needs the in-app sign-in flow wired (no UI calls `authorizationIntent()` /
+   `handleAuthResponse()` yet; *Connect* only records a status) and production app registration
+   (WHOOP developer app; Google sensitive-scope review for `calendar.freebusy` — has lead time).
+   `WHOOP_CLIENT_SECRET` currently flows via BuildConfig — must move to PKCE-only/backend before
+   real WHOOP ships (flagged in checklist).
 3. Cert pinning is prepared-not-enabled by design ([CERT_PINNING_RUNBOOK.md](CERT_PINNING_RUNBOOK.md)).
 4. Video library links are curated statically — verify each video URL resolves before shipping the
    build that surfaces them.
@@ -119,9 +122,10 @@ RELEASE_CHECKLIST §6.3 has not been formally executed.**
    [ios/docs/IOS_RELEASE_CHECKLIST.md](../ios/docs/IOS_RELEASE_CHECKLIST.md).
 
 ### P2 — Live integrations (when accounts exist)
-5. Register production WHOOP + Google OAuth apps; move WHOOP secret out of BuildConfig; flip
+5. Wire the in-app sign-in (Connect → `authorizationIntent()` → `handleAuthResponse()`); register
+   production WHOOP + Google OAuth apps; move WHOOP secret out of BuildConfig; flip
    `USE_MOCK_*`; enable cert pinning per the runbook; device-test 401-refresh, disconnect-clears-
-   tokens, and airplane-mode degradation.
+   tokens-and-revokes, and airplane-mode degradation.
 
 ### P2 — Product depth (next build cycles)
 6. **Retention mechanics with evidence:** the research docs (`docs/research/`, if the interrupted

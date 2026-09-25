@@ -21,7 +21,7 @@ engineering-control view.
 ## Storage & secrets
 - ✅ Tokens are never stored in Room, never logged. `SecureTokenStore` abstraction; `InMemoryTokenStore` for mock, `EncryptedTokenStore` when a real integration is enabled.
 - ✅ `EncryptedTokenStore` (Android Keystore–backed `EncryptedSharedPreferences`, AES-256-GCM) implemented and bound via DI when `USE_MOCK_* = false`.
-- ✅ Real OAuth via AppAuth (authorization-code + PKCE) for WHOOP and Google; tokens flow only through `SecureTokenStore`; bearer added per-request by an OkHttp interceptor (never in URLs/logs).
+- ✅ Real OAuth via AppAuth (authorization-code + PKCE) for WHOOP and Google, in the auth managers (no screen launches the sign-in flow yet — *Connect* only records a status); tokens flow only through `SecureTokenStore`; bearer added per-request by an OkHttp interceptor (never in URLs/logs).
 - ✅ No secrets/keys in the repo. `.env` / `local.properties` / `*.keystore` are gitignored; only `.env.example` (placeholders) is tracked.
 - ✅ Secrets flow via `local.properties`/env → `BuildConfig` at build time; the app builds with none set (mock mode).
 - ✅ Android backup & device-transfer exclude the database, shared prefs, and DataStore (`data_extraction_rules.xml`); `allowBackup=false`.
@@ -39,7 +39,7 @@ engineering-control view.
 ## Consent & user control
 - ✅ Explicit consent screen before connecting WHOOP or Calendar, with plain-language scope explanations (`ConnectionsScreen`).
 - ✅ Consent + connection state persisted in the `integration_connections` table (single source of truth).
-- ✅ Disconnect any integration at any time (clears the connection; Phase 2 also clears tokens).
+- ✅ Disconnect any integration at any time: clears the connection and local tokens immediately, then best-effort revokes the grant server-side (WHOOP `DELETE /v2/user/access`, Google `/revoke`; never blocks the UI). Delete-all does the same.
 - ✅ Full local data deletion (`deleteAllLocalData()` clears every table incl. activities & connections + preferences).
 - ✅ Local export preview (user-directed sharing only).
 

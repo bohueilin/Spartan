@@ -1,7 +1,9 @@
 package com.spartan.domain.engine
 
+import com.spartan.domain.model.DailyReflection
 import com.spartan.domain.model.MetricReading
 import com.spartan.domain.model.MetricType
+import com.spartan.domain.model.ReflectionMood
 import com.spartan.domain.model.WeeklyReviewSummary
 import com.spartan.domain.model.WorkoutLog
 import com.spartan.domain.model.WorkoutType
@@ -15,6 +17,7 @@ class ReviewEngine(
         metrics: List<MetricReading>,
         logs: List<WorkoutLog>,
         referenceDate: LocalDate = LocalDate.now(),
+        reflections: List<DailyReflection> = emptyList(),
     ): WeeklyReviewSummary {
         val windowStart = referenceDate.minusDays(6)
         val weight = values(metrics, MetricType.WEIGHT)
@@ -39,6 +42,23 @@ class ReviewEngine(
             if (glucose != null && glucose > 99.0) add("Fasting glucose remains worth tracking and discussing if repeated.")
             if (recentLogs.any { it.painFlag }) add("Pain was reported; avoid progression until resolved.")
         }
+        // WHOOP dates each night's sleep by its local wake-up day, so the reading on day D is the night before D.
+        val sleepByDay = metrics.filter { it.type == MetricType.SLEEP_DURATION }
+            .mapNotNull { r -> r.value?.let { r.recordedAt.toEpochDay() to it } }.toMap()
+        val reflectionWindow = referenceDate.minusDays(13).toEpochDay()..referenceDate.toEpochDay()
+        val recentReflections = reflections.filter { it.dateEpochDay in reflectionWindow }
+        val toughNights = recentReflections.filter { it.mood == ReflectionMood.TOUGH }.mapNotNull { sleepByDay[it.dateEpochDay] }
+        val strongNights = recentReflections.filter { it.mood == ReflectionMood.STRONG }.mapNotNull { sleepByDay[it.dateEpochDay] }
+        // Two matching days minimum, and one counterexample silences the pattern: never overclaim.
+        val fromReflections = buildList {
+            if (toughNights.size >= 2 && toughNights.all { it < 6.0 }) {
+                add("Your ${toughNights.size} tough days all followed nights under 6 hours of sleep — protecting sleep may be the easiest lever this week.")
+            }
+            if (strongNights.size >= 2 && strongNights.all { it >= 7.0 }) {
+                add("Your ${strongNights.size} strong days all followed nights of 7 or more hours of sleep — that rhythm looks worth protecting.")
+            }
+            if (isEmpty() && recentReflections.isNotEmpty()) add("Keep reflecting — patterns need a few more nights to show.")
+        }
 
         return WeeklyReviewSummary(
             adherencePercent = adherence,
@@ -57,10 +77,12 @@ class ReviewEngine(
             } else {
                 "Hold steady and confirm improvement with repeat measurements."
             },
+            fromReflections = fromReflections,
         ).also { summary ->
             listOf(
                 summary.improved,
                 summary.needsAttention,
+                summary.fromReflections,
                 listOf(summary.nextWeekFocus),
             ).flatten().forEach(safetyEngine::sanitize)
         }

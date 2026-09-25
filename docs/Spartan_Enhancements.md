@@ -8,15 +8,15 @@
 > backend exists; root detection → none by design; crash SDK → none, Play Vitals only.
 
 A prioritized, honest backlog for the Spartan Android app. Grounded in the current tree:
-Kotlin 2.0.21 · Compose + Material 3 · Hilt · Room **v4** (migrations `1→2→3→4`) · DataStore ·
+Kotlin 2.0.21 · Compose + Material 3 · Hilt · Room **v8** (additive migrations `1→…→8`) · DataStore ·
 WorkManager · Retrofit/OkHttp/AppAuth (Phase-2, behind `USE_MOCK_*`) · mock-first WHOOP + Calendar ·
-rules-based `CoachingEngine` gated by `SafetyEngine`. `minSdk 26`, `target/compileSdk 35`, JDK 17.
+rules-based `CoachingEngine` gated by `SafetyEngine`. `minSdk 26`, `targetSdk 35`, `compileSdk 36` (Health Connect 1.1.0 requires it), JDK 17.
 
 **Priority:** P0 launch-blocker · P1 fast-follow · P2 later. **Effort:** S (<½ day) · M (1–3 days) · L (>3 days).
 Nothing here makes medical claims; every user-facing string still passes `SafetyEngine.sanitize`. No fabricated metrics.
 
 ## Already done (do not re-propose)
-Rebrand to `com.spartan`; mock-first WHOOP + real WHOOP OAuth (AppAuth/PKCE) + Retrofit; real Google
+Rebrand to `com.spartan`; mock-first WHOOP + real WHOOP OAuth manager (AppAuth/PKCE; in-app sign-in not wired yet) + Retrofit; real Google
 Calendar free/busy; Keystore-backed `EncryptedTokenStore`; rules-based `CoachingEngine` + `SafetyEngine`;
 daily check-in UI with complete/snooze/skip/reschedule persistence (`daily_activities`); adaptive icon +
 splash + edge-to-edge; R8 release build (`isMinifyEnabled`/`isShrinkResources`); 42 JVM unit tests +
@@ -27,7 +27,7 @@ coaching eval; Play collateral (listing, privacy policy, release checklist); not
 
 ## 1. Testing & CI
 
-- **CI matrix on GitHub Actions** — **DONE.** `.github/workflows/ci.yml`: `unit` (tests+Kover), `lint`, `assemble` (debug+release+androidTest compile, R8 mapping artifact, APK-size record), and an emulator `instrumentation` job (`reactivecircus/android-emulator-runner`, API 34). Serial (`--max-workers=1`), zero secrets. *Why:* there is **no `.github/workflows/`** today; every
+- **CI matrix on GitHub Actions** — **DONE.** `.github/workflows/ci.yml`: `unit` (tests+Kover, plus the `:app:koverVerifyDomain` coverage gate — domain engine/eval/model ≥ 95% lines), `lint`, `assemble` (debug+release+androidTest compile, R8 mapping artifact, APK-size record), an emulator `instrumentation` job (`reactivecircus/android-emulator-runner`, API 34), and an `ios` job (`swift run SpartanChecks` on `macos-latest`). Serial (`--max-workers=1`), zero secrets. *Why:* there is **no `.github/workflows/`** today; every
   gate (`assembleDebug`, `testDebugUnitTest`, `lintDebug`) is run by hand, and the release checklist assumes
   they are green. *Sketch:* `.github/workflows/ci.yml` on `ubuntu-latest`, JDK 17 (`actions/setup-java`
   temurin), `android-actions/setup-android`, `gradle/actions/setup-gradle` cache. Jobs: `unit` (`./gradlew
@@ -57,7 +57,7 @@ coaching eval; Play collateral (listing, privacy policy, release checklist); not
   (`io.github.takahirom.roborazzi`, JVM, no device) or Paparazzi (`app.cash.paparazzi`) over the composables
   in `ui.screens`; golden PNGs in the repo, `verifyRoborazzi` in CI. Paparazzi conflicts with Hilt-injected
   previews — snapshot pure `@Composable`s that take state, not `MainViewModel`.
-- **Coverage reporting** — **DONE.** Kover 0.8.3 plugin; `koverXmlReport` uploaded as a CI artifact. *Why:* the 42 JVM tests concentrate on engines; coverage of
+- **Coverage reporting** — **DONE.** Kover 0.8.3 plugin; `koverXmlReport` uploaded as a CI artifact, and CI gates `:app:koverVerifyDomain` (domain ≥ 95% lines). *Why:* the 42 JVM tests concentrate on engines; coverage of
   `data.*` mappers/repository is unknown. *Sketch:* Kover (`org.jetbrains.kotlinx.kover` Gradle plugin) →
   `koverXmlReport`; upload to CI artifact / PR summary. No third-party service required (privacy posture).
 - **Baseline profiles for startup** — **DEFERRED (device-bound).** Requires a physical/managed device for MacrobenchmarkRule capture; module plan documented here, revisit once a bench device is available. *Why:* faster cold start on `minSdk 26` low-end devices;
@@ -177,7 +177,7 @@ coaching eval; Play collateral (listing, privacy policy, release checklist); not
   unclosed resources early. *Sketch:* in `SpartanApp.onCreate()`, guard with `if (BuildConfig.DEBUG)` →
   `StrictMode.setThreadPolicy(detectAll().penaltyLog())` + `setVmPolicy(detectLeakedClosableObjects()…)`.
   Debug-only; never in release.
-- **Dependency vulnerability scanning** — **DONE.** `.github/dependabot.yml` (gradle weekly, grouped androidx/kotlin; actions monthly). `security-crypto` alpha pin note included; OWASP dependency-check evaluated and skipped (NVD API-key + runtime cost outweigh benefit with Dependabot active). *Why:* no automated CVE watch; `security-crypto` is on
+- **Dependency vulnerability scanning** — **DONE.** `.github/dependabot.yml` (gradle weekly, grouped androidx/kotlin; actions monthly). `security-crypto` now on stable `1.1.0`; OWASP dependency-check evaluated and skipped (NVD API-key + runtime cost outweigh benefit with Dependabot active). *Why:* no automated CVE watch; `security-crypto` was on
   `1.1.0-alpha06` (an alpha in the crypto path). *Sketch:* enable Dependabot (`.github/dependabot.yml`,
   gradle ecosystem) for PR bumps, and add OWASP `dependency-check-gradle` (or `gradle-versions-plugin`) as a
   non-blocking CI job. Pin `security-crypto` to a stable release when one lands.

@@ -1,6 +1,4 @@
 # Automated dependency CVE/version watch (docs/Spartan_Enhancements.md §5).
-# Note: androidx.security:security-crypto is intentionally on 1.1.0-alpha06 — pin to the first
-# stable release when one lands.
 version: 2
 updates:
   - package-ecosystem: gradle

@@ -104,7 +104,7 @@ object AppModule {
     ): SecureTokenStore =
         if (realIntegrationEnabled()) encrypted.get() else inMemory.get()
 
-    // --- WHOOP integration (mock by default; real client is a Phase 2 stub) ---
+    // --- WHOOP integration (mock by default; real client built, flag-gated off) ---
     @Provides
     @Singleton
     fun provideWhoopConfig(): WhoopConfig = WhoopConfig(
@@ -143,7 +143,7 @@ object AppModule {
         return LocalFirstWhoopClient(configured, cycleDao)
     }
 
-    // --- Google Calendar integration (stub by default; real client is a Phase 2 stub) ---
+    // --- Google Calendar integration (stub by default; real client built, flag-gated off) ---
     @Provides
     @Singleton
     fun provideCalendarConfig(): CalendarConfig = CalendarConfig(

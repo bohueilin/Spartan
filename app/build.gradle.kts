@@ -17,7 +17,7 @@ ksp {
 
 android {
     namespace = "com.spartan"
-    compileSdk = 35
+    compileSdk = 36 // Health Connect 1.1.0 requires it; targetSdk (runtime behavior) stays 35
 
     // Secrets/config are read from local.properties (gitignored) or the environment. They default
     // to blank + mock mode, so Spartan builds and runs with NO credentials committed. See .env.example.
@@ -101,6 +101,19 @@ kotlin {
     }
 }
 
+// Coverage gate on the pure domain rules, the product's core (not the I/O-orchestrating usecase).
+// Kover 0.8 forbids per-rule filters, so a "domain" variant scopes the check (`koverVerifyDomain`);
+// total reports still cover the whole app.
+kover {
+    currentProject { createVariant("domain") { add("debug") } }
+    reports {
+        variant("domain") {
+            filters { includes { packages("com.spartan.domain.engine", "com.spartan.domain.eval", "com.spartan.domain.model") } }
+            verify { rule { minBound(95) } }
+        }
+    }
+}
+
 dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2024.12.01")
     implementation(composeBom)
@@ -123,11 +136,11 @@ dependencies {
     implementation("com.google.dagger:hilt-android:2.52")
     implementation("androidx.hilt:hilt-work:1.2.0") // @HiltWorker for DailyPlanRefreshWorker
     implementation("com.google.android.play:review-ktx:2.0.2") // in-app review prompt
-    implementation("androidx.health.connect:connect-client:1.1.0-alpha07") // HC adapter (flag-gated off)
+    implementation("androidx.health.connect:connect-client:1.1.0") // HC adapter (flag-gated off)
     implementation("androidx.glance:glance-appwidget:1.1.1") // home-screen "next activity" widget
 
     // Phase 2 — real integrations. Unused in the default mock build; enabled behind USE_MOCK_* flags.
-    implementation("androidx.security:security-crypto:1.1.0-alpha06") // Keystore-backed EncryptedSharedPreferences
+    implementation("androidx.security:security-crypto:1.1.0") // Keystore-backed EncryptedSharedPreferences
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.retrofit2:retrofit:2.11.0")

@@ -46,6 +46,11 @@ The gold expectations are computed from a **wellness spec written once in `GymSc
 from the engine under test — so the same manifest grades the shipped rules engine, a future
 LLM-backed `RecommendationSource`, or an RL checkpoint mid-training.
 
+**What this does and doesn't show.** The gym shows the engine behaves as its written wellness spec
+says — safe, consistent, and context-appropriate across scripted scenarios — and catches
+regressions. It does not show that following a plan improves anyone's health: the gold answers are
+spec-derived, and no user or clinical outcomes are measured.
+
 ## What it already caught
 
 Three real coaching bugs the invariant eval could not see — on **both platforms** (the Kotlin

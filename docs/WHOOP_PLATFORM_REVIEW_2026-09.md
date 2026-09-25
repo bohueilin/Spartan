@@ -63,7 +63,11 @@ It is not free, and the gate is a product decision, not an engineering one:
   filter — declaring these triggers Google Play's Health apps review.
 - A Play Console Health apps declaration.
 - Health Connect has no recovery-score type, so readiness derives from HRV / RHR / sleep trends via
-  the existing null-recovery fallback rules.
+  the existing null-recovery fallback rules. *(Correction 2026-09-25: not true today.
+  `ReadinessBand.fromRecovery(null)` returns BALANCED with `isStale = true`, so flipping
+  `USE_HEALTH_CONNECT` as-is would give every day the stale-data plan. HRV/RHR trend rules still
+  add cards, but band-based training never runs. A readiness mapping for Health Connect is needed
+  first.)*
 
 *Unverified:* WHOOP's support page listing exact Health Connect data types would not load. Confirm
 which types WHOOP actually writes before committing to this path.
@@ -80,6 +84,9 @@ which types WHOOP actually writes before committing to this path.
    whose consent screen promises least privilege, drop it or use it.
 5. **Workout endpoint on the API path** (small). We request `read:workout` and the CSV importer
    already parses workouts, but the API client never fetches them — the two real-data paths disagree.
+   *(Status 2026-09-25: kept deliberately. `RealWhoopClient` does not call the workout endpoint;
+   exercise minutes come from the CSV import, and pain/RPE adaptation from the user's own debriefs.
+   `read:workout` is still requested. API sync now follows `next_token` paging, capped at 10 pages.)*
 
 ## Sources
 

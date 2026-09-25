@@ -44,8 +44,10 @@ export ANDROID_HOME="$HOME/android-sdk"
     data clearly, no network calls are made, and no credentials are needed. If you do this, the
     store listing and the app must both say "sample data" plainly — no implication that live WHOOP
     sync is active.
-  - Shipping with real integrations (`false`) requires **production** OAuth apps for WHOOP and
-    Google (§5), which have external review lead time. Do not flip the flags until §5 is complete.
+  - Shipping with real integrations (`false`) requires the in-app sign-in flow to be wired (today
+    *Connect* only records a status; nothing launches `authorizationIntent()`) and **production**
+    OAuth apps for WHOOP and Google (§5), which have external review lead time. Do not flip the
+    flags until §5 is complete.
 - [ ] **Manifest posture unchanged.** `allowBackup="false"`, `dataExtractionRules` excluding the
       database/prefs/DataStore, cleartext traffic disabled. (Verified present; do not regress.)
 - [ ] **Security gate.** Complete the "Pre-release gate" section of

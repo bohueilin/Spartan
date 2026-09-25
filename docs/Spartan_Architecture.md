@@ -15,7 +15,7 @@ This document is the technical architecture for Spartan. It is subordinate to th
 - `docs/Spartan_Implementation_Plan.md` — phased build/test plan and the rebrand mechanics.
 - `docs/Spartan_Codebase_Audit.md` — as-found inventory of the `com.vitalcompass` code being carried forward.
 
-Section references written as **brief §3** (domain models), **brief §4** (enums / `MetricType` additions), **brief §5** (Room entities & v4 migration), **brief §6** (feature flags, scopes, redirect URIs), and **brief §7** (rule IDs) point at the corresponding numbered sections of the decisions brief.
+Section references written as **brief §3** (domain models), **brief §4** (enums / `MetricType` additions), **brief §5** (Room entities & migrations), **brief §6** (feature flags, scopes, redirect URIs), and **brief §7** (rule IDs) point at the corresponding numbered sections of the decisions brief.
 
 Everything below is **grounded in the actual code** already present in `app/src/main/java/com/vitalcompass/`. Where a component does not yet exist (WHOOP adapter, Calendar adapter, coaching engine, secure token store), it is explicitly labeled **new** and specified so it can be built without contradicting what ships today. All wearable and calendar data described for the MVP is **mock/sample data** served by `MockWhoopClient` / `StubCalendarClient`; nothing here asserts production readiness, clinical validity, or any compliance certification.
 
@@ -30,7 +30,7 @@ Everything below is **grounded in the actual code** already present in `app/src/
 | Local DB | Room | `2.6.1` (`exportSchema = false`, DB version **3**) |
 | Preferences | DataStore Preferences | `1.1.1` |
 | Background work | WorkManager | `2.10.0` |
-| SDK | `minSdk = 26`, `targetSdk = 35`, `compileSdk = 35` | — |
+| SDK | `minSdk = 26`, `targetSdk = 35`, `compileSdk = 35` (now `36`: Health Connect client 1.1.0 requires it; `targetSdk` stays 35) | — |
 | Networking / crypto libs | **none present** | see §5, §9 — added only when the real adapters land |
 
 The MVP has **no** Retrofit/OkHttp, no `security-crypto`, no auth SDKs, and makes **no network calls** (confirmed: `grep` for those artifacts returns nothing). That posture is preserved: the integration seams default to offline mock/stub implementations.
@@ -131,7 +131,7 @@ Single Gradle module `:app`, namespace `com.spartan`. Packages mirror the layers
 | `com.spartan.data.reminder` | Local notifications | `ReminderScheduler`, `ReminderWorker` (extended for per-activity + coaching notifications) |
 | `com.spartan.data.security` | **new** — secure token storage | **`SecureTokenStore`**, **`InMemoryTokenStore`** (Phase 1 default), **`EncryptedTokenStore`** (Phase 2), **`OAuthTokens`** |
 | `com.spartan.data.export` | Local text/CSV export | `LocalExportFormatter` |
-| `com.spartan.di` | Hilt wiring | `AppModule`, **`IntegrationModule`** (adapter `@Binds`) |
+| `com.spartan.di` | Hilt wiring | `AppModule` (flag-driven adapter `@Provides`, §5.4), `NetworkModule` |
 
 The dependency rule is strict and matches today's code: `ui → domain + repository`; `domain.engine → domain.model` only (no Android, no data); `data.* → domain.model`; `di` wires implementations to interfaces. Engines remain unit-testable off-device (see the existing `app/src/test/java/com/vitalcompass/domain/*`).
 
@@ -300,13 +300,16 @@ interface WhoopClient {
 ```
 
 - **`MockWhoopClient`** — the **default** binding. Returns a deterministic 7-day series of **mock/sample** `WhoopSnapshot`s (every one tagged `isMock = true`, surfaced as "Sample data" in the UI). No network, no auth. Used for the MVP, unit tests, and demos.
-- **`RealWhoopClient`** — a **stub** wired to the WHOOP Developer Platform (REST + OAuth 2.0). It is present but **not bound** by default; it depends on Retrofit/OkHttp + kotlinx-serialization (**added only when this path is enabled**) and `WhoopAuthManager` for bearer tokens. Until enabled it throws `NotImplementedError("RealWhoopClient requires enabling the WHOOP network path")` so no partial network behavior ships accidentally.
+- **`RealWhoopClient`** — the WHOOP Developer Platform v2 client (REST + OAuth 2.0 via Retrofit/OkHttp, bearer tokens from `WhoopAuthManager`). Bound only when `USE_MOCK_WHOOP = false` and a WHOOP client ID is configured; `LocalFirstWhoopClient` wraps whichever client is bound and serves imported WHOOP CSV data first when any exists.
+- **Where each signal comes from.** Real-API sync pulls **recovery, sleep, and cycles** only. Exercise minutes come from the **WHOOP CSV import** (`workouts.csv` → `EXERCISE_MINUTES`). Pain/RPE adaptation comes from the user's own **workout debriefs**, not WHOOP. The workout endpoint is deliberately not called yet; `read:workout` is requested up front so enabling it later needs no re-consent.
 
 ### 5.2 `WhoopAuthManager` — OAuth 2.0 authorization-code flow
 
 Standard authorization-code flow (with PKCE): app opens the WHOOP authorize URL in a Custom Tab → user consents → redirect back with `code` → exchange `code` for `{ access_token, refresh_token, expires_in }` → hand tokens to `SecureTokenStore` (never to Room, never logged). Refresh handled transparently before expiry using the stored refresh token; `offline` scope is what makes refresh tokens available. On refresh failure the connection row is marked `ERROR` and the user is re-prompted.
 
-**Scopes requested (WHOOP):** `read:recovery`, `read:cycles`, `read:sleep`, `read:workout`, `read:profile`, `offline`. Requested minimally — drop any scope the coaching rules don't consume.
+**Not wired in the UI yet.** `WhoopAuthManager` / `CalendarAuthManager` implement this flow, but no screen launches `authorizationIntent()` or forwards the result to `handleAuthResponse()`; the Connections *Connect* button only records a connection status. Live sign-in needs that wiring (plus production registration) before real sync can run.
+
+**Scopes requested (WHOOP):** `read:recovery`, `read:cycles`, `read:sleep`, `read:workout`, `read:profile`, `offline`. Requested minimally (drop any scope the coaching rules don't consume), with two current exceptions: `read:workout` is requested ahead of use (§5.1) and `read:profile` is not yet consumed.
 
 ### 5.3 DTOs and `WhoopMapper` normalization
 
@@ -324,19 +327,20 @@ Standard authorization-code flow (with PKCE): app opens the WHOOP authorize URL 
 | `score.strain` | `/cycle` | `DAY_STRAIN` | 0–21 | new |
 | `score.kilojoule` | `/cycle` | `ENERGY_KCAL` | kJ → kcal (`/4.184`) | new |
 
-`ReadinessBand` derivation lives in `WhoopMapper`/`CoachingEngine`, from the recovery score: `>= 67 → PRIMED`, `50–66 → BALANCED`, `34–49 → EASY`, `<= 33 → REST` (null recovery → `BALANCED` + `isStale`). A pain flag or acute illness signal is handled separately by the `PAIN_DELOAD` rule (§7). Persisted WHOOP readings are ordinary `MetricEntryEntity` rows with `note = "WHOOP (sample)"` in the mock path, so they flow through the existing Metrics/Review UI unchanged.
+`ReadinessBand` derivation lives in `WhoopMapper`/`CoachingEngine`, from the recovery score: `>= 67 → PRIMED`, `50–66 → BALANCED`, `34–49 → EASY`, `<= 33 → REST` (null recovery → `BALANCED` + `isStale`). The flag-gated Health Connect source (`USE_HEALTH_CONNECT`) has no recovery score, so if it were enabled as-is every day would read as stale `BALANCED` and get only the gentle stale-data plan. A pain flag or acute illness signal is handled separately by the `PAIN_DELOAD` rule (§7). Persisted WHOOP readings are ordinary `MetricEntryEntity` rows with `note = "WHOOP (sample)"` in the mock path, so they flow through the existing Metrics/Review UI unchanged.
 
-### 5.4 DI binding (`di/IntegrationModule`)
+### 5.4 DI binding (`di/AppModule.provideWhoopClient`)
 
 ```kotlin
-@Module @InstallIn(SingletonComponent::class)
-abstract class IntegrationModule {
-    @Binds @Singleton abstract fun bindWhoopClient(impl: MockWhoopClient): WhoopClient
-    // Real path: swap to RealWhoopClient when BuildConfig.USE_MOCK_WHOOP is false + consent.
+val configured = when {
+    BuildConfig.USE_HEALTH_CONNECT -> healthConnect.get()                  // flag-gated alternative
+    BuildConfig.USE_MOCK_WHOOP || !config.isConfigured -> mock.get()      // default build
+    else -> RealWhoopClient(api.get())
 }
+return LocalFirstWhoopClient(configured, cycleDao) // imported CSV data wins when present
 ```
 
-`WhoopAuthManager`, `WhoopMapper` provided as `@Singleton` via `@Provides` (they have no interface). `MockWhoopClient` needs no auth and no network.
+`WhoopAuthManager` is provided as a `@Singleton` via `@Provides` (it has no interface). `MockWhoopClient` needs no auth and no network.
 
 ---
 
@@ -355,7 +359,7 @@ interface CalendarClient {
 ```
 
 - **`StubCalendarClient`** — the **default** binding. Returns deterministic **mock/sample** busy blocks (e.g. `09:00–10:00`, `13:00–13:30`, `16:00–17:00`) so `AvailabilityService` can be exercised offline. `createEvent(...)` returns `Result.failure(UnsupportedOperationException)` in the stub.
-- **`GoogleCalendarClient`** (Phase-2 stub) uses `CalendarAuthManager` + the Google Calendar REST API; it is present but **not bound** by default.
+- **`GoogleCalendarClient`** uses `CalendarAuthManager` + the Google Calendar REST API; it is built but **not bound** by default (only when `USE_MOCK_CALENDAR = false` and a client ID is configured).
 
 ### 6.2 `AvailabilityService` — open-window algorithm
 
@@ -371,7 +375,7 @@ All arithmetic uses `ZonedDateTime`/`Duration` so DST transitions and cross-midn
 
 ### 6.3 `CalendarAuthManager` + scopes + opt-in event creation
 
-Same OAuth 2.0 authorization-code + PKCE pattern as WHOOP, tokens in `SecureTokenStore`.
+Same OAuth 2.0 authorization-code + PKCE pattern as WHOOP, tokens in `SecureTokenStore` (likewise not yet launched from the UI, §5.2).
 
 **Scopes (Google):** `https://www.googleapis.com/auth/calendar.freebusy` **only** for reads (least privilege — free/busy windows for availability, never event contents). Writing events adds `https://www.googleapis.com/auth/calendar.events` — **requested only when the user explicitly opts in** to "add sessions to my calendar," and revocable independently. No `openid`/`email` and no `calendar.readonly`. Reading availability never implies write access.
 
@@ -481,7 +485,7 @@ interface SecureTokenStore {
 - Phase-1 default binding **`InMemoryTokenStore`** (no real tokens exist with mock data). Phase-2 **`EncryptedTokenStore`** implements it over **`EncryptedSharedPreferences`** (`androidx.security:security-crypto`) with an **Android Keystore-backed `MasterKey`** (`AES256_GCM`) — the **only** dependency added for secure storage, and only when the integration path is enabled. Per-provider tokens are stored under namespaced keys (e.g. `whoop.access_token`), with `OAuthTokens` serialized to the stored string value.
 - **Tokens never touch Room and are never logged.** `IntegrationConnectionEntity` holds only non-secret metadata (§3.2). Access/refresh tokens + expiry live exclusively in the token store (in-memory in Phase 1, encrypted in Phase 2). No token, code, or authorization header is ever written to `Log`, analytics, crash reporting, or the export file. `OAuthTokens.toString()` is overridden to redact.
 - **`network_security_config.xml`** (new, `res/xml/`) sets `cleartextTrafficPermitted="false"` (app-wide, `usesCleartextTraffic=false` in the manifest) so the real adapters can only talk TLS. **Certificate pinning is a documented future hardening step** (pin WHOOP + Google hosts) — specified here, not yet enabled, to avoid brittle pins before the real path ships.
-- On "disconnect" or consent revoke, `clear(key)` wipes the token entry and the connection row transitions to `NOT_CONNECTED`/`CONSENT_REVOKED`.
+- On "disconnect" or consent revoke, `clear(key)` wipes the token entry first, then the app best-effort asks the provider to revoke the grant (WHOOP `DELETE /v2/user/access`, Google `POST oauth2.googleapis.com/revoke`), and the connection row transitions to `NOT_CONNECTED`/`CONSENT_REVOKED`.
 
 No secrets are committed. OAuth **client IDs** (public) and redirect URIs go in `BuildConfig`/`.env.example` placeholders (see `docs/Spartan_Implementation_Plan.md`); no client secret is embedded in the app (PKCE public-client flow), and no real or fake secret appears in this repository.
 

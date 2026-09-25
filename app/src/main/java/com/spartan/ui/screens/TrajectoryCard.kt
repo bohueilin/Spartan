@@ -20,9 +20,9 @@ import com.spartan.domain.engine.ProjectionEngine
 import com.spartan.ui.theme.Radius
 
 /**
- * The trajectory card (title: R.string.trajectory_title) — the expected-improvement view. Shows, per metric, the typical range
- * after 8 weeks of following the plan at the user's current consistency. Deliberately framed as
- * ranges from general findings with an always-visible disclaimer: motivation without over-promising.
+ * The trajectory card (title: R.string.trajectory_title) — the expected-improvement view. Shows, per metric, an illustrative
+ * range after 8 weeks of following the plan at the user's current consistency. Deliberately framed as
+ * estimates with an always-visible disclaimer: motivation without over-promising.
  */
 @Composable
 fun TrajectoryCard(projections: List<MetricProjection>) {

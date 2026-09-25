@@ -10,6 +10,8 @@ import retrofit2.http.Query
  * v1 is no longer supported by WHOOP. Migration cost here was three path strings: we never
  * deserialize record ids (the v1 long -> v2 UUID change is the migration's main break) and the
  * Json reader ignores unknown keys, so v2's added fields parse harmlessly.
+ *
+ * Collections are paged: pass a response's `next_token` back as `nextToken`; a null token is omitted.
  */
 interface WhoopApi {
     @GET("v2/recovery")
@@ -17,6 +19,7 @@ interface WhoopApi {
         @Query("start") start: String,
         @Query("end") end: String,
         @Query("limit") limit: Int = 25,
+        @Query("nextToken") nextToken: String? = null,
     ): WhoopCollection<WhoopRecoveryRecord>
 
     @GET("v2/activity/sleep")
@@ -24,6 +27,7 @@ interface WhoopApi {
         @Query("start") start: String,
         @Query("end") end: String,
         @Query("limit") limit: Int = 25,
+        @Query("nextToken") nextToken: String? = null,
     ): WhoopCollection<WhoopSleepRecord>
 
     @GET("v2/cycle")
@@ -31,5 +35,6 @@ interface WhoopApi {
         @Query("start") start: String,
         @Query("end") end: String,
         @Query("limit") limit: Int = 25,
+        @Query("nextToken") nextToken: String? = null,
     ): WhoopCollection<WhoopCycleRecord>
 }

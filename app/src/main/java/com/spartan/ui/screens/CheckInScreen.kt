@@ -88,7 +88,6 @@ import com.spartan.domain.engine.TrainingProfile
 import com.spartan.domain.engine.PlanUrgency
 import com.spartan.domain.engine.VideoGuide
 import com.spartan.domain.engine.VideoLibrary
-import com.spartan.domain.model.ActivityCategory
 import com.spartan.domain.model.ActivityPriority
 import com.spartan.domain.model.ActivityStatus
 import com.spartan.domain.model.DailyActivity
@@ -143,12 +142,9 @@ fun CheckInScreen(
     // Checking off a training activity opens a 5-second debrief (minutes/effort/pain) that feeds
     // the adaptive rules — dismissible with one tap, never required.
     var debriefFor by remember { mutableStateOf<DailyActivity?>(null) }
-    val exerciseCategories = remember {
-        setOf(ActivityCategory.ZONE2, ActivityCategory.STRENGTH, ActivityCategory.MOBILITY, ActivityCategory.MOVEMENT)
-    }
     val completeWithDebrief: (String) -> Unit = { id ->
         onComplete(id)
-        state.todayActivities.firstOrNull { it.id == id && it.category in exerciseCategories }
+        state.todayActivities.firstOrNull { it.id == id && it.category in DEBRIEF_CATEGORIES }
             ?.let { debriefFor = it }
     }
     // Skeleton only while a first sync is genuinely in flight — a failed sync falls through to
@@ -220,6 +216,7 @@ fun CheckInScreen(
     debriefFor?.let { activity ->
         ExerciseDebriefSheet(
             activity = activity,
+            alreadyLoggedToday = debriefRepeatsLog(activity, state.todayActivities, state.workoutsLoggedToday),
             onSave = { minutes, rpe, pain ->
                 onLogExercise(activity, minutes, rpe, pain)
                 debriefFor = null

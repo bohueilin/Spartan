@@ -9,9 +9,12 @@ import your own WHOOP export).
 | | Android (repo root) | iOS (`ios/`) |
 | --- | --- | --- |
 | Full app UI | ✅ Emulator or device (Paths A–C below) | Needs one Xcode pass (see the iOS section) |
-| Shared coaching core (rules, safety, CSV parser, video library, CoachingGym) | ✅ `./gradlew :app:testDebugUnitTest` — 129 tests | ✅ `swift run SpartanChecks` — 67 checks, no Xcode needed |
+| Shared coaching core (rules, safety, CSV parser, video library, CoachingGym) | ✅ `./gradlew :app:testDebugUnitTest` — the full suite | ✅ `swift run SpartanChecks` — the full suite, no Xcode needed |
 | Real WHOOP data via CSV import | ✅ In-app (Connections screen) | Domain layer ported; UI wiring lands with the Xcode pass |
 | Follow-along training videos | ✅ Activity cards + "Train this metric" | Library ported (9 verified videos); UI wiring pending |
+
+Current test and check counts live in the README's
+["Engineering, verified"](../README.md#engineering-verified) table.
 
 The two platforms share one coaching spec: the same rules, thresholds, safety engine, CSV
 parsing, video catalog, and the same CoachingGym reward bar (see `docs/COACH_GYM.md`). If a
@@ -153,7 +156,7 @@ Command Line Tools (**no Xcode required**):
 ```bash
 cd ios/SpartanKit
 swift build
-swift run SpartanChecks   # 67 checks · 30,000+ assertions · expect "ALL CHECKS PASSED"
+swift run SpartanChecks   # expect "ALL CHECKS PASSED"
 ```
 
 `SpartanChecks` covers the coaching engine + 756-plan eval sweep, the safety engine, the WHOOP

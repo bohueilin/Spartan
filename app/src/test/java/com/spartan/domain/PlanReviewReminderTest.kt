@@ -4,8 +4,14 @@ import com.spartan.domain.engine.PlanEngine
 import com.spartan.domain.engine.ReminderEngine
 import com.spartan.domain.engine.ReminderRequest
 import com.spartan.domain.engine.ReviewEngine
+import com.spartan.domain.engine.SafetyEngine
+import com.spartan.domain.model.DailyReflection
 import com.spartan.domain.model.MetricReading
 import com.spartan.domain.model.MetricType
+import com.spartan.domain.model.ReflectionMood
+import com.spartan.domain.model.ReflectionMood.OKAY
+import com.spartan.domain.model.ReflectionMood.STRONG
+import com.spartan.domain.model.ReflectionMood.TOUGH
 import com.spartan.domain.model.WorkoutLog
 import com.spartan.domain.model.WorkoutType
 import org.junit.Assert.assertEquals
@@ -194,6 +200,92 @@ class PlanReviewReminderTest {
         // 0% out of nothing is the absence of data, not a shortfall to be reported back.
         assertFalse(summary.needsAttention.any { it.contains("below 60%") })
         assertFalse(summary.nextWeekFocus.contains("easier to complete"))
+    }
+
+    private val reviewDay = LocalDate.of(2026, 5, 11)
+    private val keepReflecting = "Keep reflecting — patterns need a few more nights to show."
+
+    private fun sleep(daysAgo: Long, hours: Double) =
+        MetricReading(MetricType.SLEEP_DURATION, hours, reviewDay.minusDays(daysAgo))
+
+    private fun reflect(daysAgo: Long, mood: ReflectionMood) =
+        DailyReflection(reviewDay.minusDays(daysAgo).toEpochDay(), mood)
+
+    private fun fromReflections(metrics: List<MetricReading>, reflections: List<DailyReflection>) =
+        ReviewEngine().summarize(metrics, emptyList(), referenceDate = reviewDay, reflections = reflections).fromReflections
+
+    @Test
+    fun reflections_toughDaysAfterShortNightsNeedTwoQualifyingDays() {
+        val one = fromReflections(listOf(sleep(1, 5.0)), listOf(reflect(1, TOUGH)))
+        val two = fromReflections(listOf(sleep(1, 5.0), sleep(3, 5.5)), listOf(reflect(1, TOUGH), reflect(3, TOUGH)))
+
+        assertEquals(listOf(keepReflecting), one)
+        assertEquals(
+            listOf("Your 2 tough days all followed nights under 6 hours of sleep — protecting sleep may be the easiest lever this week."),
+            two,
+        )
+    }
+
+    @Test
+    fun reflections_oneToughDayAfterAFullNightSuppressesTheSleepPattern() {
+        val metrics = listOf(sleep(1, 5.0), sleep(2, 5.5), sleep(3, 7.5))
+        val reflections = listOf(reflect(1, TOUGH), reflect(2, TOUGH), reflect(3, TOUGH))
+
+        assertEquals(listOf(keepReflecting), fromReflections(metrics, reflections))
+    }
+
+    @Test
+    fun reflections_strongDaysAfterLongNightsAreNamed() {
+        val metrics = listOf(sleep(0, 7.0), sleep(2, 8.2), sleep(4, 7.6))
+        val reflections = listOf(reflect(0, STRONG), reflect(2, STRONG), reflect(4, STRONG))
+
+        assertEquals(
+            listOf("Your 3 strong days all followed nights of 7 or more hours of sleep — that rhythm looks worth protecting."),
+            fromReflections(metrics, reflections),
+        )
+        // Same evidence bar as the tough rule: one day, or one counterexample, says nothing.
+        assertEquals(listOf(keepReflecting), fromReflections(metrics, reflections.take(1)))
+        assertEquals(listOf(keepReflecting), fromReflections(metrics + sleep(5, 6.9), reflections + reflect(5, STRONG)))
+    }
+
+    @Test
+    fun reflections_noRecentReflectionsSayNothing() {
+        val metrics = listOf(sleep(1, 5.0), sleep(20, 5.0), sleep(21, 5.0))
+
+        assertTrue(fromReflections(metrics, emptyList()).isEmpty())
+        // Outside the 14-day window counts as no reflections at all.
+        assertTrue(fromReflections(metrics, listOf(reflect(20, TOUGH), reflect(21, TOUGH))).isEmpty())
+    }
+
+    @Test
+    fun reflections_withoutAPatternGiveOneNeutralLine() {
+        val metrics = listOf(sleep(1, 5.0), sleep(2, 8.0))
+        // Tough days without sleep data count neither for nor against the pattern.
+        val reflections = listOf(reflect(1, OKAY), reflect(2, OKAY), reflect(3, TOUGH), reflect(4, TOUGH))
+
+        assertEquals(listOf(keepReflecting), fromReflections(metrics, reflections))
+    }
+
+    @Test
+    fun reflections_useTheNightBeforeTheReflectedDay() {
+        val reflections = listOf(reflect(2, TOUGH), reflect(4, TOUGH))
+        // WHOOP dates a night by its wake-up day: the reading on day D is the night before D.
+        val shortNightsBefore = listOf(sleep(2, 5.0), sleep(4, 5.0), sleep(1, 8.0), sleep(3, 8.0))
+        val shortNightsAfter = listOf(sleep(2, 8.0), sleep(4, 8.0), sleep(1, 5.0), sleep(3, 5.0))
+
+        assertTrue(fromReflections(shortNightsBefore, reflections).single().startsWith("Your 2 tough days"))
+        assertEquals(listOf(keepReflecting), fromReflections(shortNightsAfter, reflections))
+    }
+
+    @Test
+    fun reflections_everyLinePassesTheSafetyEngine() {
+        val lines = fromReflections(
+            listOf(sleep(1, 5.0), sleep(2, 5.0), sleep(3, 8.0), sleep(4, 8.0)),
+            listOf(reflect(1, TOUGH), reflect(2, TOUGH), reflect(3, STRONG), reflect(4, STRONG)),
+        ) + fromReflections(emptyList(), listOf(reflect(1, OKAY)))
+
+        assertEquals(3, lines.size)
+        assertTrue(lines.all(SafetyEngine()::validateCopy))
     }
 
     @Test

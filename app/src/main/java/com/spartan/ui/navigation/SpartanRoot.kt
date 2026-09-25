@@ -1,5 +1,6 @@
 package com.spartan.ui.navigation
 
+import android.annotation.SuppressLint
 import android.content.Intent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -37,11 +38,9 @@ import androidx.compose.ui.res.stringResource
 import com.spartan.R
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navDeepLink
 import com.spartan.domain.model.MetricType
@@ -132,18 +131,26 @@ fun SpartanRoot(
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
-            val backStack by navController.currentBackStackEntryAsState()
-            val currentDestination = backStack?.destination
-            val selectedTabRoute = parentTabRoute(currentDestination?.route)
+            // Library-group-restricted, but the only full view of the stack: previousBackStackEntry
+            // is one level deep, and detail → edit needs two to find the tab it was opened from.
+            @SuppressLint("RestrictedApi")
+            val backStack by navController.currentBackStack.collectAsStateWithLifecycle()
+            val selectedTabRoute = selectedTabRoute(backStack.map { it.destination.route })
             NavigationBar {
                 tabs.forEach { tab ->
                     NavigationBarItem(
-                        selected = selectedTabRoute == tab.route || currentDestination?.hierarchy?.any { it.route == tab.route } == true,
+                        selected = selectedTabRoute == tab.route,
                         onClick = {
-                            navController.navigate(tab.route) {
-                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
+                            // Re-tapping the highlighted tab returns to its root screen; restoreState
+                            // would otherwise keep the user on the pushed screen they tapped from.
+                            if (selectedTabRoute == tab.route) {
+                                navController.popBackStack(tab.route, inclusive = false)
+                            } else {
+                                navController.navigate(tab.route) {
+                                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
                             }
                         },
                         // Decorative: the visible label below already names the tab, and a
@@ -237,7 +244,9 @@ fun SpartanRoot(
             composable("complete/{type}/{minutes}") { entry ->
                 val type = entry.arguments?.getString("type")?.let(WorkoutType::valueOf) ?: WorkoutType.ZONE_2
                 val minutes = entry.arguments?.getString("minutes")?.toIntOrNull() ?: 30
-                WorkoutCompletionScreen(type, minutes, onSave = viewModel::completeWorkout, onDone = { navController.popBackStack() })
+                // Read once on entry: this screen's own save must not flash the notice as it fades out.
+                val alreadyLogged = remember { (state.workoutsLoggedToday[type] ?: 0) > 0 }
+                WorkoutCompletionScreen(type, minutes, alreadyLogged, onSave = viewModel::completeWorkout, onDone = { navController.popBackStack() })
             }
             composable("review") { ReviewScreen(state) }
             composable("settings") {
@@ -299,11 +308,9 @@ fun SpartanRoot(
     }
 }
 
-private fun parentTabRoute(route: String?): String? = when {
-    route == null -> null
-    route == "detail/{type}" || route == "addMetric" || route == "editMetric/{id}" -> "metrics"
-    route == "complete/{type}/{minutes}" -> "plan"
-    route == "reminders" || route == "privacy" || route == "diagnostics" -> "settings"
-    route == "connections" -> "today"
-    else -> route
-}
+/**
+ * The tab to highlight: the nearest tab at or below the top of the back stack, so a screen reached
+ * from several tabs (Connections, metric detail) lights the tab it was actually opened from.
+ */
+internal fun selectedTabRoute(backStackRoutes: List<String?>): String? =
+    backStackRoutes.lastOrNull { route -> tabs.any { it.route == route } }

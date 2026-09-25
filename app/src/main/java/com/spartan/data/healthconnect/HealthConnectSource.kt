@@ -31,8 +31,9 @@ import javax.inject.Inject
  *  2. A connect-time permission request via `PermissionController.createRequestPermissionResultContract()`.
  *  3. The Play Console Health apps declaration.
  * Until granted, this source degrades to an empty list (→ the existing "couldn't refresh" path),
- * never a crash. Health Connect has no "recovery score"; the readiness band derives from
- * HRV/RHR/sleep trends via the existing null-recovery fallback rules.
+ * never a crash. Health Connect has no "recovery score", and `ReadinessBand.fromRecovery(null)`
+ * is BALANCED with `isStale = true` — so if this flag flips as-is, every day gets the gentle
+ * stale-data plan: HRV/RHR trend rules still add their cards, but band-based training never runs.
  */
 class HealthConnectSource @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -89,7 +90,7 @@ class HealthConnectSource @Inject constructor(
 
         fun build() = WhoopSnapshot(
             dateEpochDay = day,
-            recoveryScore = null, // HC has no recovery concept; band falls back to trend rules
+            recoveryScore = null, // HC has no recovery concept; readiness reads as stale (see class KDoc)
             hrvMs = hrvMs,
             restingHeartRate = restingHeartRate,
             sleepDurationHours = sleepDurationHours,

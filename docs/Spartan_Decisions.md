@@ -18,11 +18,11 @@ Status: authoritative as of the Spartan rebrand/pivot from the as-found **Vital 
 | D3 | Daily output shape | A **`DailyPlan`** containing a **bounded `List<DailyActivity>` (default 2–4)**. Not a single-session recommendation. |
 | D4 | Engine input model | **`ReadinessSnapshot`** (wearable-agnostic domain model) built from a **`WhoopSnapshot`** (WHOOP-layer normalized data) via `ReadinessSnapshot.from(...)`. There is **no** `CoachingInput`/`WhoopRecovery` input type. |
 | D5 | Activity status | **`ActivityStatus { PLANNED, DONE, SNOOZED, SKIPPED, RESCHEDULED, MISSED }`** (6 values; supports the required snooze/skip/reschedule loop). Uses `DONE` (not `COMPLETED`) and `PLANNED` (not `PENDING`). Persisted. |
-| D6 | WHOOP adapter names | **`WhoopClient`** (interface) · **`MockWhoopClient`** (default) · **`RealWhoopClient`** (Phase-2 stub) · **`WhoopMapper`** · **`WhoopAuthManager`**. (Client + Mock/Real, not Adapter.) |
-| D7 | Calendar adapter names | **`CalendarClient`** (interface) · **`StubCalendarClient`** (default) · **`GoogleCalendarClient`** (Phase-2 stub) · **`CalendarAuthManager`** · **`AvailabilityService`**. |
+| D6 | WHOOP adapter names | **`WhoopClient`** (interface) · **`MockWhoopClient`** (default) · **`RealWhoopClient`** (built; flag-gated off) · **`WhoopMapper`** · **`WhoopAuthManager`**. (Client + Mock/Real, not Adapter.) |
+| D7 | Calendar adapter names | **`CalendarClient`** (interface) · **`StubCalendarClient`** (default) · **`GoogleCalendarClient`** (built; flag-gated off) · **`CalendarAuthManager`** · **`AvailabilityService`**. |
 | D8 | Scheduling contract | **`AvailabilityService.openWindows(constraints): List<TimeWindow>`** and **`AvailabilityService.suggestSlot(activityMinutes, constraints): TimeWindow?`** (earliest fitting gap or null). No `ActivityScheduler`, no `availableMinutes(): Int`. |
 | D9 | Feature flags | **`BuildConfig.USE_MOCK_WHOOP`** and **`BuildConfig.USE_MOCK_CALENDAR`**, **default `true`** (mock/stub). `.env`/tooling keys: `SPARTAN_USE_MOCK_WHOOP` / `SPARTAN_USE_MOCK_CALENDAR`. One polarity everywhere: *true ⇒ mock*. |
-| D10 | v3→v4 Room migration | Add tables **`daily_activities`** (`DailyActivityEntity`) and **`integration_connections`** (`IntegrationConnectionEntity`). WHOOP readings are stored as ordinary **`metric_entries`** rows (reusing the existing pipeline). **No** `whoop_daily` table, **no** `daily_check_ins` table, **no** `metric_entries.source` column. |
+| D10 | v3→v4 Room migration (schema since grown additively to v8 — §5) | Add tables **`daily_activities`** (`DailyActivityEntity`) and **`integration_connections`** (`IntegrationConnectionEntity`). WHOOP readings are stored as ordinary **`metric_entries`** rows (reusing the existing pipeline). **No** `whoop_daily` table, **no** `daily_check_ins` table, **no** `metric_entries.source` column. |
 | D11 | Consent representation | Single source: the **`integration_connections`** Room table (`IntegrationConnectionEntity`). Drives connect/disconnect UI and is cleared on data deletion. Not a DataStore `ConsentState`, not loose booleans. |
 | D12 | Calendar read scope | **`https://www.googleapis.com/auth/calendar.freebusy`** only for reads (least privilege; never event contents). **`calendar.events`** is strictly opt-in for writes. No `calendar.readonly`, no `openid`/`email`. |
 | D13 | Secure token store | Interface **`SecureTokenStore { fun save(key, value); fun load(key): String?; fun clear(key) }`**. Phase-1 default binding **`InMemoryTokenStore`** (no real tokens exist with mock data). Phase-2 **`EncryptedTokenStore`** (Keystore-backed EncryptedSharedPreferences). |
@@ -39,8 +39,8 @@ Status: authoritative as of the Spartan rebrand/pivot from the as-found **Vital 
 | Coaching (rules) | `CoachingEngine`, `RecommendationSource` (iface), `RuleBasedRecommendationSource` (default), `CoachingRule` | `com.spartan.domain.engine` |
 | Safety (reused) | `SafetyEngine` (blocked-phrase sanitizer — reused unchanged) | `com.spartan.domain.engine` |
 | Metrics (reused/extended) | `MetricEngine`, `InsightEngine`, `PlanEngine`, `ReviewEngine`, `ReminderEngine` | `com.spartan.domain.engine` |
-| WHOOP | `WhoopClient`, `MockWhoopClient`, `RealWhoopClient`(stub), `WhoopMapper`, `WhoopAuthManager`, `WhoopSyncService` | `com.spartan.data.whoop` |
-| Calendar | `CalendarClient`, `StubCalendarClient`, `GoogleCalendarClient`(stub), `CalendarAuthManager`, `AvailabilityService` | `com.spartan.data.calendar` |
+| WHOOP | `WhoopClient`, `MockWhoopClient`, `RealWhoopClient` (flag-gated), `WhoopMapper`, `WhoopAuthManager`, `WhoopSyncService` | `com.spartan.data.whoop` |
+| Calendar | `CalendarClient`, `StubCalendarClient`, `GoogleCalendarClient` (flag-gated), `CalendarAuthManager`, `AvailabilityService` | `com.spartan.data.calendar` |
 | Security | `SecureTokenStore` (iface), `InMemoryTokenStore` (default), `EncryptedTokenStore` (Phase 2) | `com.spartan.data.security` |
 | Notifications (reused/extended) | `ReminderScheduler`, `ReminderWorker` | `com.spartan.data.reminder` |
 
@@ -77,9 +77,10 @@ Status: authoritative as of the Spartan rebrand/pivot from the as-found **Vital 
 
 > `MetricEngine.validate(...)` uses an exhaustive `when(type)` — each new member gets a range branch (e.g. RECOVERY_SCORE 0–100, HRV_RMSSD 5–300, SLEEP_PERFORMANCE 0–100, SLEEP_DEBT 0–24, RESPIRATORY_RATE 5–40, DAY_STRAIN 0–21, ENERGY_KCAL 0–10000).
 
-## 5. Room entities & v4 migration (canonical)
+## 5. Room entities & migrations (canonical)
 
-`AppDatabase` version **3 → 4**, `MIGRATION_3_4`:
+`AppDatabase` is at version **8**; every migration is additive and exported schemas live in
+`app/schemas/`. The Spartan core tables arrived in **3 → 4**, `MIGRATION_3_4`:
 
 ```sql
 CREATE TABLE IF NOT EXISTS daily_activities (
@@ -102,6 +103,10 @@ CREATE TABLE IF NOT EXISTS integration_connections (
 ```
 
 WHOOP metrics persist as `metric_entries` rows via `WhoopMapper` (no new column). Tokens are **never** in Room.
+
+Later migrations: **4 → 5** `audit_events` · **5 → 6** `whoop_cycles` + `whoop_workouts` (raw WHOOP
+CSV import rows; normalized readings still land in `metric_entries`) · **6 → 7** `goals` +
+`pressure_windows` · **7 → 8** `daily_reflections`.
 
 ## 6. Feature flags, scopes, redirect URIs
 

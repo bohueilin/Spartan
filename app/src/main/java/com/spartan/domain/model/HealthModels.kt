@@ -106,4 +106,6 @@ data class WeeklyReviewSummary(
     val improved: List<String>,
     val needsAttention: List<String>,
     val nextWeekFocus: String,
+    /** Sleep patterns behind the user's own nightly reflections; empty without recent reflections. */
+    val fromReflections: List<String> = emptyList(),
 )

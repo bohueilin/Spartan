@@ -47,7 +47,7 @@ There are no other third parties. Spartan contains no analytics SDK, no telemetr
 
 ## 5. Your controls
 
-- **Disconnect anytime.** You can disconnect WHOOP or Google Calendar independently at any time from the app's connections screen. Disconnecting stops data access immediately and clears the stored sign-in tokens; for a CSV import it also removes the imported raw cycle and workout tables so plans return to labeled sample data. Previously normalized readings remain on your device as your history until you delete them (per-source purge is planned).
+- **Disconnect anytime.** You can disconnect WHOOP or Google Calendar independently at any time from the app's connections screen. Disconnecting deletes the stored sign-in tokens from your device immediately, which stops data access, and also asks WHOOP or Google to revoke Spartan's access. That request is best-effort: if your device is offline it may not arrive, and you can always revoke access from your WHOOP or Google account settings. For a CSV import, disconnecting also removes the imported raw cycle and workout tables so plans return to labeled sample data. Previously normalized readings remain on your device as your history until you delete them (per-source purge is planned).
 - **Delete everything.** The app includes a full data deletion option that clears every table, all preferences, and all scheduled reminders, returning the app to its first-run state.
 - **Export first.** Before deleting, you can produce a local, human-readable summary of your data. Export is user-directed — the app never sends it anywhere on its own.
 

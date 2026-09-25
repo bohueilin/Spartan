@@ -14,7 +14,15 @@ import net.openid.appauth.AuthorizationServiceConfiguration
 import net.openid.appauth.NoClientAuthentication
 import net.openid.appauth.ResponseTypeValues
 import net.openid.appauth.TokenRequest
+import okhttp3.Call
+import okhttp3.Callback
+import okhttp3.FormBody
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.Response
+import java.io.IOException
 import java.time.Instant
+import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
 
 /**
@@ -34,6 +42,7 @@ data class CalendarConfig(
         const val EVENTS_SCOPE = "https://www.googleapis.com/auth/calendar.events"
         const val AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
         const val TOKEN_URL = "https://oauth2.googleapis.com/token"
+        const val REVOKE_URL = "https://oauth2.googleapis.com/revoke"
     }
 }
 
@@ -46,6 +55,8 @@ class CalendarAuthManager(
     private val context: Context,
     private val config: CalendarConfig,
     private val tokenStore: SecureTokenStore,
+    // Lazy so the stub build, which never has a token to revoke, never builds a client.
+    private val revokeClient: Lazy<OkHttpClient> = lazy { OkHttpClient.Builder().callTimeout(10, TimeUnit.SECONDS).build() },
 ) {
     private val serviceConfig = AuthorizationServiceConfiguration(
         Uri.parse(CalendarConfig.AUTH_URL),
@@ -56,18 +67,20 @@ class CalendarAuthManager(
 
     fun accessToken(): String? = tokenStore.load(SecureTokenStore.GOOGLE_ACCESS)
 
-    fun authorizationIntent(includeWriteScope: Boolean = false): Intent {
+    fun authorizationIntent(includeWriteScope: Boolean = false): Intent =
+        AuthorizationService(context).getAuthorizationRequestIntent(authorizationRequest(includeWriteScope))
+
+    internal fun authorizationRequest(includeWriteScope: Boolean = false): AuthorizationRequest {
         val scopes = buildList {
             add(config.readScope)
             if (includeWriteScope) add(config.writeScope)
         }.joinToString(" ")
-        val request = AuthorizationRequest.Builder(
+        return AuthorizationRequest.Builder(
             serviceConfig,
             config.clientId,
             ResponseTypeValues.CODE,
             Uri.parse(config.redirectUri),
         ).setScope(scopes).build()
-        return AuthorizationService(context).getAuthorizationRequestIntent(request)
     }
 
     suspend fun handleAuthResponse(data: Intent): Result<Unit> {
@@ -102,9 +115,26 @@ class CalendarAuthManager(
             }
         }
 
+    /**
+     * Deletes the local tokens first (the source of truth), then asks Google to revoke the grant in
+     * the background. Best-effort: it never delays or fails a disconnect, and sends nothing when
+     * no token was stored.
+     */
     fun disconnect() {
+        // Revoking the refresh token ends the whole grant; the access token is the fallback.
+        val token = tokenStore.load(SecureTokenStore.GOOGLE_REFRESH) ?: tokenStore.load(SecureTokenStore.GOOGLE_ACCESS)
         tokenStore.clear(SecureTokenStore.GOOGLE_ACCESS)
         tokenStore.clear(SecureTokenStore.GOOGLE_REFRESH)
+        if (token == null) return
+        // Token in the form body, never the URL: URLs end up in server and proxy logs.
+        val request = Request.Builder()
+            .url(CalendarConfig.REVOKE_URL)
+            .post(FormBody.Builder().add("token", token).build())
+            .build()
+        revokeClient.value.newCall(request).enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) = Unit
+            override fun onResponse(call: Call, response: Response) = response.close()
+        })
     }
 }
 

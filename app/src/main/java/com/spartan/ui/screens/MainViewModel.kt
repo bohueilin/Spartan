@@ -51,6 +51,7 @@ import com.spartan.domain.model.ActivityStatus
 import com.spartan.domain.model.ClinicalStatus
 import com.spartan.domain.model.TargetStatus
 import com.spartan.domain.model.DailyActivity
+import com.spartan.domain.model.DailyReflection
 import com.spartan.domain.model.DailyPlan
 import com.spartan.domain.model.InsightCard
 import com.spartan.domain.model.MetricAssessment
@@ -114,6 +115,8 @@ data class MainUiState(
     val exportText: String = "",
     // Spartan daily check-in
     val todayActivities: List<DailyActivity> = emptyList(),
+    /** Sessions already logged today per workout type, so a repeat log is flagged first. */
+    val workoutsLoggedToday: Map<WorkoutType, Int> = emptyMap(),
     val planHeadline: String = "",
     val readinessBand: ReadinessBand? = null,
     val recoveryScore: Int? = null,
@@ -174,6 +177,43 @@ internal fun shouldOfferReflection(
     alreadyAnsweredToday: Boolean,
 ): Boolean = hourOfDay >= REFLECTION_HOUR && hasActivities && !alreadyAnsweredToday
 
+/** The workout type a Today training check-off is logged as. */
+internal fun workoutTypeFor(category: ActivityCategory): WorkoutType = when (category) {
+    ActivityCategory.STRENGTH -> WorkoutType.STRENGTH
+    ActivityCategory.MOBILITY, ActivityCategory.RECOVERY -> WorkoutType.MOBILITY
+    else -> WorkoutType.ZONE_2 // ZONE2 / MOVEMENT map to easy aerobic work
+}
+
+/** Today check-offs in these categories open the exercise debrief, which logs a session. */
+internal val DEBRIEF_CATEGORIES = setOf(
+    ActivityCategory.ZONE2, ActivityCategory.STRENGTH, ActivityCategory.MOBILITY, ActivityCategory.MOVEMENT,
+)
+
+/**
+ * Sessions logged on [day] per type. Today and Coach can both log the same real session, so a
+ * repeat is flagged before saving — never silently merged or dropped.
+ */
+internal fun workoutsLoggedOn(logs: List<WorkoutLog>, day: LocalDate): Map<WorkoutType, Int> =
+    logs.filter { it.completedAt == day }.groupingBy { it.type }.eachCount()
+
+/**
+ * Whether debriefing [activity] would log its type again. Logs explained by today's other
+ * checked-off activities don't count: two planned mobility sessions are not a double log, but one
+ * also logged from Coach (or an activity checked off twice) is.
+ */
+internal fun debriefRepeatsLog(
+    activity: DailyActivity,
+    todayActivities: List<DailyActivity>,
+    loggedToday: Map<WorkoutType, Int>,
+): Boolean {
+    val type = workoutTypeFor(activity.category)
+    val otherCheckOffs = todayActivities.count {
+        it.id != activity.id && it.status == ActivityStatus.DONE &&
+            it.category in DEBRIEF_CATEGORIES && workoutTypeFor(it.category) == type
+    }
+    return (loggedToday[type] ?: 0) > otherCheckOffs
+}
+
 /**
  * Everything needed to put an activity back exactly as it was before a snooze/skip/reschedule.
  * Captured before the write so Undo is a true restore, not a guess at the prior state.
@@ -225,6 +265,7 @@ private data class HealthBundle(
     val planOverrides: List<PlanWorkoutOverrideEntity> = emptyList(),
     val whoopImportInfo: WhoopImportInfo? = null,
     val coach: CoachBundle = CoachBundle(),
+    val reflections: List<DailyReflection> = emptyList(),
 )
 
 /** Coach-hub state derived from persisted goals/windows + imported cycles. */
@@ -416,11 +457,18 @@ class MainViewModel @Inject constructor(
             exportText = LocalExportFormatter.format(profile, metrics, targets, workouts, reminders = reminders),
         )
     }.let { baseFlow ->
-        combine(baseFlow, repository.planOverrides, whoopImportInfoFlow, coachFlow) { base, overrides, importInfo, coach ->
+        combine(
+            baseFlow,
+            repository.planOverrides,
+            whoopImportInfoFlow,
+            coachFlow,
+            repository.reflections,
+        ) { base, overrides, importInfo, coach, reflections ->
             base.copy(
                 planOverrides = overrides,
                 whoopImportInfo = importInfo,
                 coach = coach,
+                reflections = reflections.map { DailyReflection(it.dateEpochDay, ReflectionMood.valueOf(it.mood), it.note) },
                 exportText = LocalExportFormatter.format(
                     profile = base.profile,
                     metrics = base.rawMetrics,
@@ -493,7 +541,7 @@ class MainViewModel @Inject constructor(
         )
         // No sessions logged yet means there is no week to review — hand the UI null so it shows
         // the designed empty state instead of a fabricated "Adherence 0%" the user never earned.
-        val review = reviewEngine.summarize(health.readings, health.logs)
+        val review = reviewEngine.summarize(health.readings, health.logs, reflections = health.reflections)
             .takeIf { health.logs.isNotEmpty() }
         val offTarget = assessments.filter { a ->
             a.clinicalStatus == ClinicalStatus.ABOVE_RANGE || a.clinicalStatus == ClinicalStatus.BELOW_RANGE ||
@@ -527,6 +575,7 @@ class MainViewModel @Inject constructor(
                 health.exportText
             },
             todayActivities = checkIn.activities,
+            workoutsLoggedToday = workoutsLoggedOn(health.logs, LocalDate.ofEpochDay(today)),
             planHeadline = checkIn.plan?.headline ?: "",
             readinessBand = checkIn.readiness?.band,
             recoveryScore = checkIn.readiness?.recoveryScore,
@@ -830,14 +879,9 @@ class MainViewModel @Inject constructor(
      * deloads next week's plan, closing the coach→do→adapt loop.
      */
     fun logExerciseDebrief(activity: DailyActivity, actualMinutes: Int, rpe: Int, pain: Boolean) {
-        val type = when (activity.category) {
-            ActivityCategory.STRENGTH -> WorkoutType.STRENGTH
-            ActivityCategory.MOBILITY, ActivityCategory.RECOVERY -> WorkoutType.MOBILITY
-            else -> WorkoutType.ZONE_2 // ZONE2 / MOVEMENT map to easy aerobic work
-        }
         viewModelScope.launch {
             repository.addWorkout(
-                type = type,
+                type = workoutTypeFor(activity.category),
                 planned = activity.estimatedMinutes,
                 completed = actualMinutes.coerceIn(1, 300),
                 rpe = rpe.coerceIn(1, 10),

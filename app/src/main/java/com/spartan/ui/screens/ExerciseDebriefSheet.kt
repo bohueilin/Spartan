@@ -14,6 +14,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
@@ -47,6 +48,7 @@ import kotlin.math.roundToInt
 @Composable
 fun ExerciseDebriefSheet(
     activity: DailyActivity,
+    alreadyLoggedToday: Boolean,
     onSave: (minutes: Int, rpe: Int, pain: Boolean) -> Unit,
     onSkip: () -> Unit,
 ) {
@@ -54,7 +56,8 @@ fun ExerciseDebriefSheet(
     var rpe by rememberSaveable(activity.id) { mutableFloatStateOf(5f) }
     var pain by rememberSaveable(activity.id) { mutableStateOf(false) }
 
-    ModalBottomSheet(onDismissRequest = onSkip) {
+    // Opens fully expanded: at half height, Skip and the note below it sat under the fold.
+    ModalBottomSheet(onDismissRequest = onSkip, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(
             Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -92,6 +95,13 @@ fun ExerciseDebriefSheet(
             ) {
                 Text(stringResource(R.string.workout_pain_label), Modifier.weight(1f))
                 Switch(checked = pain, onCheckedChange = null)
+            }
+            if (alreadyLoggedToday) {
+                Text(
+                    stringResource(R.string.workout_already_logged, workoutTypeLabel(workoutTypeFor(activity.category))),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
             Button(
                 onClick = {

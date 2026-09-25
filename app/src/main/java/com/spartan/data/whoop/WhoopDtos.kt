@@ -4,7 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * Minimal DTOs for the WHOOP Developer API v1 collection endpoints. Only the fields Spartan uses
+ * Minimal DTOs for the WHOOP Developer API v2 collection endpoints. Only the fields Spartan uses
  * are modeled; the JSON parser is configured with `ignoreUnknownKeys = true`, so WHOOP can add
  * fields without breaking us. These DTOs never leave [com.spartan.data.whoop]; [WhoopResponseMapper]
  * normalizes them into the wearable-agnostic `WhoopSnapshot`.

@@ -3,6 +3,18 @@
 A product/UX review of the whole app, separate from the defect audit in `AUDIT_2026-08-25.md`.
 Every structural claim below was verified against the tree before it was written down.
 
+> **Status (2026-09-25)** — addressed since this review (see `AUDIT_RESPONSE_2026-09-25.md`):
+> - **Bottom bar misreports location** (F-013) — fixed: the selected tab is now the nearest tab on
+>   the back stack, so Connections (from Settings) highlights Settings and a metric detail opened
+>   from Today highlights Today.
+> - **Two logging paths** (F-014) — mitigated, not merged: both seams now show an "already logged
+>   today" notice before saving, so a second log is a deliberate choice.
+> - **Reflections write-only / opportunity #3 "Reflection payback"** (F-008) — addressed:
+>   `ReviewEngine.summarize` now takes reflections, and Weekly Review shows sleep patterns behind
+>   the user's own nightly reflections.
+>
+> The rest below is unchanged from 2026-09-07.
+
 ## Verified structural findings
 
 | Finding | Evidence |

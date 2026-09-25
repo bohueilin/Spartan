@@ -8,7 +8,7 @@
 | Status | Draft for Phase 1 (MVP) |
 | Owner | Product |
 | Platform | Native Android — Kotlin, Jetpack Compose, Material 3 |
-| Min / target / compile SDK | 26 / 35 / 35 (JDK 17) |
+| Min / target / compile SDK | 26 / 35 / 36 (JDK 17; compile 36 is required by Health Connect 1.1.0) |
 | Regulatory framing | Consumer **wellness** app. Not a medical device. Not a HIPAA covered entity. No diagnosis, no treatment, no compliance certification claimed. |
 
 > Canonical vocabulary: see docs/Spartan_Decisions.md (authoritative).

@@ -526,6 +526,7 @@ fun WeeklyPlanSection(state: MainUiState, onEditMinutes: (String, Int) -> Unit, 
 fun WorkoutCompletionScreen(
     type: WorkoutType,
     planned: Int,
+    alreadyLoggedToday: Boolean,
     onSave: (WorkoutType, Int, Int, Int, Boolean) -> Unit,
     onDone: () -> Unit,
 ) {
@@ -561,6 +562,13 @@ fun WorkoutCompletionScreen(
         ) {
             Text(stringResource(R.string.workout_pain_label), modifier = Modifier.weight(1f))
             Switch(checked = pain, onCheckedChange = null)
+        }
+        if (alreadyLoggedToday) {
+            Text(
+                stringResource(R.string.workout_already_logged, workoutTypeLabel(type)),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
         Button(
             onClick = {
@@ -620,6 +628,15 @@ fun ReviewScreen(state: MainUiState) {
             review.improved.forEach { Text("•  $it", style = MaterialTheme.typography.bodyMedium) }
             Text(stringResource(R.string.review_needs_attention), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             review.needsAttention.forEach { Text("•  $it", style = MaterialTheme.typography.bodyMedium) }
+            // Pays back the nightly reflection; renders nothing without recent reflections.
+            if (review.fromReflections.isNotEmpty()) {
+                OutlinedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(Radius.card)) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(stringResource(R.string.review_reflections_title), fontWeight = FontWeight.SemiBold)
+                        review.fromReflections.forEach { Text(it, style = MaterialTheme.typography.bodyMedium) }
+                    }
+                }
+            }
             Text(stringResource(R.string.review_next_week_focus), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Text(review.nextWeekFocus)
         }
@@ -1015,7 +1032,7 @@ private fun formatTrendValue(value: Double): String =
     if (value % 1.0 == 0.0) value.toInt().toString() else "%.1f".format(value)
 
 /** "ZONE_2" → "Zone 2": enum names never appear raw in user copy. */
-private fun workoutTypeLabel(type: WorkoutType): String =
+internal fun workoutTypeLabel(type: WorkoutType): String =
     // ROOT for the ASCII enum constant; default locale only for the display titlecase.
     type.name.replace('_', ' ').lowercase(Locale.ROOT).replaceFirstChar { it.titlecase(Locale.getDefault()) }
 

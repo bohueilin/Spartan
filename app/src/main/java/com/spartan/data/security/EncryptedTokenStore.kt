@@ -1,3 +1,6 @@
+// security-crypto 1.1.0 deprecates this whole API with no drop-in successor; this file is its only user.
+@file:Suppress("DEPRECATION")
+
 package com.spartan.data.security
 
 import android.content.Context

@@ -63,7 +63,7 @@ public final class ProjectionEngine {
     /// `ProjectionEngine.DISCLAIMER`.
     // Kept byte-identical to the Android ProjectionEngine.DISCLAIMER for cross-platform parity.
     public static let disclaimer =
-        "Typical ranges seen with consistent aerobic and strength training in general research" +
+        "Illustrative estimates for consistent aerobic and strength training" +
         " — not a prediction or a guarantee for you. Individual results vary." +
         " This is wellness guidance, not medical advice."
 

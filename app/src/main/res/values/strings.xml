@@ -321,6 +321,7 @@
     <string name="trajectory_title">Where this can take you</string>
 
     <!-- Workout -->
+    <string name="workout_already_logged">You already logged %1$s today. Saving adds another session.</string>
     <string name="workout_completed_minutes">Completed minutes</string>
     <string name="workout_pain_label">Pain or concerning symptoms</string>
     <string name="workout_rpe">RPE %1$d</string>

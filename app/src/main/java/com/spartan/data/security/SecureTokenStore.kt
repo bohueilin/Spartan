@@ -8,12 +8,8 @@ import javax.inject.Singleton
  * Abstraction for storing sensitive OAuth tokens. Tokens are NEVER written to Room, logs,
  * analytics, or crash reports.
  *
- * Phase 1 (mock data): [InMemoryTokenStore] is bound by default — with the mock WHOOP client and
- * stub Calendar client there are no real tokens to protect.
- *
- * Phase 2 (real integrations): bind an `EncryptedTokenStore` backed by the Android Keystore via
- * Jetpack Security `EncryptedSharedPreferences` (see docs/Spartan_Architecture.md §9). That change
- * is a single DI binding swap; no caller changes.
+ * AppModule binds [EncryptedTokenStore] (Keystore-backed) when a real integration is enabled, and
+ * [InMemoryTokenStore] for the default mock build, which has no real tokens to protect.
  */
 interface SecureTokenStore {
     fun save(key: String, value: String)
@@ -42,7 +38,3 @@ class InMemoryTokenStore @Inject constructor() : SecureTokenStore {
     override fun clear(key: String) { map.remove(key) }
     override fun clearAll() { map.clear() }
 }
-
-// TODO(Phase 2): EncryptedTokenStore using androidx.security:security-crypto
-//   EncryptedSharedPreferences with an AES256_GCM key from the Android Keystore. Bind it in
-//   AppModule in place of InMemoryTokenStore once real WHOOP/Google tokens exist.

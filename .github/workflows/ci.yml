@@ -23,6 +23,8 @@ jobs:
         run: ./gradlew --no-daemon --max-workers=1 :app:testDebugUnitTest
       - name: Coverage report (Kover)
         run: ./gradlew --no-daemon --max-workers=1 :app:koverXmlReport
+      - name: Coverage gate (domain rules engine >= 95% lines)
+        run: ./gradlew --no-daemon --max-workers=1 :app:koverVerifyDomain
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -102,3 +104,13 @@ jobs:
         with:
           name: instrumentation-report
           path: app/build/reports/androidTests/
+
+  ios:
+    name: iOS SpartanKit checks
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Plain executable mirroring the XCTest suite; exits non-zero on any failed assertion.
+      - name: SpartanChecks
+        working-directory: ios/SpartanKit
+        run: swift run SpartanChecks

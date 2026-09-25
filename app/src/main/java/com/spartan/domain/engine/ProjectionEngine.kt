@@ -26,14 +26,14 @@ data class MetricProjection(
 )
 
 /**
- * Projects an honest EXPECTED IMPROVEMENT RANGE for a user's wearable metrics over the
+ * Projects an ILLUSTRATIVE improvement range for a user's wearable metrics over the
  * next 8 weeks if they keep completing their Spartan plan.
  *
- * The ranges are typical effects of consistent aerobic-base plus strength training reported
- * in general exercise-science findings, scaled down conservatively when the user's trailing
- * 7-day consistency is low. They are population-typical ranges — never a personal prediction,
- * diagnosis, or guarantee. Every surface that renders these projections must also render
- * [DISCLAIMER]. The model is fully deterministic: same inputs, same output.
+ * The full-effect ranges below are conservative, capped planning ranges chosen for this app —
+ * not derived from a specific study or a personal model — and are scaled down when the user's
+ * trailing 7-day consistency is low. Never a personal prediction, diagnosis, or guarantee.
+ * Every surface that renders these projections must also render [DISCLAIMER]. The model is
+ * fully deterministic: same inputs, same output.
  */
 class ProjectionEngine(private val safetyEngine: SafetyEngine = SafetyEngine()) {
 
@@ -186,7 +186,7 @@ class ProjectionEngine(private val safetyEngine: SafetyEngine = SafetyEngine()) 
 
     companion object {
         /** Shown wherever projections render. */
-        const val DISCLAIMER: String = "Typical ranges seen with consistent aerobic and strength training in general research — not a prediction or a guarantee for you. Individual results vary. This is wellness guidance, not medical advice."
+        const val DISCLAIMER: String = "Illustrative estimates for consistent aerobic and strength training — not a prediction or a guarantee for you. Individual results vary. This is wellness guidance, not medical advice."
 
         private const val ASSUMPTION_FULL = "If you complete your plan on 5+ days a week"
         private const val ASSUMPTION_INACTIVE =

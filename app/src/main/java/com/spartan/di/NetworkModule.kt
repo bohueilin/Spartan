@@ -86,7 +86,7 @@ object NetworkModule {
             .create(GoogleCalendarApi::class.java)
     }
 
-    private fun bearerInterceptor(tokenStore: SecureTokenStore, key: String) = Interceptor { chain ->
+    internal fun bearerInterceptor(tokenStore: SecureTokenStore, key: String) = Interceptor { chain ->
         val token = tokenStore.load(key)
         val request = if (token.isNullOrBlank()) {
             chain.request()
@@ -102,7 +102,7 @@ object NetworkModule {
      * Single-flight: refresh runs under [lock]; if another request already refreshed while we
      * waited (token changed under us), we skip the redundant refresh and just retry.
      */
-    private fun refreshAuthenticator(
+    internal fun refreshAuthenticator(
         tokenStore: SecureTokenStore,
         key: String,
         lock: Any,
