@@ -12,23 +12,23 @@ class SelectedTabRouteTest {
 
     @Test
     fun sharedScreensLightTheTabTheyWereOpenedFrom() {
-        assertEquals("settings", selectedTabRoute(listOf(null, "today", "settings", "connections")))
+        assertEquals("you", selectedTabRoute(listOf(null, "today", "you", "connections")))
         assertEquals("today", selectedTabRoute(listOf(null, "today", "connections")))
         assertEquals("today", selectedTabRoute(listOf(null, "today", "detail/{type}")))
-        assertEquals("plan", selectedTabRoute(listOf(null, "today", "plan", "detail/{type}")))
+        assertEquals("insights", selectedTabRoute(listOf(null, "today", "insights", "detail/{type}")))
     }
 
     @Test
     fun nestedPushesKeepTheirOriginTab() {
-        assertEquals("metrics", selectedTabRoute(listOf(null, "today", "metrics", "detail/{type}", "editMetric/{id}")))
-        assertEquals("plan", selectedTabRoute(listOf(null, "today", "plan", "complete/{type}/{minutes}")))
-        assertEquals("settings", selectedTabRoute(listOf(null, "today", "settings", "connections", "privacy")))
+        assertEquals("insights", selectedTabRoute(listOf(null, "today", "insights", "detail/{type}", "editMetric/{id}")))
+        assertEquals("progress", selectedTabRoute(listOf(null, "today", "progress", "training", "complete/{type}/{minutes}")))
+        assertEquals("you", selectedTabRoute(listOf(null, "today", "you", "connections", "privacy")))
     }
 
     @Test
     fun tabRoutesSelectThemselves() {
         assertEquals("today", selectedTabRoute(listOf(null, "today")))
-        listOf("metrics", "plan", "review", "settings").forEach { tab ->
+        listOf("insights", "progress", "you").forEach { tab ->
             assertEquals(tab, selectedTabRoute(listOf(null, "today", tab)))
         }
     }

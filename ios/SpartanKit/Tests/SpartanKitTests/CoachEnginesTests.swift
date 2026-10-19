@@ -58,6 +58,17 @@ final class CoachEnginesTests: XCTestCase {
         XCTAssertEqual("40–49", ReferenceRanges.bracketLabel(44))
     }
 
+    func testReferenceRangesCohortPhraseReadsCorrectlyForEveryProfile() throws {
+        XCTAssertEqual("adults", ReferenceRanges.cohortPhrase(nil, .unspecified))
+        XCTAssertEqual("women", ReferenceRanges.cohortPhrase(nil, .female))
+        XCTAssertEqual("men aged 30–39", ReferenceRanges.cohortPhrase(34, .male))
+        XCTAssertEqual("adults aged 18–29", ReferenceRanges.cohortPhrase(22, .unspecified))
+        let rhr = try XCTUnwrap(ReferenceRanges.bandFor(.restingHeartRate, ageYears: nil, sex: .unspecified))
+        XCTAssertTrue(rhr.education.hasPrefix("Typical resting heart rate for adults sits around"))
+        let hrv = try XCTUnwrap(ReferenceRanges.bandFor(.hrvRmssd, ageYears: 44, sex: .female))
+        XCTAssertTrue(hrv.education.contains("cohort medians for adults aged 40–49 span"))
+    }
+
     func testReferenceRangesEducationCopyPassesSafetyEngine() throws {
         let safety = SafetyEngine()
         let ages: [Int?] = [nil, 25, 44, 65]

@@ -24,7 +24,7 @@ The palette is already defined in code (`ui/theme/Theme.kt`, `Tokens.kt`) and du
 
 | Token | Dark | Light | Use |
 |---|---|---|---|
-| Background | `#0A0F0E` | `#F6F8F8` | Canvas. Dark is the hero look. |
+| Background | `#0A0F0E` | `#FFFFFF` | Canvas. Light is a pure-white canvas; cards separate by soft shadow. |
 | Surface | `#121817` | `#FFFFFF` | Cards |
 | Outline | `#3D4F48` | `#9BADAA` | Borders, ring track |
 | Accent (teal) | `#3FE0C8` | `#0B685C` | The one accent. Primary actions, brand. |
@@ -34,12 +34,12 @@ The palette is already defined in code (`ui/theme/Theme.kt`, `Tokens.kt`) and du
 | Ink | `#EAF1EF` | `#11201E` | Primary text |
 | Muted | `#9DB0AB` | `#4A5654` | Secondary text |
 
-**Geometry:** 18dp card radius, 8dp chip radius, 10dp skeleton radius. Spacing scale
-4/8/12/16/20/24. Ring stroke 9dp, round caps.
+**Geometry:** 20dp card radius, 12dp tile radius, 8dp chip radius, fully round buttons and pills,
+10dp skeleton radius. Spacing scale 4/8/12/16/20/24, 32 between sections, 24 page gutter.
 
-**Type:** the app ships system fonts (Roboto on Android, SF on iOS) on purpose. For marketing art
-only, a geometric grotesque is acceptable — **Inter Tight**, **Space Grotesk**, or **General Sans**
-are the closest free matches. Wordmark tracking is **3** everywhere (`SPARTAN`, all caps).
+**Type:** the Android app ships **Inter** (variable, OFL) with a bold display scale; iOS still
+uses SF. Use Inter for marketing art too. Wordmark tracking is **3** everywhere (`SPARTAN`, all
+caps). Full component and type reference: [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md).
 
 **Motion:** 140ms micro, 220ms state change, 420ms reveal. Everything eases out. There is exactly
 one continuous animation in the whole product (the loading pulse) — do not invent more.
@@ -75,17 +75,17 @@ one continuous animation in the whole product (the loading pulse) — do not inv
 
 ### Screenshot shot list (in order, with captions)
 
-Capture on the real device, dark theme, at 1080×2404. The captions are the marketing copy — the
-screenshot itself must be unretouched.
+Capture on the real device at 1080×2404, light theme for the store set (dark as an alternate).
+The captions are the marketing copy — the screenshot itself must be unretouched.
 
-1. **Today / readiness** — ring at 42 "Take it easy". Caption: *"One number. One plan."*
-2. **Today / plan list** — REQUIRED card with accent border. Caption: *"Today, decided for you."*
-3. **Expanded activity + follow-along card** — the new video card. Caption: *"Every action explains itself."*
-4. **Metric detail + trend** — the new gradient sparkline. Caption: *"Your trend, not a population average."*
-5. **Coach** — goal + healthy ranges. Caption: *"A goal that bends the week."*
-6. **Connections** — consent copy + SAMPLE DATA chip. Caption: *"Honest about what's real."*
-7. **Privacy** — export + delete. Caption: *"Local-first. Delete it all, anytime."*
-8. *(optional)* **Reflection sheet** — Caption: *"An ending, not a scoreboard."*
+1. **Today / readiness** — ring at 42 "Take it easy" with "What's driving it". Caption: *"One number, and why."*
+2. **Today / plan list** — plan cards with Required/Due pills. Caption: *"Today, decided for you."*
+3. **Activity sheet + follow-along card** — Caption: *"Every action explains itself."*
+4. **Insights** — signal cards with your-normal band and a "Try" action. Caption: *"Your normal, not a population average."*
+5. **Metric detail** — chart, meaning, and the sticky "Add to today" bar. Caption: *"From number to next step."*
+6. **Progress** — goal + this week. Caption: *"A goal that bends the week."*
+7. **Connections** — consent copy + SAMPLE DATA chip. Caption: *"Honest about what's real."*
+8. *(optional)* **Privacy** — export + delete. Caption: *"Local-first. Delete it all, anytime."*
 
 Capture command (already proven on this device):
 

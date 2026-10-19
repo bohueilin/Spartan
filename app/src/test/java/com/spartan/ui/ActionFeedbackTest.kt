@@ -8,6 +8,7 @@ import com.spartan.domain.model.Intensity
 import com.spartan.domain.model.TimeOfDay
 import com.spartan.ui.screens.UndoToken
 import com.spartan.ui.screens.UserMessage
+import com.spartan.ui.screens.shouldOfferReflection
 import com.spartan.ui.screens.shouldOfferReminders
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -111,5 +112,24 @@ class ActionFeedbackTest {
         val message = UserMessage(textRes = 1, formatArg = "3:15 PM", undo = token)
         assertEquals(token, message.undo)
         assertEquals("3:15 PM", message.formatArg)
+    }
+
+    // --- Evening reflection: never on install day ---
+
+    @Test
+    fun reflectionWaitsForTheEveningAPlanAndASecondDay() {
+        assertTrue(shouldOfferReflection(hourOfDay = 20, hasActivities = true, alreadyAnsweredToday = false, firstDay = false))
+        assertFalse(shouldOfferReflection(hourOfDay = 12, hasActivities = true, alreadyAnsweredToday = false, firstDay = false))
+        assertFalse(shouldOfferReflection(hourOfDay = 20, hasActivities = false, alreadyAnsweredToday = false, firstDay = false))
+        assertFalse(shouldOfferReflection(hourOfDay = 20, hasActivities = true, alreadyAnsweredToday = true, firstDay = false))
+        // Someone who installed this evening has not lived a Spartan day yet.
+        assertFalse(shouldOfferReflection(hourOfDay = 20, hasActivities = true, alreadyAnsweredToday = false, firstDay = true))
+    }
+
+    @Test
+    fun anAddedActivityIsUndoneByRemovingIt() {
+        val token = UndoToken(activityId = "1:add:breathing", previousStatus = ActivityStatus.PLANNED, removeOnUndo = true)
+        assertTrue(token.removeOnUndo)
+        assertFalse(UndoToken(activityId = "x", previousStatus = ActivityStatus.PLANNED).removeOnUndo)
     }
 }

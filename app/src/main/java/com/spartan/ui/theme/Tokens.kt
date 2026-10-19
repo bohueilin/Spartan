@@ -23,11 +23,13 @@ object Spacing {
     val lg = 16.dp
     val xl = 20.dp
     val xxl = 24.dp
+    val section = 32.dp // between page sections
 }
 
 object Radius {
     val chip = 8.dp
-    val card = 18.dp
+    val tile = 12.dp
+    val card = 20.dp
 }
 
 object Motion {

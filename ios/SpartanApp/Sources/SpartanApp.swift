@@ -69,7 +69,7 @@ extension Color {
     }
 
     // Core scheme (Theme.kt LightColors / DarkColors).
-    static let spartanBackground = spartanDynamic(light: 0xF6F8F8, dark: 0x0A0F0E)
+    static let spartanBackground = spartanDynamic(light: 0xFFFFFF, dark: 0x0A0F0E)
     static let spartanSurface = spartanDynamic(light: 0xFFFFFF, dark: 0x121817)
     static let spartanSurfaceVariant = spartanDynamic(light: 0xE6ECEB, dark: 0x1E2A26)
     // Light accent/tertiary darkened one step (0x0E7C6E→0x0B685C, 0x9A6A1B→0x7E5613) so 11pt-bold

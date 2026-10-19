@@ -19,9 +19,9 @@ import com.spartan.data.local.TargetEntity
 import com.spartan.data.local.UserProfileEntity
 import com.spartan.data.local.WorkoutSessionEntity
 import com.spartan.data.local.toEntity
-import com.spartan.data.whoop.WhoopClient
 import com.spartan.data.whoop.WhoopMapper
 import com.spartan.domain.model.ActivityStatus
+import com.spartan.domain.model.DailyActivity
 import com.spartan.domain.model.DailyPlan
 import com.spartan.domain.model.MetricReading
 import com.spartan.domain.model.MetricType
@@ -253,6 +253,13 @@ class HealthRepository @Inject constructor(
         logAudit("PLAN", "PLAN_GENERATED", "activities=${plan.activities.size}")
     }
 
+    /** Adds a user-chosen activity to a day's plan. Idempotent: the same action twice is one row. */
+    suspend fun addActivity(activity: DailyActivity, dateEpochDay: Long) {
+        dao.insertActivityIfAbsent(activity.toEntity(dateEpochDay))
+    }
+
+    suspend fun removeActivity(id: String) = dao.deleteActivity(id)
+
     /** Returns expired snoozes to PLANNED so the plan never silently loses activities. */
     suspend fun reactivateExpiredSnoozes() {
         dao.reactivateExpiredSnoozes(System.currentTimeMillis())
@@ -351,7 +358,8 @@ class HealthRepository @Inject constructor(
         addMetric(MetricType.HDL_C, 41.0, "Seed demo data", today)
         addMetric(MetricType.TG_HDL_RATIO, 3.26, "Seed demo data", today)
         addMetric(MetricType.VITAMIN_D_25OH, 23.0, "Seed demo data", today)
-        addMetric(MetricType.RESTING_HEART_RATE, 68.0, "Seed demo data", today)
+        // No seeded resting HR: the sample WHOOP feed writes one daily, and a second same-day
+        // value would make today's number flip with whichever source synced last.
         addMetric(MetricType.WEIGHT, 81.16, "Seed demo data", today)
         addMetric(MetricType.BMI, 25.9, "Seed demo data", today)
         addMetric(MetricType.SYSTOLIC_BP, 102.0, "Seed demo data", today)

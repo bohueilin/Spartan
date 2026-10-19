@@ -4,21 +4,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedCard
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -29,13 +21,15 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import com.spartan.R
-import com.spartan.ui.theme.Radius
+import com.spartan.ui.components.DetailPage
+import com.spartan.ui.components.PrimaryButton
+import com.spartan.ui.components.SecondaryButton
+import com.spartan.ui.components.SpartanCard
+import com.spartan.ui.components.StatusPill
+import com.spartan.ui.components.Tone
 import com.spartan.ui.theme.Spacing
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -55,19 +49,12 @@ fun ConnectionsScreen(
     onConnectCalendar: () -> Unit,
     onDisconnectCalendar: () -> Unit,
     onManagePrivacy: () -> Unit,
+    onBack: () -> Unit,
 ) {
-    Column(
-        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-    Column(
-        modifier = Modifier.widthIn(max = 600.dp).fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(Spacing.md),
-    ) {
-        Text(stringResource(R.string.connections_title), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.semantics { heading() })
+    DetailPage(stringResource(R.string.connections_title), onBack) {
         Text(
             stringResource(R.string.connections_intro),
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
@@ -119,11 +106,7 @@ fun ConnectionsScreen(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        OutlinedButton(onClick = onManagePrivacy, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.connections_privacy_button))
-        }
-        Spacer(Modifier.height(8.dp))
-    }
+        SecondaryButton(stringResource(R.string.connections_privacy_button), onManagePrivacy, Modifier.fillMaxWidth())
     }
 }
 
@@ -145,40 +128,41 @@ private fun IntegrationCard(
     disconnectWarning: String? = null,
 ) {
     var confirmDisconnect by rememberSaveable(title) { mutableStateOf(false) }
-    OutlinedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(Radius.card)) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    SpartanCard {
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                Text(title, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
                 if (connected) {
                     // Honest provenance: sample/stub integrations never wear the CONNECTED chip.
                     if (isSample) {
                         SampleDataChip()
                     } else {
-                        Surface(shape = RoundedCornerShape(Radius.chip), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)) {
-                            Text(
-                                stringResource(R.string.connections_connected_chip), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                            )
-                        }
+                        StatusPill(stringResource(R.string.connections_connected_chip), Tone.POSITIVE)
                     }
                 }
             }
             Text(body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(stringResource(R.string.connections_requests_label), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
-            scopes.forEach { Text("• $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            Spacer(Modifier.height(4.dp))
+            Text(stringResource(R.string.connections_requests_label), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(top = Spacing.xs))
+            scopes.forEach {
+                Row {
+                    Text("•", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(end = Spacing.sm))
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            Spacer(Modifier.height(Spacing.sm))
             if (connected) {
-                OutlinedButton(
-                    // Disconnecting also removes imported data, so it asks first when there is
-                    // something to lose. Nothing is destroyed on the way to the dialog.
-                    onClick = { if (disconnectWarning != null) confirmDisconnect = true else onDisconnect() },
-                    modifier = Modifier.fillMaxWidth(),
-                ) { Text(stringResource(R.string.connections_disconnect)) }
+                // Disconnecting also removes imported data, so it asks first when there is
+                // something to lose. Nothing is destroyed on the way to the dialog.
+                SecondaryButton(
+                    stringResource(R.string.connections_disconnect),
+                    { if (disconnectWarning != null) confirmDisconnect = true else onDisconnect() },
+                    Modifier.fillMaxWidth(),
+                )
             } else {
-                Button(onClick = onConnect, modifier = Modifier.fillMaxWidth()) { Text(connectLabel) }
+                PrimaryButton(connectLabel, onConnect, Modifier.fillMaxWidth())
             }
             if (secondaryActionLabel != null && onSecondaryAction != null) {
-                OutlinedButton(onClick = onSecondaryAction, enabled = secondaryActionEnabled, modifier = Modifier.fillMaxWidth()) { Text(secondaryActionLabel) }
+                SecondaryButton(secondaryActionLabel, onSecondaryAction, Modifier.fillMaxWidth(), enabled = secondaryActionEnabled)
                 secondaryActionHint?.let {
                     Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -206,8 +190,8 @@ private fun IntegrationCard(
 /** Outcome of a WHOOP CSV import: progress, a summary of what landed, or a gentle failure. */
 @Composable
 private fun WhoopImportResultCard(import: WhoopImportUiState, onDismiss: () -> Unit) {
-    OutlinedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(Radius.card)) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    SpartanCard {
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             when {
                 import.inProgress -> {
                     Text(
@@ -215,13 +199,12 @@ private fun WhoopImportResultCard(import: WhoopImportUiState, onDismiss: () -> U
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     // Visible progress: a multi-second import must not be indistinguishable from a hang.
-                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth().clip(CircleShape))
                 }
                 import.failed -> {
                     Text(
                         stringResource(R.string.connections_import_failed_title),
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
+                        style = MaterialTheme.typography.titleMedium,
                     )
                     Text(
                         if (import.failedButRecognized.isEmpty()) {
@@ -235,9 +218,7 @@ private fun WhoopImportResultCard(import: WhoopImportUiState, onDismiss: () -> U
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    OutlinedButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
-                        Text(stringResource(R.string.connections_import_dismiss))
-                    }
+                    SecondaryButton(stringResource(R.string.connections_import_dismiss), onDismiss, Modifier.fillMaxWidth())
                 }
                 import.summary != null -> {
                     val summary = import.summary
@@ -246,8 +227,7 @@ private fun WhoopImportResultCard(import: WhoopImportUiState, onDismiss: () -> U
                         formatter.format(LocalDate.ofEpochDay(summary.lastDayEpoch))
                     Text(
                         stringResource(R.string.connections_import_success_title),
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
+                        style = MaterialTheme.typography.titleMedium,
                     )
                     Text(
                         stringResource(
@@ -267,9 +247,7 @@ private fun WhoopImportResultCard(import: WhoopImportUiState, onDismiss: () -> U
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    OutlinedButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
-                        Text(stringResource(R.string.connections_import_dismiss))
-                    }
+                    SecondaryButton(stringResource(R.string.connections_import_dismiss), onDismiss, Modifier.fillMaxWidth())
                 }
             }
         }

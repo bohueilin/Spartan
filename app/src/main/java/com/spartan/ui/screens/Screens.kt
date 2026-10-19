@@ -1,70 +1,59 @@
 package com.spartan.ui.screens
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Download
-import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.outlined.Link
-import androidx.compose.material.icons.outlined.Notifications
-import androidx.compose.material.icons.outlined.PlayCircle
-import androidx.compose.material.icons.outlined.PrivacyTip
+import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material.icons.outlined.Share
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -72,40 +61,35 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.spartan.R
-import com.spartan.ui.theme.Motion
-import com.spartan.ui.theme.SpartanBands
-import com.spartan.ui.theme.rememberReducedMotion
-import com.spartan.ui.theme.Radius
-import com.spartan.ui.theme.Spacing
 import com.spartan.data.local.ReminderFrequency
-import com.spartan.domain.engine.TrainingProfile
-import com.spartan.domain.engine.VideoLibrary
 import com.spartan.domain.model.ClinicalStatus
-import com.spartan.domain.model.InsightCard
-import com.spartan.domain.model.Intensity
-import com.spartan.domain.model.MetricAssessment
 import com.spartan.domain.model.MetricReading
 import com.spartan.domain.model.MetricType
 import com.spartan.domain.model.PlannedWorkout
 import com.spartan.domain.model.TargetStatus
 import com.spartan.domain.model.WorkoutType
+import com.spartan.ui.components.DetailPage
+import com.spartan.ui.components.IconTile
+import com.spartan.ui.components.PrimaryButton
+import com.spartan.ui.components.SecondaryButton
+import com.spartan.ui.components.SpartanCard
+import com.spartan.ui.theme.Motion
+import com.spartan.ui.theme.Radius
+import com.spartan.ui.theme.Spacing
+import com.spartan.ui.theme.SpartanBands
+import com.spartan.ui.theme.rememberReducedMotion
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -129,19 +113,18 @@ fun OnboardingScreen(onComplete: (String, Double?, Int?) -> Unit) {
     ) {
         Column(Modifier.widthIn(max = 600.dp).fillMaxWidth()) {
         OnboardingHero()
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(Spacing.xxl))
         Text(
-            stringResource(R.string.common_brand),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
+            stringResource(R.string.common_brand).uppercase(),
+            style = MaterialTheme.typography.labelSmall,
             letterSpacing = 3.sp,
             color = MaterialTheme.colorScheme.primary,
         )
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(Spacing.sm))
         Text(
             stringResource(R.string.onboarding_tagline),
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.displaySmall,
+            color = MaterialTheme.colorScheme.onSurface,
         )
         Text(
             stringResource(R.string.onboarding_intro),
@@ -175,14 +158,11 @@ fun OnboardingScreen(onComplete: (String, Double?, Int?) -> Unit) {
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
-        Button(
-            onClick = { onComplete(name, height.toDoubleOrNull(), age.toIntOrNull()?.takeIf { it in 13..100 }) },
-            // heightIn, not height: the 52dp resting size grows with the user's font scale
-            // instead of clipping the label; padding stays outside the touch target.
-            modifier = Modifier.fillMaxWidth().padding(top = 8.dp).heightIn(min = 52.dp),
-        ) {
-            Text(stringResource(R.string.onboarding_begin), fontWeight = FontWeight.SemiBold)
-        }
+        PrimaryButton(
+            stringResource(R.string.onboarding_begin),
+            { onComplete(name, height.toDoubleOrNull(), age.toIntOrNull()?.takeIf { it in 13..100 }) },
+            Modifier.fillMaxWidth().padding(top = Spacing.xl),
+        )
         Text(
             stringResource(R.string.onboarding_disclaimer),
             style = MaterialTheme.typography.bodySmall,
@@ -257,44 +237,13 @@ private fun OnboardingHero() {
     }
 }
 
-@Composable
-fun MetricsScreen(state: MainUiState, onAdd: () -> Unit, onMetricClick: (MetricType) -> Unit) {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-    LazyColumn(
-        modifier = Modifier.widthIn(max = 600.dp).fillMaxSize().padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(Spacing.md),
-    ) {
-        item {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.metrics_title), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f).semantics { heading() })
-                if (state.whoopIsMock) SampleDataChip()
-                IconButton(onClick = onAdd) { Icon(Icons.Outlined.Add, contentDescription = stringResource(R.string.metrics_add_metric)) }
-            }
-        }
-        // Skeleton only on first load: post-onboarding a profile always exists once the health
-        // bundle emits, so a null profile means data is still streaming in — a loaded-but-empty
-        // metric list never re-triggers the skeleton. Never shown on sync failure; a failed sync
-        // with nothing to show gets Today's banner instead of a bare title.
-        if (state.assessments.isEmpty() && state.profile == null && !state.syncFailed) {
-            item { TabLoadingSkeleton() }
-        } else if (state.syncFailed && state.assessments.isEmpty()) {
-            item { SafetyBanner(stringResource(R.string.checkin_sync_failed)) }
-        } else {
-            state.whoopImportInfo?.let { info -> item { WhoopImportBanner(info) } }
-            items(state.insights.take(2)) { InsightCardView(it) }
-            items(state.assessments) { MetricRow(it, onMetricClick) }
-        }
-    }
-    }
-}
-
 /**
  * Persistent "your real WHOOP data is in" banner at the top of the Metrics tab — the same message
  * the Connections import success card shows, kept visible so the numbers below always carry their
  * provenance and date span. Accent-tinted so it reads as a positive state, not a warning.
  */
 @Composable
-private fun WhoopImportBanner(info: WhoopImportInfo) {
+internal fun WhoopImportBanner(info: WhoopImportInfo) {
     val fmt = remember { java.time.format.DateTimeFormatter.ofPattern("MMM d") }
     val range = "${fmt.format(java.time.LocalDate.ofEpochDay(info.firstDayEpoch))} – " +
         fmt.format(java.time.LocalDate.ofEpochDay(info.lastDayEpoch))
@@ -315,7 +264,6 @@ private fun WhoopImportBanner(info: WhoopImportInfo) {
                 Text(
                     stringResource(R.string.metrics_import_banner_title),
                     style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.primary,
                 )
                 Text(
@@ -326,117 +274,6 @@ private fun WhoopImportBanner(info: WhoopImportInfo) {
             }
         }
     }
-}
-
-@Composable
-fun MetricDetailScreen(state: MainUiState, type: MetricType, onAdd: () -> Unit, onEdit: (MetricReading) -> Unit) {
-    val assessment = state.assessments.firstOrNull { it.reading.type == type }
-    val history = state.readings.filter { it.type == type }
-    ScreenColumn {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(type.label, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f).semantics { heading() })
-            if (state.whoopIsMock) SampleDataChip()
-            IconButton(onClick = onAdd) { Icon(Icons.Outlined.Edit, contentDescription = stringResource(R.string.metrics_add_entry)) }
-        }
-        assessment?.let {
-            StatusChips(it)
-            Text(it.clinicalMessage, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(top = 12.dp))
-            Text(it.targetMessage, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 8.dp))
-        }
-        // Oldest→newest: TrendCard reads values.last() as "Latest" and draws left-to-right, while
-        // `history` arrives newest-first for the entry list below. Without this sort the card
-        // labels the oldest reading "Latest" and renders every trend backwards.
-        TrendCard(stringResource(R.string.metrics_history), history.sortedBy { it.recordedAt }.mapNotNull { it.value })
-        // Plain-language education for WHOOP metrics (renders nothing for lab metrics).
-        MetricExplainerSection(type)
-        TrainThisMetricSection(
-            type = type,
-            assessment = assessment,
-            profile = TrainingProfile(ageYears = state.userAgeYears, offTargetMetrics = state.offTargetMetrics),
-        )
-        Text(stringResource(R.string.metrics_entries), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-        history.forEach {
-            OutlinedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(Radius.card)) {
-                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("${it.recordedAt}: ${it.value ?: stringResource(R.string.common_pending)} ${type.unit}", modifier = Modifier.weight(1f))
-                    IconButton(onClick = { onEdit(it) }) {
-                        Icon(Icons.Outlined.Edit, contentDescription = stringResource(R.string.metrics_edit_entry))
-                    }
-                }
-            }
-        }
-    }
-}
-
-/**
- * Concrete follow-along training videos for metrics exercise can move. When the latest reading is
- * outside its clinical range or personal target, the section says so explicitly — this is the
- * "here is what to actually do about it" answer, one tap from the number itself.
- */
-@Composable
-private fun TrainThisMetricSection(type: MetricType, assessment: MetricAssessment?, profile: TrainingProfile) {
-    val training = VideoLibrary.recommend(type, profile) ?: return
-    val offTarget = assessment != null && (
-        assessment.clinicalStatus == ClinicalStatus.ABOVE_RANGE ||
-            assessment.clinicalStatus == ClinicalStatus.BELOW_RANGE ||
-            assessment.targetStatus == TargetStatus.ABOVE_PERSONAL_TARGET ||
-            assessment.targetStatus == TargetStatus.BELOW_PERSONAL_TARGET
-        )
-    Text(stringResource(R.string.metrics_train_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-    if (offTarget) {
-        Text(
-            stringResource(R.string.metrics_train_off_target),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Medium,
-        )
-    }
-    Text(training.intro, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    val uriHandler = LocalUriHandler.current
-    training.guides.forEach { guide ->
-        OutlinedCard(
-            Modifier
-                .fillMaxWidth()
-                .clickable(onClickLabel = stringResource(R.string.metrics_train_open_video, guide.title)) {
-                    uriHandler.openUri(guide.url)
-                },
-            shape = RoundedCornerShape(Radius.card),
-        ) {
-            Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    Icons.Outlined.PlayCircle,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(30.dp),
-                )
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(guide.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                    Text(
-                        stringResource(
-                            R.string.metrics_train_video_meta,
-                            guide.channel, guide.minutes, intensityLabel(guide.intensity),
-                        ),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        }
-    }
-    Text(
-        stringResource(R.string.metrics_train_disclaimer),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-}
-
-@Composable
-private fun intensityLabel(intensity: Intensity): String = when (intensity) {
-    Intensity.REST -> stringResource(R.string.intensity_rest)
-    Intensity.EASY -> stringResource(R.string.intensity_easy)
-    Intensity.MODERATE -> stringResource(R.string.intensity_moderate)
-    Intensity.HARD -> stringResource(R.string.intensity_hard)
 }
 
 @Composable
@@ -451,8 +288,7 @@ fun AddMetricScreen(
     var note by rememberSaveable(initialReading?.id) { mutableStateOf(initialReading?.note.orEmpty()) }
     var showError by rememberSaveable { mutableStateOf(false) }
     val pendingAllowed = type in setOf(MetricType.APOB, MetricType.LPA, MetricType.CAC)
-    ScreenColumn {
-        Text(if (initialReading == null) stringResource(R.string.metrics_add_metric) else stringResource(R.string.metrics_edit_metric), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.semantics { heading() })
+    DetailPage(if (initialReading == null) stringResource(R.string.metrics_add_metric) else stringResource(R.string.metrics_edit_metric), onDone) {
         Box {
             FilledTonalButton(onClick = { expanded = true }) { Text(type.label) }
             DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
@@ -479,47 +315,59 @@ fun AddMetricScreen(
             modifier = Modifier.fillMaxWidth(),
         )
         OutlinedTextField(note, { note = it }, label = { Text(stringResource(R.string.metrics_note_label)) }, modifier = Modifier.fillMaxWidth())
-        Button(
-            onClick = {
-                if (onSave(type, value, note)) {
-                    onDone()
-                } else {
-                    showError = true
-                }
-            },
-            modifier = Modifier.fillMaxWidth(),
-        ) { Text(stringResource(R.string.common_save)) }
+        PrimaryButton(
+            stringResource(R.string.common_save),
+            { if (onSave(type, value, note)) onDone() else showError = true },
+            Modifier.fillMaxWidth(),
+        )
     }
 }
 
 /** The weekly-plan cards, rendered inside the Coach hub. */
+/**
+ * The weekly training template, one card per session: what, how hard, how long (adjustable in
+ * five-minute steps), and a Log button. The page above it already states the week's focus.
+ */
 @Composable
 fun WeeklyPlanSection(state: MainUiState, onEditMinutes: (String, Int) -> Unit, onComplete: (PlannedWorkout) -> Unit) {
-    Text(state.weeklyPlan?.focus.orEmpty(), style = MaterialTheme.typography.bodyLarge)
     state.weeklyPlan?.workouts.orEmpty().forEach { workout ->
         val key = "${workout.day}-${workout.type.name}"
         val minutes = workout.minutes
-        OutlinedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(Radius.card)) {
-            Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+        SpartanCard {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(48.dp).clip(RoundedCornerShape(Radius.tile)).background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) {
+                    Text(workout.day, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                }
+                Spacer(Modifier.width(Spacing.lg))
                 Column(Modifier.weight(1f)) {
-                    Text("${workout.day} - ${workoutTypeLabel(workout.type)}", fontWeight = FontWeight.SemiBold)
-                    Text(stringResource(R.string.plan_minutes_intensity, minutes, workout.intensity))
-                    Text(workout.guidance, style = MaterialTheme.typography.bodySmall)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
-                        TextButton(onClick = { onEditMinutes(key, (minutes - 5).coerceAtLeast(5)) }) {
-                            Text(stringResource(R.string.plan_minus_five))
-                        }
-                        TextButton(onClick = { onEditMinutes(key, (minutes + 5).coerceAtMost(180)) }) {
-                            Text(stringResource(R.string.plan_plus_five))
-                        }
+                    Text(workoutTypeLabel(workout.type), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+                    Text(workout.intensity, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            Text(workout.guidance, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = Spacing.md))
+            Row(Modifier.padding(top = Spacing.md), verticalAlignment = Alignment.CenterVertically) {
+                // Stepper: the two 48dp buttons carry the spoken labels; the number between them is the value.
+                Row(
+                    Modifier.clip(CircleShape).border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(onClick = { onEditMinutes(key, (minutes - 5).coerceAtLeast(5)) }) {
+                        Icon(Icons.Outlined.Remove, contentDescription = stringResource(R.string.plan_minus_a11y, workoutTypeLabel(workout.type)))
+                    }
+                    Text(stringResource(R.string.insights_minutes, minutes), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
+                    IconButton(onClick = { onEditMinutes(key, (minutes + 5).coerceAtMost(180)) }) {
+                        Icon(Icons.Outlined.Add, contentDescription = stringResource(R.string.plan_plus_a11y, workoutTypeLabel(workout.type)))
                     }
                 }
-                // Tonal, not filled: seven-plus per-card actions must defer to the view's primary.
-                FilledTonalButton(onClick = { onComplete(workout.copy(minutes = minutes)) }) { Text(stringResource(R.string.plan_log)) }
+                Spacer(Modifier.weight(1f))
+                // Tonal, not filled: seven-plus per-card actions must defer to the page's primary.
+                FilledTonalButton(onClick = { onComplete(workout.copy(minutes = minutes)) }, shape = CircleShape) {
+                    Text(stringResource(R.string.plan_log), style = MaterialTheme.typography.labelLarge)
+                }
             }
         }
     }
-    Text(state.weeklyPlan?.safetyNote.orEmpty(), style = MaterialTheme.typography.bodySmall)
+    state.weeklyPlan?.safetyNote?.takeIf { it.isNotBlank() }?.let { SafetyBanner(it) }
 }
 
 @Composable
@@ -533,8 +381,7 @@ fun WorkoutCompletionScreen(
     var completed by rememberSaveable { mutableStateOf(planned.toString()) }
     var rpe by rememberSaveable { mutableStateOf(5f) }
     var pain by rememberSaveable { mutableStateOf(false) }
-    ScreenColumn {
-        Text(stringResource(R.string.workout_title), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.semantics { heading() })
+    DetailPage(stringResource(R.string.workout_title), onDone) {
         Text(workoutTypeLabel(type))
         OutlinedTextField(
             completed,
@@ -570,129 +417,25 @@ fun WorkoutCompletionScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Button(
-            onClick = {
+        PrimaryButton(
+            stringResource(R.string.workout_save),
+            {
                 onSave(type, planned, completed.toIntOrNull() ?: 0, rpe.roundToInt(), pain)
                 onDone()
             },
-            modifier = Modifier.fillMaxWidth(),
-        ) { Text(stringResource(R.string.workout_save)) }
-    }
-}
-
-@Composable
-fun ReviewScreen(state: MainUiState) {
-    val review = state.review
-    ScreenColumn {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.review_title), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f).semantics { heading() })
-            if (state.whoopIsMock) SampleDataChip()
-        }
-        // Skeleton only on first load: post-onboarding a profile always exists once the health
-        // bundle emits, so a null profile means data is still streaming in — the plan-005 empty
-        // card renders only after loading has finished, never as a flash before data arrives.
-        // A failed sync with no review gets Today's banner, never the misleading "Check back
-        // Sunday" copy.
-        if (state.profile == null && !state.syncFailed) {
-            TabLoadingSkeleton()
-        } else if (state.syncFailed && review == null) {
-            SafetyBanner(stringResource(R.string.checkin_sync_failed))
-        } else if (review == null) {
-            // No confident zeros: an absent review renders a designed empty state, never "0%".
-            OutlinedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(Radius.card)) {
-                Text(
-                    stringResource(R.string.review_empty_body),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(Spacing.lg),
-                )
-            }
-        } else {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                SummaryCard(stringResource(R.string.review_adherence), stringResource(R.string.review_percent_value, review.adherencePercent), Modifier.weight(1f))
-                SummaryCard(stringResource(R.string.review_strength), "${review.strengthSessions}", Modifier.weight(1f))
-            }
-            // Calm consistency — descriptive, no streak-loss anxiety.
-            SummaryCard(stringResource(R.string.review_consistency), stringResource(R.string.review_consistency_value, state.consistencyDays7), Modifier.fillMaxWidth())
-            // Expected-improvement ranges at the current consistency (honest ranges, not promises).
-            TrajectoryCard(state.projections)
-            // Longitudinal readiness trends from the WHOOP-normalized metric history.
-            TrendCard(stringResource(R.string.review_recovery_trend), recentValues(state, MetricType.RECOVERY_SCORE))
-            TrendCard(stringResource(R.string.review_hrv_trend), recentValues(state, MetricType.HRV_RMSSD))
-            TrendCard(stringResource(R.string.review_sleep_trend), recentValues(state, MetricType.SLEEP_PERFORMANCE))
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                SummaryCard(stringResource(R.string.review_seven_day_weight), review.sevenDayWeightAverage?.let { "%.1f".format(it) } ?: stringResource(R.string.review_no_entry), Modifier.weight(1f))
-                SummaryCard(stringResource(R.string.review_seven_day_rhr), review.sevenDayRhrAverage?.let { "%.0f".format(it) } ?: stringResource(R.string.review_no_entry), Modifier.weight(1f))
-            }
-            Text(stringResource(R.string.review_what_improved), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            review.improved.forEach { Text("•  $it", style = MaterialTheme.typography.bodyMedium) }
-            Text(stringResource(R.string.review_needs_attention), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            review.needsAttention.forEach { Text("•  $it", style = MaterialTheme.typography.bodyMedium) }
-            // Pays back the nightly reflection; renders nothing without recent reflections.
-            if (review.fromReflections.isNotEmpty()) {
-                OutlinedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(Radius.card)) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(stringResource(R.string.review_reflections_title), fontWeight = FontWeight.SemiBold)
-                        review.fromReflections.forEach { Text(it, style = MaterialTheme.typography.bodyMedium) }
-                    }
-                }
-            }
-            Text(stringResource(R.string.review_next_week_focus), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Text(review.nextWeekFocus)
-        }
-    }
-}
-
-/** Last 14 readings for a metric, oldest first, for the trend sparkline. */
-private fun recentValues(state: MainUiState, type: MetricType): List<Double> =
-    state.readings.filter { it.type == type && it.value != null }
-        .sortedBy { it.recordedAt }
-        .takeLast(14)
-        .mapNotNull { it.value }
-
-@Composable
-fun SettingsScreen(
-    onConnections: () -> Unit,
-    onReminders: () -> Unit,
-    onPrivacy: () -> Unit,
-    onDiagnostics: (() -> Unit)? = null,
-) {
-    ScreenColumn {
-        Text(stringResource(R.string.settings_title), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.semantics { heading() })
-        SettingsCard(stringResource(R.string.settings_connections), stringResource(R.string.settings_connections_subtitle), Icons.Outlined.Link, onConnections)
-        SettingsCard(stringResource(R.string.settings_reminders), stringResource(R.string.settings_reminders_subtitle), Icons.Outlined.Notifications, onReminders)
-        SettingsCard(stringResource(R.string.settings_privacy), stringResource(R.string.settings_privacy_subtitle), Icons.Outlined.PrivacyTip, onPrivacy)
-        if (onDiagnostics != null) {
-            SettingsCard(stringResource(R.string.settings_diagnostics), stringResource(R.string.settings_diagnostics_subtitle), Icons.Outlined.BugReport, onDiagnostics)
-        }
-        OutlinedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(Radius.card)) {
-            Column(Modifier.padding(16.dp)) {
-                Text(stringResource(R.string.settings_about), fontWeight = FontWeight.SemiBold)
-                Text(
-                    stringResource(R.string.settings_version, com.spartan.BuildConfig.VERSION_NAME),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp),
-                )
-                Text(
-                    stringResource(R.string.settings_disclaimer),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 8.dp),
-                )
-            }
-        }
+            Modifier.fillMaxWidth(),
+        )
     }
 }
 
 @Composable
 fun ReminderSettingsScreen(
+    onBack: () -> Unit,
     state: MainUiState,
     onRequestNotifications: () -> Unit,
     onSave: (String, String, String, Int, Int, Boolean, ReminderFrequency, Int) -> Unit,
 ) {
-    ScreenColumn {
-        Text(stringResource(R.string.reminders_title), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.semantics { heading() })
+    DetailPage(stringResource(R.string.reminders_title), onBack) {
         if (state.notificationDenied) Text(stringResource(R.string.reminders_notifications_denied))
         val exerciseReminder = state.reminders.firstOrNull { it.id == "exercise" }
         ReminderEditor(
@@ -724,37 +467,37 @@ fun ReminderSettingsScreen(
 }
 
 @Composable
-fun PrivacyScreen(state: MainUiState, onShare: (String) -> Unit, onDelete: () -> Unit) {
+fun PrivacyScreen(state: MainUiState, onShare: (String) -> Unit, onDelete: () -> Unit, onBack: () -> Unit) {
     var confirmDelete by rememberSaveable { mutableStateOf(false) }
-    ScreenColumn {
-        Text(stringResource(R.string.privacy_title), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.semantics { heading() })
-        Text(stringResource(R.string.privacy_body))
-        OutlinedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(Radius.card)) {
-            Column(Modifier.padding(16.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Outlined.Download, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.privacy_export_preview), fontWeight = FontWeight.SemiBold)
-                }
-                Text(state.exportText, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 12.dp))
+    DetailPage(stringResource(R.string.privacy_title), onBack) {
+        Text(stringResource(R.string.privacy_body), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        SpartanCard {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconTile(Icons.Outlined.Download, MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(Spacing.md))
+                Text(stringResource(R.string.privacy_export_preview), style = MaterialTheme.typography.titleMedium)
             }
+            Text(
+                state.exportText,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = Spacing.md),
+            )
         }
-        Button(onClick = { onShare(state.exportText) }, modifier = Modifier.fillMaxWidth()) {
-            Icon(Icons.Outlined.Share, contentDescription = null)
-            Spacer(Modifier.width(8.dp))
-            Text(stringResource(R.string.privacy_share_export))
-        }
-        Text(stringResource(R.string.privacy_share_note), style = MaterialTheme.typography.bodySmall)
+        PrimaryButton(stringResource(R.string.privacy_share_export), { onShare(state.exportText) }, Modifier.fillMaxWidth(), icon = Icons.Outlined.Share)
+        Text(stringResource(R.string.privacy_share_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         // Outlined + error content: the destructive action must not share the primary style of
         // "Share local export" above it.
         OutlinedButton(
             onClick = { confirmDelete = true },
             colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-            modifier = Modifier.fillMaxWidth(),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
+            shape = CircleShape,
+            modifier = Modifier.fillMaxWidth().padding(top = Spacing.lg).heightIn(min = 52.dp),
         ) {
-            Icon(Icons.Outlined.Delete, contentDescription = null)
-            Spacer(Modifier.width(8.dp))
-            Text(stringResource(R.string.privacy_delete_data))
+            Icon(Icons.Outlined.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(Spacing.sm))
+            Text(stringResource(R.string.privacy_delete_data), style = MaterialTheme.typography.labelLarge)
         }
     }
     if (confirmDelete) {
@@ -776,164 +519,6 @@ fun PrivacyScreen(state: MainUiState, onShare: (String) -> Unit, onDelete: () ->
                 }
             },
         )
-    }
-}
-
-@Composable
-private fun ScreenColumn(content: @Composable ColumnScope.() -> Unit) {
-    Column(
-        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        // 600dp cap keeps tablet/landscape line lengths inside the readable range.
-        Column(
-            modifier = Modifier.widthIn(max = 600.dp).fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            content = content,
-        )
-    }
-}
-
-@Composable
-private fun SummaryCard(label: String, value: String, modifier: Modifier = Modifier) {
-    Card(modifier, shape = RoundedCornerShape(Radius.card), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-        Column(Modifier.padding(16.dp)) {
-            Text(label, style = MaterialTheme.typography.labelLarge)
-            Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
-        }
-    }
-}
-
-@Composable
-private fun MetricRow(assessment: MetricAssessment, onClick: (MetricType) -> Unit) {
-    OutlinedCard(
-        modifier = Modifier.fillMaxWidth().clickable { onClick(assessment.reading.type) },
-        shape = RoundedCornerShape(Radius.card),
-    ) {
-        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(assessment.reading.type.label, fontWeight = FontWeight.SemiBold)
-                Text("${assessment.reading.value ?: stringResource(R.string.common_pending)} ${assessment.reading.type.unit}", style = MaterialTheme.typography.bodyLarge)
-                Text(assessment.clinicalMessage, style = MaterialTheme.typography.bodySmall)
-            }
-            StatusChips(assessment)
-        }
-    }
-}
-
-@Composable
-private fun StatusChips(assessment: MetricAssessment) {
-    Column(horizontalAlignment = Alignment.End) {
-        StatusBadge(stringResource(statusLabelRes(assessment.clinicalStatus)))
-        Spacer(Modifier.height(6.dp))
-        StatusBadge(stringResource(targetLabelRes(assessment.targetStatus)))
-    }
-}
-
-@Composable
-private fun StatusBadge(label: String) {
-    Surface(
-        shape = RoundedCornerShape(Radius.chip),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        contentColor = MaterialTheme.colorScheme.onSurface,
-    ) {
-        Text(label, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
-    }
-}
-
-@Composable
-private fun InsightCardView(card: InsightCard) {
-    OutlinedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(Radius.card)) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(card.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Text(card.explanation)
-            HorizontalDivider()
-            Text(card.whyItMatters, style = MaterialTheme.typography.bodyMedium)
-            card.safeActions.forEach { Text("- $it", style = MaterialTheme.typography.bodySmall) }
-        }
-    }
-}
-
-@Composable
-private fun TrendCard(title: String, values: List<Double>) {
-    OutlinedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(Radius.card)) {
-        Column(Modifier.padding(16.dp)) {
-            Text(title, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(8.dp))
-            if (values.size < 2) {
-                Text(stringResource(R.string.common_trend_empty), style = MaterialTheme.typography.bodySmall)
-            } else {
-                val latest = values.last()
-                val average = values.average()
-                val min = values.minOrNull() ?: 0.0
-                val max = values.maxOrNull() ?: 0.0
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                    Text(stringResource(R.string.common_trend_latest, formatTrendValue(latest)), style = MaterialTheme.typography.bodySmall)
-                    Text(stringResource(R.string.common_trend_avg, formatTrendValue(average)), style = MaterialTheme.typography.bodySmall)
-                    Text(stringResource(R.string.common_trend_range, formatTrendValue(min), formatTrendValue(max)), style = MaterialTheme.typography.bodySmall)
-                }
-                Spacer(Modifier.height(8.dp))
-                val color = MaterialTheme.colorScheme.primary
-                val gridColor = MaterialTheme.colorScheme.outline
-                // Inset so the 4dp end marker and the stroke cap are never clipped by the canvas.
-                Canvas(Modifier.fillMaxWidth().height(112.dp)) {
-                    val span = (max - min).takeIf { it > 0.0 } ?: 1.0
-                    val pad = 6.dp.toPx()
-                    val plotHeight = size.height - pad * 2
-                    fun pointAt(index: Int, value: Double): Offset {
-                        val x = size.width * index / (values.lastIndex.coerceAtLeast(1)).toFloat()
-                        val y = pad + (plotHeight - (((value - min) / span).toFloat() * plotHeight))
-                        return Offset(x, y)
-                    }
-                    // A single baseline: enough structure to read the line against, no chart junk.
-                    drawLine(
-                        gridColor,
-                        start = Offset(0f, size.height - pad),
-                        end = Offset(size.width, size.height - pad),
-                        strokeWidth = 1.dp.toPx(),
-                    )
-                    val points = values.mapIndexed { index, value -> pointAt(index, value) }
-                    val line = Path().apply {
-                        points.forEachIndexed { index, p -> if (index == 0) moveTo(p.x, p.y) else lineTo(p.x, p.y) }
-                    }
-                    // Area fill: the depth that makes a sparkline read as a trend, not a scribble.
-                    val area = Path().apply {
-                        addPath(line)
-                        lineTo(points.last().x, size.height - pad)
-                        lineTo(points.first().x, size.height - pad)
-                        close()
-                    }
-                    drawPath(
-                        area,
-                        Brush.verticalGradient(
-                            listOf(color.copy(alpha = 0.28f), color.copy(alpha = 0f)),
-                            startY = pad,
-                            endY = size.height - pad,
-                        ),
-                    )
-                    drawPath(line, color, style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round))
-                    // Only the newest reading gets a dot — the eye should land on "where I am now".
-                    points.lastOrNull()?.let { end ->
-                        drawCircle(color, radius = 5.dp.toPx(), center = end)
-                        drawCircle(Color.Black.copy(alpha = 0.35f), radius = 2.dp.toPx(), center = end)
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SettingsCard(title: String, subtitle: String, icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit) {
-    OutlinedCard(Modifier.fillMaxWidth().clickable(onClick = onClick), shape = RoundedCornerShape(Radius.card)) {
-        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, contentDescription = null)
-            Spacer(Modifier.width(12.dp))
-            Column {
-                Text(title, fontWeight = FontWeight.SemiBold)
-                Text(subtitle, style = MaterialTheme.typography.bodySmall)
-            }
-        }
     }
 }
 
@@ -959,12 +544,12 @@ private fun ReminderEditor(
     val validTime = parsedHour in 0..23 && parsedMinute in 0..59
     val selectedDaysMask = daysMaskFor(selectedFrequency, daysOfWeekMask)
 
-    OutlinedCard(Modifier.fillMaxWidth(), shape = RoundedCornerShape(Radius.card)) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    SpartanCard {
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(title, fontWeight = FontWeight.SemiBold)
-                    Text("%02d:%02d".format(hour, minute), style = MaterialTheme.typography.bodySmall)
+                    Text(title, style = MaterialTheme.typography.titleMedium)
+                    Text("%02d:%02d".format(hour, minute), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Switch(
                     checked = enabled,
@@ -1014,22 +599,18 @@ private fun ReminderEditor(
                     )
                 }
             }
-            Button(
-                onClick = {
+            SecondaryButton(
+                stringResource(R.string.reminders_save),
+                {
                     if (enabled) onRequestNotifications()
                     onSave(id, title, body, parsedHour ?: hour, parsedMinute ?: minute, enabled, selectedFrequency, selectedDaysMask)
                 },
+                Modifier.fillMaxWidth(),
                 enabled = validTime,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(stringResource(R.string.reminders_save))
-            }
+            )
         }
     }
 }
-
-private fun formatTrendValue(value: Double): String =
-    if (value % 1.0 == 0.0) value.toInt().toString() else "%.1f".format(value)
 
 /** "ZONE_2" → "Zone 2": enum names never appear raw in user copy. */
 internal fun workoutTypeLabel(type: WorkoutType): String =
@@ -1043,7 +624,7 @@ private fun daysMaskFor(frequency: ReminderFrequency, customMask: Int): Int = wh
     ReminderFrequency.CUSTOM_DAYS -> customMask
 }
 
-private fun statusLabelRes(status: ClinicalStatus): Int = when (status) {
+internal fun statusLabelRes(status: ClinicalStatus): Int = when (status) {
     ClinicalStatus.BELOW_RANGE -> R.string.status_below_range
     ClinicalStatus.NORMAL -> R.string.status_clinical_normal
     ClinicalStatus.ABOVE_RANGE -> R.string.status_above_range
@@ -1051,7 +632,7 @@ private fun statusLabelRes(status: ClinicalStatus): Int = when (status) {
     ClinicalStatus.UNKNOWN -> R.string.status_reference_hidden
 }
 
-private fun targetLabelRes(status: TargetStatus): Int = when (status) {
+internal fun targetLabelRes(status: TargetStatus): Int = when (status) {
     TargetStatus.MEETS_TARGET -> R.string.target_meets
     TargetStatus.ABOVE_PERSONAL_TARGET -> R.string.target_above
     TargetStatus.BELOW_PERSONAL_TARGET -> R.string.target_below

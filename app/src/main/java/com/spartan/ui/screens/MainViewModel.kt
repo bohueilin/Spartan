@@ -13,7 +13,6 @@ import com.spartan.data.calendar.CalendarAuthManager
 import com.spartan.data.calendar.CalendarClient
 import com.spartan.data.export.LocalExportFormatter
 import com.spartan.data.local.ConnectionStatus
-import com.spartan.data.local.IntegrationConnectionEntity
 import com.spartan.data.local.IntegrationProvider
 import com.spartan.data.local.MetricEntryEntity
 import com.spartan.data.local.PlanWorkoutOverrideEntity
@@ -32,6 +31,12 @@ import com.spartan.data.whoop.WhoopClient
 import com.spartan.data.local.toEntity
 import com.spartan.data.whoop.csv.WhoopCsvImporter
 import com.spartan.data.whoop.csv.toWhoopSnapshot
+import com.spartan.domain.engine.ActionPlaybook
+import com.spartan.domain.engine.BedtimePlan
+import com.spartan.domain.engine.Signal
+import com.spartan.domain.engine.SignalEngine
+import com.spartan.domain.engine.SleepPlanner
+import com.spartan.domain.engine.SuggestedAction
 import com.spartan.domain.engine.Goal
 import com.spartan.domain.engine.GoalEngine
 import com.spartan.domain.engine.GoalPlanModifiers
@@ -122,6 +127,8 @@ data class MainUiState(
     val recoveryScore: Int? = null,
     /** Plain-language reasons the engine derived from the user's own baselines (may be empty). */
     val readinessNotes: List<String> = emptyList(),
+    /** Each daily wearable signal read against the user's own normal range (see [SignalEngine]). */
+    val signals: List<Signal> = emptyList(),
     val planSafetyBanner: String? = null,
     val whoopIsMock: Boolean = true,
     val whoopConnected: Boolean = false,
@@ -175,7 +182,8 @@ internal fun shouldOfferReflection(
     hourOfDay: Int,
     hasActivities: Boolean,
     alreadyAnsweredToday: Boolean,
-): Boolean = hourOfDay >= REFLECTION_HOUR && hasActivities && !alreadyAnsweredToday
+    firstDay: Boolean,
+): Boolean = hourOfDay >= REFLECTION_HOUR && hasActivities && !alreadyAnsweredToday && !firstDay
 
 /** The workout type a Today training check-off is logged as. */
 internal fun workoutTypeFor(category: ActivityCategory): WorkoutType = when (category) {
@@ -224,6 +232,8 @@ data class UndoToken(
     val previousSnoozedUntilMillis: Long? = null,
     val previousScheduledEpochMinute: Long? = null,
     val previousCompletedAtMillis: Long? = null,
+    /** Undo means "take it back out": the action added this activity rather than changing it. */
+    val removeOnUndo: Boolean = false,
 )
 
 /**
@@ -322,6 +332,11 @@ class MainViewModel @Inject constructor(
     private val generatedPlan = MutableStateFlow<DailyPlan?>(null)
     private val readinessState = MutableStateFlow<ReadinessSnapshot?>(null)
     private val latestSnapshot = MutableStateFlow<WhoopSnapshot?>(null)
+
+    /** Tonight's lights-out target from the observed wake time and carried sleep debt. */
+    val bedtimePlan: StateFlow<BedtimePlan> = latestSnapshot
+        .map { SleepPlanner.tonight(it?.wakeMinuteOfDay, it?.sleepDebtHours) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SleepPlanner.tonight(null, null))
     private val syncFailed = MutableStateFlow(false)
     private val reviewRequested = MutableStateFlow(false)
     private val refreshing = MutableStateFlow(false)
@@ -390,11 +405,14 @@ class MainViewModel @Inject constructor(
         repository.reflections,
         reflectionDismissedDay,
         hourTicker,
-    ) { activities, reflections, dismissedDay, hour ->
+        preferencesStore.firstOpenMillis,
+    ) { activities, reflections, dismissedDay, hour, firstOpen ->
         shouldOfferReflection(
             hourOfDay = hour,
             hasActivities = activities.isNotEmpty(),
             alreadyAnsweredToday = reflections.any { it.dateEpochDay == today } || dismissedDay == today,
+            // Asking "how did today feel?" minutes after install asks about a day spent without us.
+            firstDay = firstOpen == null || epochDayOf(firstOpen) == today,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
@@ -580,6 +598,7 @@ class MainViewModel @Inject constructor(
             readinessBand = checkIn.readiness?.band,
             recoveryScore = checkIn.readiness?.recoveryScore,
             readinessNotes = checkIn.readiness?.trendNotes.orEmpty(),
+            signals = SignalEngine.signals(health.readings),
             planSafetyBanner = checkIn.plan?.safetyBanner,
             whoopIsMock = isMockData,
             whoopConnected = checkIn.whoopConnected,
@@ -972,6 +991,24 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Puts a suggested action into today's plan — the step that turns an insight into something
+     * done. Confirms with a snackbar whose Undo takes it back out.
+     */
+    fun addAction(action: SuggestedAction, metric: MetricType) {
+        val activity = ActionPlaybook.toActivity(action, metric, today)
+        viewModelScope.launch {
+            repository.addActivity(activity, today)
+            _messages.send(
+                UserMessage(
+                    textRes = R.string.snackbar_added_to_plan,
+                    formatArg = action.title,
+                    undo = UndoToken(activity.id, ActivityStatus.PLANNED, removeOnUndo = true),
+                ),
+            )
+        }
+    }
+
     /** The state an activity was in before the current action, for a true Undo restore. */
     private fun DailyActivity.undoToken() = UndoToken(
         activityId = id,
@@ -988,6 +1025,10 @@ class MainViewModel @Inject constructor(
     fun undoActivityAction(token: UndoToken) {
         viewModelScope.launch {
             reminderScheduler.cancelActivityReminder(token.activityId)
+            if (token.removeOnUndo) {
+                repository.removeActivity(token.activityId)
+                return@launch
+            }
             repository.updateActivityStatus(
                 id = token.activityId,
                 status = token.previousStatus,
@@ -997,6 +1038,9 @@ class MainViewModel @Inject constructor(
             )
         }
     }
+
+    private fun epochDayOf(epochMillis: Long): Long =
+        java.time.Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()).toLocalDate().toEpochDay()
 
     private fun clockLabel(epochMillis: Long): String =
         java.time.Instant.ofEpochMilli(epochMillis)

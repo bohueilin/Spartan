@@ -1,10 +1,12 @@
 package com.spartan.ui
 
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
@@ -41,6 +43,14 @@ class CheckInScreenTest {
         }
     }
 
+    private val activityCheckbox = SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Checkbox)
+
+    private fun awaitTodaysPlan() {
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithText("Today's plan").fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
     private fun completeOnboardingIfShown() {
         awaitComposeHierarchy()
         // Fresh installs land on onboarding; subsequent runs land on the check-in.
@@ -55,29 +65,24 @@ class CheckInScreenTest {
     @Test
     fun onboardingLeadsToDailyPlan_withSampleDataLabeled() {
         completeOnboardingIfShown()
-        composeRule.waitUntil(10_000) {
-            composeRule.onAllNodesWithText("TODAY'S PLAN").fetchSemanticsNodes().isNotEmpty()
-        }
+        awaitTodaysPlan()
         // Honesty requirement: mock mode must be visibly labeled.
-        composeRule.onNodeWithText("SAMPLE DATA").assertExists()
-        // The plan is non-empty: at least one activity checkbox with a content description exists.
+        composeRule.onAllNodesWithText("SAMPLE DATA").onFirst().assertExists()
+        // The plan is non-empty: at least one activity checkbox exists.
         composeRule.waitUntil(10_000) {
-            composeRule.onAllNodesWithContentDescription("Recovery", substring = true)
-                .fetchSemanticsNodes().isNotEmpty()
+            composeRule.onAllNodes(activityCheckbox).fetchSemanticsNodes().isNotEmpty()
         }
     }
 
     @Test
     fun skippingAnActivity_confirmsWithAnUndoableSnackbar() {
         completeOnboardingIfShown()
-        composeRule.waitUntil(10_000) {
-            composeRule.onAllNodesWithText("TODAY'S PLAN").fetchSemanticsNodes().isNotEmpty()
-        }
-        // Open the first activity's overflow menu and skip it.
-        composeRule.onAllNodesWithContentDescription("More options for", substring = true)
-            .onFirst()
-            .performClick()
-        composeRule.onNodeWithText("Skip today").performClick()
+        awaitTodaysPlan()
+        // Open the first activity's sheet (its card carries the title as text) and skip it.
+        val title = composeRule.onAllNodes(activityCheckbox).onFirst().fetchSemanticsNode()
+            .config[SemanticsProperties.ContentDescription].first()
+        composeRule.onAllNodesWithText(title).onFirst().performScrollTo().performClick()
+        composeRule.onNodeWithText("Skip today").performScrollTo().performClick()
 
         // Every reversible action must confirm itself and offer a way back.
         composeRule.waitUntil(5_000) {
@@ -94,11 +99,9 @@ class CheckInScreenTest {
     @Test
     fun activityCheckbox_meetsTouchTargetMinimum() {
         completeOnboardingIfShown()
-        composeRule.waitUntil(10_000) {
-            composeRule.onAllNodesWithText("TODAY'S PLAN").fetchSemanticsNodes().isNotEmpty()
-        }
+        awaitTodaysPlan()
         // First activity checkbox: 48dp minimum touch target (a11y contract from the design system).
-        composeRule.onAllNodesWithContentDescription("minute", substring = true)
+        composeRule.onAllNodes(activityCheckbox)
             .onFirst()
             .assertHeightIsAtLeast(48.dp)
             .assertWidthIsAtLeast(48.dp)

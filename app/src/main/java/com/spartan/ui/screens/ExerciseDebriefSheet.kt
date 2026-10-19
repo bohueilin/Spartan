@@ -6,20 +6,18 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -32,11 +30,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.unit.dp
 import com.spartan.R
 import com.spartan.domain.model.DailyActivity
+import com.spartan.ui.components.PrimaryButton
+import com.spartan.ui.theme.Spacing
 import kotlin.math.roundToInt
 
 /**
@@ -59,10 +57,10 @@ fun ExerciseDebriefSheet(
     // Opens fully expanded: at half height, Skip and the note below it sat under the fold.
     ModalBottomSheet(onDismissRequest = onSkip, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(
-            Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            Modifier.fillMaxWidth().padding(horizontal = Spacing.xxl, vertical = Spacing.sm),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
-            Text(stringResource(R.string.debrief_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.debrief_title), style = MaterialTheme.typography.headlineSmall)
             Text(
                 activity.title,
                 style = MaterialTheme.typography.bodyMedium,
@@ -103,20 +101,18 @@ fun ExerciseDebriefSheet(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Button(
-                onClick = {
-                    onSave(minutesText.toIntOrNull() ?: activity.estimatedMinutes, rpe.roundToInt(), pain)
-                },
-                // heightIn, not height: the label must grow with font scale, not clip.
-                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
-            ) { Text(stringResource(R.string.debrief_save), fontWeight = FontWeight.SemiBold) }
+            PrimaryButton(
+                stringResource(R.string.debrief_save),
+                { onSave(minutesText.toIntOrNull() ?: activity.estimatedMinutes, rpe.roundToInt(), pain) },
+                Modifier.fillMaxWidth(),
+            )
             TextButton(onClick = onSkip, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.debrief_skip)) }
             Text(
                 stringResource(R.string.debrief_note),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(Spacing.md))
         }
     }
 }

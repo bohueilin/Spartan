@@ -98,8 +98,8 @@ object ReferenceRanges {
             metric = MetricType.RESTING_HEART_RATE,
             typicalLow = lo + shift, typicalHigh = hi + shift,
             fitnessForwardLow = 50.0 + shift, fitnessForwardHigh = 62.0 + shift,
-            education = "Typical resting heart rate for a ${bracketLabel(ageYears)} " +
-                "${sexNoun(sex)} sits around ${(lo + shift).toInt()}–${(hi + shift).toInt()} bpm, " +
+            education = "Typical resting heart rate for ${cohortPhrase(ageYears, sex)} " +
+                "sits around ${(lo + shift).toInt()}–${(hi + shift).toInt()} bpm, " +
                 "and aerobically trained people often run ${(50 + shift).toInt()}–" +
                 "${(62 + shift).toInt()}. A slow drift down over months is the classic sign of a " +
                 "building aerobic base.",
@@ -120,15 +120,23 @@ object ReferenceRanges {
             metric = MetricType.HRV_RMSSD,
             typicalLow = lo, typicalHigh = hi,
             education = "HRV is the most individual number on this list — cohort medians for " +
-                "${bracketLabel(ageYears)} span roughly ${lo.toInt()}–${hi.toInt()} ms and " +
+                "${cohortPhrase(ageYears, SexAtBirth.UNSPECIFIED)} span roughly ${lo.toInt()}–${hi.toInt()} ms and " +
                 "decline naturally with age. Judge yourself against your own baseline trend, " +
                 "not this table.",
         )
     }
 
-    private fun sexNoun(sex: SexAtBirth): String = when (sex) {
-        SexAtBirth.FEMALE -> "woman"
-        SexAtBirth.MALE -> "man"
-        SexAtBirth.UNSPECIFIED -> "adult"
+    /**
+     * Who a band describes, as a plural noun phrase that reads correctly in every combination:
+     * "adults", "women", "men aged 30–39". (A singular "a <bracket> <noun>" produced
+     * "a adult adult" and "a 18–29 woman".)
+     */
+    fun cohortPhrase(ageYears: Int?, sex: SexAtBirth): String {
+        val people = when (sex) {
+            SexAtBirth.FEMALE -> "women"
+            SexAtBirth.MALE -> "men"
+            SexAtBirth.UNSPECIFIED -> "adults"
+        }
+        return if (ageYears == null) people else "$people aged ${bracketLabel(ageYears)}"
     }
 }

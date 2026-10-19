@@ -46,6 +46,19 @@ class CoachEnginesTest {
     }
 
     @Test
+    fun referenceRanges_cohortPhrase_readsCorrectlyForEveryProfile() {
+        assertEquals("adults", ReferenceRanges.cohortPhrase(null, SexAtBirth.UNSPECIFIED))
+        assertEquals("women", ReferenceRanges.cohortPhrase(null, SexAtBirth.FEMALE))
+        assertEquals("men aged 30–39", ReferenceRanges.cohortPhrase(34, SexAtBirth.MALE))
+        assertEquals("adults aged 18–29", ReferenceRanges.cohortPhrase(22, SexAtBirth.UNSPECIFIED))
+        // The education copy embeds it: no more "a adult adult".
+        val rhr = ReferenceRanges.bandFor(MetricType.RESTING_HEART_RATE, null, SexAtBirth.UNSPECIFIED)!!
+        assertTrue(rhr.education.startsWith("Typical resting heart rate for adults sits around"))
+        val hrv = ReferenceRanges.bandFor(MetricType.HRV_RMSSD, 44, SexAtBirth.FEMALE)!!
+        assertTrue(hrv.education.contains("cohort medians for adults aged 40–49 span"))
+    }
+
+    @Test
     fun referenceRanges_educationCopy_passesSafetyEngine() {
         val safety = SafetyEngine()
         for (age in listOf(null, 25, 44, 65)) {

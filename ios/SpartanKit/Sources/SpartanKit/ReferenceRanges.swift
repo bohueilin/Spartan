@@ -129,10 +129,8 @@ public enum ReferenceRanges {
         let typicalHighInt: Int = Int(hi + shift)
         let fitLowInt: Int = Int(50.0 + shift)
         let fitHighInt: Int = Int(62.0 + shift)
-        let bracket: String = bracketLabel(ageYears)
-        let noun: String = sexNoun(sex)
-        var education = "Typical resting heart rate for a \(bracket) "
-        education += "\(noun) sits around \(typicalLowInt)–\(typicalHighInt) bpm, "
+        var education = "Typical resting heart rate for \(cohortPhrase(ageYears, sex)) "
+        education += "sits around \(typicalLowInt)–\(typicalHighInt) bpm, "
         education += "and aerobically trained people often run \(fitLowInt)–"
         education += "\(fitHighInt). A slow drift down over months is the classic sign of a "
         education += "building aerobic base."
@@ -157,9 +155,8 @@ public enum ReferenceRanges {
         }
         let lowInt: Int = Int(lo)
         let highInt: Int = Int(hi)
-        let bracket: String = bracketLabel(ageYears)
         var education = "HRV is the most individual number on this list — cohort medians for "
-        education += "\(bracket) span roughly \(lowInt)–\(highInt) ms and "
+        education += "\(cohortPhrase(ageYears, .unspecified)) span roughly \(lowInt)–\(highInt) ms and "
         education += "decline naturally with age. Judge yourself against your own baseline trend, "
         education += "not this table."
         return ReferenceBand(
@@ -169,11 +166,17 @@ public enum ReferenceRanges {
         )
     }
 
-    private static func sexNoun(_ sex: SexAtBirth) -> String {
+    /// Who a band describes, as a plural noun phrase that reads correctly in every combination:
+    /// "adults", "women", "men aged 30–39". (A singular "a <bracket> <noun>" produced
+    /// "a adult adult" and "a 18–29 woman".)
+    public static func cohortPhrase(_ ageYears: Int?, _ sex: SexAtBirth) -> String {
+        let people: String
         switch sex {
-        case .female: return "woman"
-        case .male: return "man"
-        case .unspecified: return "adult"
+        case .female: people = "women"
+        case .male: people = "men"
+        case .unspecified: people = "adults"
         }
+        guard ageYears != nil else { return people }
+        return "\(people) aged \(bracketLabel(ageYears))"
     }
 }

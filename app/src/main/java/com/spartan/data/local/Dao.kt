@@ -123,8 +123,12 @@ interface HealthDao {
         now: Long,
     )
 
-    @Query("SELECT COUNT(*) FROM daily_activities WHERE dateEpochDay = :day")
+    /** Generated plan items only — an action the user added must not stop the day's plan seeding. */
+    @Query("SELECT COUNT(*) FROM daily_activities WHERE dateEpochDay = :day AND ruleId != 'USER_ADDED'")
     suspend fun activityCountForDay(day: Long): Int
+
+    @Query("DELETE FROM daily_activities WHERE id = :id")
+    suspend fun deleteActivity(id: String)
 
     /** Wakes snoozed activities whose snooze window has passed back to PLANNED. */
     @Query(
@@ -192,7 +196,7 @@ interface HealthDao {
      * Clears a day's not-yet-completed plan so it can be regenerated after the data source
      * changes (e.g. a CSV import replacing sample data). Completed items are history — kept.
      */
-    @Query("DELETE FROM daily_activities WHERE dateEpochDay = :day AND status != 'DONE'")
+    @Query("DELETE FROM daily_activities WHERE dateEpochDay = :day AND status != 'DONE' AND ruleId != 'USER_ADDED'")
     suspend fun deleteNonCompletedActivitiesForDay(day: Long)
 
     // --- Coach: goals + pressure windows ---

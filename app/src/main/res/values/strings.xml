@@ -2,33 +2,21 @@
     <string name="app_name">Spartan</string>
 
     <!-- Check-in -->
-    <string name="checkin_building_plan">Building today\'s plan...</string>
-    <string name="checkin_collapse_activity">Collapse %1$s</string>
+    <string name="checkin_building_plan">Building today\'s plan…</string>
     <string name="checkin_completed">Completed</string>
-    <string name="checkin_connect">Connect</string>
     <string name="checkin_connect_prompt_body_real">Connect WHOOP to personalize your plan.</string>
     <string name="checkin_connect_prompt_body_sample">You\'re viewing sample data. Connect to personalize your plan with your real recovery, sleep, and strain.</string>
     <string name="checkin_connect_whoop">Connect WHOOP</string>
     <string name="checkin_empty_plan">Nothing scheduled yet. Connect WHOOP or pull the latest data to generate today\'s plan.</string>
-    <string name="checkin_expand_activity">Expand %1$s</string>
     <string name="checkin_find_time">Find a time</string>
-    <string name="checkin_improves_chip">Improves %1$s</string>
     <string name="checkin_improves_detail">%1$s — improves %2$s. Tap to track it.</string>
     <string name="checkin_open_metric">Open %1$s details</string>
     <string name="checkin_urgency_due">Due today</string>
     <string name="checkin_urgency_overdue">Overdue</string>
-    <string name="checkin_what_improves">WHAT THIS IMPROVES</string>
-    <string name="checkin_follow_along_video">Follow along: %1$s (%2$d min)</string>
     <string name="checkin_footer_disclaimer">Spartan offers wellness and fitness guidance, not medical advice. For any health concern, contact a qualified clinician.</string>
     <string name="checkin_minutes_time_of_day">~%1$d min · %2$s</string>
-    <string name="checkin_minutes_today">~%1$d min today</string>
-    <string name="checkin_more_options">More options for %1$s</string>
     <string name="checkin_not_completed">Not completed</string>
-    <string name="checkin_priority_optional">OPTIONAL</string>
-    <string name="checkin_priority_recommended">RECOMMENDED</string>
-    <string name="checkin_priority_required">REQUIRED</string>
     <string name="checkin_progress_a11y">%1$d of %2$d activities done</string>
-    <string name="checkin_progress_done">%1$d of %2$d done</string>
     <string name="checkin_readiness">Readiness</string>
     <string name="checkin_recovery_a11y">Recovery %1$s, %2$s</string>
     <string name="checkin_recovery_a11y_sample">%1$s, sample data</string>
@@ -52,10 +40,8 @@
     <string name="checkin_snooze_hour">Snooze 1 hour</string>
     <string name="checkin_snoozed">Snoozed</string>
     <string name="checkin_snoozed_until">Snoozed until %1$s</string>
-    <string name="checkin_steps">STEPS</string>
     <string name="checkin_sync_failed">Couldn\'t refresh WHOOP data. Showing your most recent sync.</string>
-    <string name="checkin_todays_plan">TODAY\'S PLAN</string>
-    <string name="checkin_why_this_matters">WHY THIS MATTERS</string>
+    <string name="checkin_todays_plan">Today\'s plan</string>
     <string name="checkin_good_morning">Good morning</string>
     <string name="checkin_good_afternoon">Good afternoon</string>
     <string name="checkin_good_evening">Good evening</string>
@@ -65,7 +51,6 @@
     <string name="checkin_day_complete_sub">Recovery earned. See where this takes you in Review.</string>
 
     <!-- Coach hub -->
-    <string name="coach_title">Coach</string>
     <string name="coach_goal_section">YOUR GOAL</string>
     <string name="coach_goal_intro">Pick one focused goal. Spartan checks it against safe, sustainable rates and bends the week toward it.</string>
     <string name="coach_set_goal">Set a goal</string>
@@ -80,7 +65,6 @@
     <string name="coach_goal_abandon">Retire goal</string>
     <string name="coach_goal_on_track">On track</string>
     <string name="coach_goal_behind">Keep going</string>
-    <string name="coach_windows_section">HIGH-PRESSURE WINDOWS</string>
     <!-- Pre-cased fallback label for an unnamed window (locale-safe: no runtime lowercase). -->
     <string name="coach_windows_section_lower">high-pressure windows</string>
     <string name="coach_windows_intro">Tell Spartan when your week gets tense — recurring meetings, reviews. It schedules a five-minute breathing reset just before each one.</string>
@@ -89,9 +73,7 @@
     <string name="coach_window_start">Start hour (0–23)</string>
     <string name="coach_window_end">End hour (1–24)</string>
     <string name="coach_window_remove">Remove</string>
-    <string name="coach_stress_section">WHAT YOUR DATA SAYS</string>
-    <string name="coach_ranges_section">YOUR HEALTHY RANGES</string>
-    <string name="coach_ranges_intro">Typical ranges for a %1$s, next to your numbers. Your own baseline beats any table.</string>
+    <string name="coach_ranges_intro">Typical ranges for %1$s, next to your numbers. Your own baseline beats any table.</string>
     <string name="coach_ranges_profile_cta">Add age and sex for tighter ranges</string>
     <string name="coach_ranges_edit">Edit profile</string>
     <string name="coach_range_typical">Typical %1$s</string>
@@ -101,23 +83,111 @@
     <string name="coach_profile_age">Age</string>
     <string name="coach_profile_save">Save</string>
     <string name="coach_sex_female">Female</string>
-    <!-- Pre-cased mid-sentence noun forms (locale-safe: no runtime lowercase). -->
-    <string name="coach_sex_female_lower">female</string>
     <string name="coach_sex_male">Male</string>
-    <string name="coach_sex_male_lower">male</string>
     <string name="coach_sex_unspecified">Prefer not to say</string>
 
+    <!-- Today (redesign) -->
+    <string name="checkin_drivers">WHAT\'S DRIVING IT</string>
+    <string name="checkin_driver_a11y">%1$s %2$s, %3$s</string>
+    <string name="driver_hrv">HRV</string>
+    <string name="driver_rhr">Resting HR</string>
+    <string name="driver_sleep">Sleep</string>
+    <string name="driver_strain">Strain</string>
+    <string name="checkin_plan_summary">%1$d of %2$d · ~%3$d min</string>
+    <string name="checkin_priority_required_label">Required</string>
+    <string name="checkin_open_activity">Open %1$s</string>
+    <string name="checkin_why_this_matters_title">Why this matters</string>
+    <string name="checkin_what_improves_title">What it improves</string>
+    <string name="checkin_how_to">How to do it</string>
+    <string name="checkin_see_metric">See your %1$s</string>
+    <string name="checkin_mark_done">Mark as done</string>
+    <string name="checkin_mark_not_done">Mark as not done</string>
+    <string name="tonight_eyebrow">TONIGHT</string>
+    <string name="tonight_title">Lights out by %1$s</string>
+    <string name="tonight_duration">%1$dh %2$02dm</string>
+    <string name="tonight_duration_hours">%1$dh</string>
+    <string name="tonight_title_late">Lights out soon</string>
+    <string name="tonight_body_late">Your target was %1$s. Every minute of sleep tonight still counts — keep the wind-down short.</string>
+    <string name="tonight_body">Start winding down at %1$s for about %2$s of sleep.</string>
+    <string name="tonight_body_debt">Start winding down at %1$s for about %2$s of sleep. That pays down part of your %3$s h of sleep debt.</string>
+
+    <!-- Metric detail (redesign) -->
+    <string name="detail_trend_title">Last %1$d readings</string>
+    <string name="detail_band_legend">The shaded band is your normal — the middle half of your recent days.</string>
+    <string name="detail_meaning">What this means for you</string>
+    <string name="detail_no_reading">No reading yet. Add one to see where it sits.</string>
+    <string name="detail_improve">How to improve it</string>
+    <string name="detail_clinician_first">This is a clinician-first marker. Bring the result to your next appointment and decide next steps together.</string>
+    <string name="detail_about">About %1$s</string>
+    <string name="detail_add_entry">Add entry</string>
+    <string name="detail_add_to_today">Add to today</string>
+
+    <!-- Progress (replaces Weekly review) -->
+    <string name="progress_title">Progress</string>
+    <string name="progress_subtitle">This week · %1$s</string>
+    <string name="progress_this_week">This week</string>
+    <string name="progress_active_days">Active days</string>
+    <string name="progress_of_seven">%1$d of 7</string>
+    <string name="progress_avg_recovery">Avg recovery</string>
+    <string name="progress_avg_sleep">Avg sleep</string>
+    <string name="progress_avg_hrv">Avg HRV</string>
+    <string name="progress_next_week">NEXT WEEK\'S FOCUS</string>
+    <string name="progress_review_empty">Check off a session on Today and your weekly review starts filling in here — what improved, what needs attention, and next week\'s focus.</string>
+    <string name="progress_trends">Your trends</string>
+    <string name="progress_plan_header">Your training week</string>
+    <string name="progress_goal_empty_title">Set one focused goal</string>
+
+    <!-- You (profile, plan settings, data, privacy) -->
+    <string name="you_title">You</string>
+    <string name="you_profile_hint">Add age and sex for tighter ranges and better video picks</string>
+    <string name="you_profile_details">Age %1$d · %2$s</string>
+    <string name="you_profile_age_only">Age %1$d</string>
+    <string name="you_profile_a11y">Edit your profile</string>
+    <string name="you_section_plan">Your plan</string>
+    <string name="you_section_data">Data and devices</string>
+    <string name="you_section_privacy">Privacy</string>
+    <string name="you_goal">Goal</string>
+    <string name="you_goal_none">Not set — pick one focused goal</string>
+    <string name="you_windows">High-pressure windows</string>
+    <string name="you_windows_count">%1$d set · a breathing reset before each</string>
+    <string name="you_windows_none">None yet · get a breathing reset before tense moments</string>
+    <string name="you_ranges">Healthy ranges</string>
+    <string name="you_ranges_subtitle">Typical ranges for your age and sex, next to your numbers</string>
+    <string name="you_training_subtitle">Your weekly template of Zone 2, strength, and recovery</string>
+    <string name="you_licenses">Set in Inter, used under the SIL Open Font License.</string>
+
+    <!-- Insights: every signal against your own normal, and what to do about it -->
+    <string name="insights_title">Insights</string>
+    <string name="insights_subtitle">How your body is trending, and what to do about it</string>
+    <string name="insights_signals">Your signals</string>
+    <string name="insights_patterns">Patterns in your week</string>
+    <string name="insights_labs">Lab results</string>
+    <string name="insights_labs_empty">Add a lab result, like ApoB or fasting glucose, to see it next to its clinical range and your trend.</string>
+    <string name="insights_add_result">Add a result</string>
+    <string name="insights_try">TRY</string>
+    <string name="insights_minutes">%1$d min</string>
+    <string name="insights_add">Add</string>
+    <string name="insights_add_a11y">Add %1$s to today\'s plan</string>
+    <string name="insights_in_plan">In today\'s plan</string>
+    <string name="insights_read_more">Read more</string>
+    <string name="insights_show_less">Show less</string>
+    <string name="insights_footer">Ranges here are your own recent history, not a diagnosis. For any health concern, talk with a qualified clinician.</string>
+    <string name="signal_learning">Learning your normal</string>
+    <string name="signal_within">Your normal</string>
+    <string name="signal_better">Better than usual</string>
+    <string name="signal_higher">Higher than usual</string>
+    <string name="signal_lower">Lower than usual</string>
+    <string name="signal_normal_range">Your normal %1$s · %2$d days</string>
+    <string name="signal_learning_days">%1$d of %2$d days to learn your normal</string>
+
     <!-- Common -->
+    <string name="common_back">Back</string>
     <string name="a11y_effort_slider">Effort, 1 to 10</string>
     <string name="common_brand">SPARTAN</string>
     <string name="notification_public_body">You have a reminder. Unlock to see it.</string>
     <string name="common_cancel">Cancel</string>
     <string name="common_pending">pending</string>
     <string name="common_save">Save</string>
-    <string name="common_trend_avg">Avg %1$s</string>
-    <string name="common_trend_empty">Add more entries to see a trend.</string>
-    <string name="common_trend_latest">Latest %1$s</string>
-    <string name="common_trend_range">Range %1$s-%2$s</string>
 
     <!-- Connections -->
     <string name="connections_calendar_body">Reads your free/busy times only — never event titles or details — to schedule activities into open windows. Creating calendar events is a separate, optional step you confirm each time.</string>
@@ -169,8 +239,6 @@
     <!-- Metric explainers -->
     <string name="explainer_good_pattern">What a good pattern looks like</string>
     <string name="explainer_how_used">How Spartan uses it</string>
-    <string name="explainer_title">Understanding %1$s</string>
-    <string name="explainer_what_it_is">What it is</string>
     <string name="explainer_what_moves_it">What moves it</string>
 
     <!-- Metric status badges -->
@@ -185,7 +253,6 @@
     <string name="target_none">No target</string>
 
     <!-- Metrics -->
-    <string name="metrics_add_entry">Add entry</string>
     <string name="metrics_import_banner_body">%1$d days imported · %2$s · everything below is your data</string>
     <string name="metrics_import_banner_title">Your WHOOP data is in</string>
     <string name="metrics_add_metric">Add metric</string>
@@ -201,9 +268,7 @@
     <string name="intensity_easy">Easy</string>
     <string name="intensity_moderate">Moderate</string>
     <string name="intensity_hard">Challenging</string>
-    <string name="metrics_history">History</string>
     <string name="metrics_note_label">Note</string>
-    <string name="metrics_title">Metrics</string>
     <string name="metrics_value_error">Enter a valid value for %1$s.</string>
     <string name="metrics_value_error_pending">Enter a valid value or leave blank for pending.</string>
     <string name="metrics_value_label">Value</string>
@@ -220,11 +285,9 @@
 
     <!-- Plan -->
     <string name="plan_log">Log</string>
-    <string name="plan_minus_five">-5</string>
-    <string name="plan_minutes_intensity">%1$d min - %2$s</string>
-    <string name="plan_plus_five">+5</string>
+    <string name="plan_minus_a11y">Five minutes less %1$s</string>
+    <string name="plan_plus_a11y">Five minutes more %1$s</string>
     <string name="plan_title">Weekly plan</string>
-    <string name="plan_title_caps">WEEKLY PLAN</string>
 
     <!-- Privacy -->
     <string name="privacy_body">Your data is stored on this device. Spartan has no cloud backend, no accounts, and no analytics, telemetry, or advertising SDKs. The only network connections are the WHOOP and Google Calendar syncs you explicitly connect — in sample-data mode, the app makes no network calls at all.</string>
@@ -247,7 +310,6 @@
     <string name="reflection_note_label">Anything worth remembering? (optional)</string>
     <string name="reflection_save">Save</string>
     <string name="reflection_title">How did today feel?</string>
-    <string name="review_reflections_observation">You logged %1$d reflections this week.</string>
     <string name="review_reflections_title">How your days felt</string>
 
     <!-- Reminders -->
@@ -268,27 +330,15 @@
     <string name="reminders_title">Reminders</string>
 
     <!-- Review -->
-    <string name="review_adherence">Adherence</string>
-    <string name="review_consistency">Consistency</string>
-    <string name="review_consistency_value">Active on %1$d of the last 7 days</string>
-    <string name="review_empty_body">Your weekly review appears after your first full week of activity. Check back Sunday.</string>
-    <string name="review_hrv_trend">HRV trend</string>
     <string name="review_needs_attention">Needs attention</string>
-    <string name="review_next_week_focus">Next week focus</string>
-    <string name="review_no_entry">No entry</string>
-    <string name="review_percent_value">%1$d%%</string>
-    <string name="review_recovery_trend">Recovery trend</string>
-    <string name="review_seven_day_rhr">7-day RHR</string>
-    <string name="review_seven_day_weight">7-day weight</string>
-    <string name="review_sleep_trend">Sleep performance trend</string>
     <string name="review_strength">Strength</string>
-    <string name="review_title">Weekly review</string>
     <string name="review_what_improved">What improved</string>
 
     <!-- Sample-data provenance -->
     <string name="sample_data_a11y">Sample data</string>
 
     <!-- Snackbars: every action confirms, and reversible ones offer Undo -->
+    <string name="snackbar_added_to_plan">Added %1$s to today</string>
     <string name="snackbar_no_slot_found">No open gap long enough today. Your plan is unchanged.</string>
     <string name="snackbar_scheduled_for">Scheduled for %1$s</string>
     <string name="snackbar_scheduled_for_sample">Scheduled for %1$s (sample calendar)</string>
@@ -297,10 +347,9 @@
     <string name="snackbar_undo">Undo</string>
 
     <!-- Bottom navigation tabs -->
-    <string name="tab_coach">Coach</string>
-    <string name="tab_metrics">Metrics</string>
-    <string name="tab_review">Review</string>
-    <string name="tab_settings">Settings</string>
+    <string name="tab_insights">Insights</string>
+    <string name="tab_progress">Progress</string>
+    <string name="tab_you">You</string>
     <string name="tab_today">Today</string>
 
     <!-- Settings -->
@@ -314,7 +363,6 @@
     <string name="settings_privacy_subtitle">Export or delete local data.</string>
     <string name="settings_reminders">Reminders</string>
     <string name="settings_reminders_subtitle">Activity and logging notifications.</string>
-    <string name="settings_title">Settings</string>
     <string name="settings_version">Version %1$s</string>
 
     <!-- Trajectory -->

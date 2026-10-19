@@ -1,7 +1,7 @@
 package com.spartan.ui.screens
 
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -10,11 +10,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.spartan.R
-import com.spartan.ui.theme.Radius
-import com.spartan.ui.theme.Spacing
 
 /**
  * The "SAMPLE DATA" provenance chip. Rendered on EVERY surface that shows WHOOP-derived numbers
@@ -27,18 +24,17 @@ import com.spartan.ui.theme.Spacing
 @Composable
 fun SampleDataChip(modifier: Modifier = Modifier) {
     Surface(
-        shape = RoundedCornerShape(Radius.chip),
-        color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.16f),
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.tertiaryContainer,
         modifier = modifier,
     ) {
         val a11y = stringResource(R.string.sample_data_a11y)
         Text(
             stringResource(R.string.checkin_sample_data),
             style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.tertiary,
+            color = MaterialTheme.colorScheme.onTertiaryContainer,
             // Spoken label: all-caps "SAMPLE DATA" can be spelled out letter-by-letter by TalkBack.
-            modifier = Modifier.padding(horizontal = Spacing.sm, vertical = 3.dp)
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
                 .semantics { contentDescription = a11y },
         )
     }

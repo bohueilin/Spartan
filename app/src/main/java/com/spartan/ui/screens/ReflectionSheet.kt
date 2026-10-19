@@ -8,8 +8,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -28,11 +27,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.spartan.R
 import com.spartan.domain.model.ReflectionMood
-import com.spartan.ui.theme.Radius
+import com.spartan.ui.components.PrimaryButton
 import com.spartan.ui.theme.Spacing
 
 /**
@@ -56,8 +54,7 @@ fun ReflectionSheet(
         ) {
             Text(
                 stringResource(R.string.reflection_title),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.semantics { heading() },
             )
             Text(
@@ -103,13 +100,12 @@ fun ReflectionSheet(
                 TextButton(onClick = onDismiss, modifier = Modifier.heightIn(min = 48.dp)) {
                     Text(stringResource(R.string.reflection_not_tonight))
                 }
-                Button(
-                    onClick = { mood?.let { onSave(it, note) } },
+                PrimaryButton(
+                    stringResource(R.string.reflection_save),
+                    { mood?.let { onSave(it, note) } },
+                    Modifier.padding(start = Spacing.sm),
                     enabled = mood != null,
-                    modifier = Modifier.heightIn(min = 48.dp).padding(start = Spacing.sm),
-                ) {
-                    Text(stringResource(R.string.reflection_save))
-                }
+                )
             }
         }
     }
@@ -128,12 +124,8 @@ private fun MoodChip(
 ) {
     val border = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
     Surface(
-        shape = RoundedCornerShape(Radius.card),
-        color = if (selected) {
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-        } else {
-            MaterialTheme.colorScheme.surface
-        },
+        shape = CircleShape,
+        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
         border = androidx.compose.foundation.BorderStroke(if (selected) 1.5.dp else 1.dp, border),
         modifier = modifier
             .heightIn(min = 48.dp)
@@ -147,8 +139,7 @@ private fun MoodChip(
             Text(
                 label,
                 style = MaterialTheme.typography.labelLarge,
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
             )
         }
     }
