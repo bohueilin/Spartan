@@ -18,8 +18,11 @@ import com.spartan.data.local.ReminderEntity
 import com.spartan.data.local.TargetEntity
 import com.spartan.data.local.UserProfileEntity
 import com.spartan.data.local.WorkoutSessionEntity
+import com.spartan.data.local.toDomain
 import com.spartan.data.local.toEntity
 import com.spartan.data.whoop.WhoopMapper
+import com.spartan.domain.engine.ActionPlaybook
+import com.spartan.domain.model.ActivityCategory
 import com.spartan.domain.model.ActivityStatus
 import com.spartan.domain.model.DailyActivity
 import com.spartan.domain.model.DailyPlan
@@ -53,8 +56,15 @@ class HealthRepository @Inject constructor(
     val pressureWindows: Flow<List<PressureWindowEntity>> = dao.observePressureWindows()
     val reflections: Flow<List<DailyReflectionEntity>> = dao.observeRecentReflections()
 
+    /** Every saved reflection (not only the recent page above) — what the export carries. */
+    val allReflections: Flow<List<DailyReflectionEntity>> = dao.observeAllReflections()
+
     fun dailyActivities(dateEpochDay: Long): Flow<List<DailyActivityEntity>> =
         dao.observeActivitiesForDay(dateEpochDay)
+
+    /** One-shot read of a day's saved activities (generated and user-added). */
+    suspend fun activitiesForDay(dateEpochDay: Long): List<DailyActivity> =
+        dao.activitiesForDay(dateEpochDay).map { it.toDomain() }
 
     fun metricReadings(): Flow<List<MetricReading>> = metrics.map { entries ->
         entries.map {
@@ -179,6 +189,13 @@ class HealthRepository @Inject constructor(
     suspend fun completedBreathworkCount(startDay: Long, endDay: Long): Int =
         dao.completedBreathworkCount(startDay, endDay)
 
+    /**
+     * Completed sessions in [categories] in [startDay, endDay] — a fitness or recovery habit goal's
+     * check-offs (the sleep anchor and the clinician check-in are not sessions and never count).
+     */
+    suspend fun completedActivityCount(categories: Set<ActivityCategory>, startDay: Long, endDay: Long): Int =
+        if (categories.isEmpty()) 0 else dao.completedActivityCount(categories, startDay, endDay)
+
     /** Oldest→today booleans for the trailing [days]: did each day have a completed activity? */
     suspend fun consistencyFlags(days: Int, todayEpochDay: Long): List<Boolean> {
         val active = dao.completedActivityDays(todayEpochDay - (days - 1), todayEpochDay).toSet()
@@ -226,12 +243,25 @@ class HealthRepository @Inject constructor(
 
     /**
      * Regenerates a day's plan after the data source changed (e.g. real CSV data replacing
-     * sample data): not-yet-completed activities are replaced, completed ones stay as history.
+     * sample data) or today's cycle replaced a holding plan: not-yet-completed generated
+     * activities are replaced, completed ones stay as history, and actions the user added stay.
+     * One transaction, so Today never observes the half-way empty day. Returns the replaced
+     * activities that had a snooze or reschedule reminder armed, for the caller to cancel.
      */
-    suspend fun reseedDailyPlan(plan: DailyPlan) {
-        dao.deleteNonCompletedActivitiesForDay(plan.dateEpochDay)
-        plan.activities.forEach { dao.insertActivityIfAbsent(it.toEntity(plan.dateEpochDay)) }
+    suspend fun reseedDailyPlan(plan: DailyPlan): List<String> {
+        val armed = database.withTransaction {
+            val replaced = dao.activitiesForDay(plan.dateEpochDay)
+                .filter {
+                    it.ruleId != ActionPlaybook.USER_ADDED_RULE &&
+                        (it.status == ActivityStatus.SNOOZED || it.status == ActivityStatus.RESCHEDULED)
+                }
+                .map { it.id }
+            dao.deleteNonCompletedActivitiesForDay(plan.dateEpochDay)
+            plan.activities.forEach { dao.insertActivityIfAbsent(it.toEntity(plan.dateEpochDay)) }
+            replaced
+        }
         logAudit("PLAN", "PLAN_REGENERATED", "activities=${plan.activities.size}")
+        return armed
     }
 
     /**

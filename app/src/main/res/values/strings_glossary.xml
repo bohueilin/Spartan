@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Plain-language metric glossary on Insights, metric detail and Progress (research §3.1–3.3): every
+  number shows its value, the user's own usual, and the direction it is moving. Direction words
+  only — never better/worse — and never a fixed 8 hours of sleep. "Over N days" counts the calendar
+  days the readings actually cover, and "yesterday" is said only when the reading really is.
+-->
+<resources>
+    <!-- Number line: "Your usual 62–78 ms · rising over 7 days" -->
+    <string name="glossary_usual">Your usual %1$s</string>
+    <string name="glossary_range">%1$s–%2$s</string>
+    <!-- Quantity: %2$d, the days needed to learn a usual -->
+    <plurals name="glossary_usual_learning">
+        <item quantity="one">Spartan is still learning your usual (%1$d of %2$d day)</item>
+        <item quantity="other">Spartan is still learning your usual (%1$d of %2$d days)</item>
+    </plurals>
+    <plurals name="glossary_trend_rising">
+        <item quantity="one">rising over %1$d day</item>
+        <item quantity="other">rising over %1$d days</item>
+    </plurals>
+    <plurals name="glossary_trend_falling">
+        <item quantity="one">falling over %1$d day</item>
+        <item quantity="other">falling over %1$d days</item>
+    </plurals>
+    <plurals name="glossary_trend_steady">
+        <item quantity="one">steady over %1$d day</item>
+        <item quantity="other">steady over %1$d days</item>
+    </plurals>
+    <string name="glossary_separator">" · "</string>
+
+    <!-- Metric-specific context shown with the number -->
+    <string name="glossary_zone">%1$s zone</string>
+    <string name="glossary_recovery_yesterday">%1$s yesterday</string>
+    <!-- The reading before the latest, from an earlier day: "58% on Tue" or "58% on Oct 3" -->
+    <string name="glossary_recovery_on_day">%1$s on %2$s</string>
+    <!-- The reading before the latest when its day is unknown -->
+    <string name="glossary_recovery_previous">Previous reading %1$s</string>
+    <string name="glossary_sleep_got_of_need">%1$s of about %2$s needed</string>
+    <string name="glossary_debt_payback">Pay it back over a few nights, not one.</string>
+    <string name="glossary_strain_target">Today\'s target: %1$s %2$d–%3$d</string>
+    <string name="glossary_population_label">General adult reference</string>
+
+    <!-- TalkBack: one sentence for the numbers; the chart stays decorative -->
+    <string name="glossary_a11y_above">%1$s %2$s, above your usual of %3$s to %4$s</string>
+    <string name="glossary_a11y_below">%1$s %2$s, below your usual of %3$s to %4$s</string>
+    <string name="glossary_a11y_within">%1$s %2$s, within your usual of %3$s to %4$s</string>
+    <!-- Quantity: %4$d, the days needed to learn a usual -->
+    <plurals name="glossary_a11y_learning">
+        <item quantity="one">%1$s %2$s, Spartan is still learning your usual, %3$d of %4$d day</item>
+        <item quantity="other">%1$s %2$s, Spartan is still learning your usual, %3$d of %4$d days</item>
+    </plurals>
+    <string name="glossary_a11y_separator">", "</string>
+</resources>

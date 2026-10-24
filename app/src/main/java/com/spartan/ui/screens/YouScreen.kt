@@ -23,6 +23,7 @@ import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.PrivacyTip
 import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -30,7 +31,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,7 +40,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.spartan.BuildConfig
 import com.spartan.R
+import com.spartan.domain.engine.GoalPreset
 import com.spartan.domain.engine.GoalType
+import com.spartan.domain.engine.PlanConstraints
 import com.spartan.domain.engine.SexAtBirth
 import com.spartan.ui.components.ListRow
 import com.spartan.ui.components.PageGutter
@@ -52,6 +55,9 @@ import java.util.Locale
 /**
  * You: who Spartan is coaching, the plan settings you set once and revisit rarely, your data
  * connections, and every privacy control — the profile tab of a travel app, for your health.
+ * With no goal yet, the goal row opens [GoalWizardSheet] (a custom goal still opens
+ * [GoalSetupSheet]); with an active or paused goal it goes to Progress. Plan settings edit only
+ * the plan's constraints, through the wizard's constraints step, and never touch the goal.
  */
 @Composable
 fun YouScreen(
@@ -66,9 +72,14 @@ fun YouScreen(
     onOpenReminders: () -> Unit,
     onOpenPrivacy: () -> Unit,
     onOpenDiagnostics: (() -> Unit)?,
+    onStartGoalPlan: (GoalPreset, Double, Int, PlanConstraints) -> Unit = { _, _, _, _ -> },
+    onSavePlanConstraints: (PlanConstraints) -> Unit = {},
 ) {
-    var showProfileSheet by remember { mutableStateOf(false) }
-    var showGoalSheet by remember { mutableStateOf(false) }
+    // Saveable, so a sheet open mid-edit survives rotation and process recreation.
+    var showProfileSheet by rememberSaveable { mutableStateOf(false) }
+    var showGoalSheet by rememberSaveable { mutableStateOf(false) }
+    var showWizard by rememberSaveable { mutableStateOf(false) }
+    var showPlanSettings by rememberSaveable { mutableStateOf(false) }
     val rows = PaddingValues(horizontal = Spacing.xl, vertical = Spacing.xs)
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         LazyColumn(
@@ -82,13 +93,25 @@ fun YouScreen(
             item { SectionHeader(stringResource(R.string.you_section_plan)) }
             item {
                 SpartanCard(contentPadding = rows) {
+                    val activeGoal = state.activeGoal
+                    val pausedGoal = state.pausedGoal
                     ListRow(
                         Icons.Outlined.Flag,
                         stringResource(R.string.you_goal),
-                        state.goalProgress?.summary ?: stringResource(R.string.you_goal_none),
-                        onClick = { if (state.activeGoal != null) onOpenProgress() else showGoalSheet = true },
+                        when {
+                            activeGoal != null -> state.goalProgress?.summary ?: goalTitle(activeGoal)
+                            pausedGoal != null -> stringResource(R.string.wizard_goal_paused, goalTitle(pausedGoal))
+                            else -> stringResource(R.string.you_goal_none)
+                        },
+                        onClick = { if (activeGoal != null || pausedGoal != null) onOpenProgress() else showWizard = true },
                     )
                     ListRow(Icons.AutoMirrored.Outlined.EventNote, stringResource(R.string.plan_title), stringResource(R.string.you_training_subtitle), onOpenTraining)
+                    ListRow(
+                        Icons.Outlined.Settings,
+                        stringResource(R.string.wizard_plan_settings_title),
+                        stringResource(R.string.wizard_plan_settings_subtitle),
+                        onClick = { showPlanSettings = true },
+                    )
                     ListRow(
                         Icons.Outlined.Schedule,
                         stringResource(R.string.you_windows),
@@ -131,8 +154,32 @@ fun YouScreen(
     if (showProfileSheet) {
         ProfileSheet(state, onSave = { age, sex -> onSaveDemographics(age, sex); showProfileSheet = false }, onDismiss = { showProfileSheet = false })
     }
+    if (showWizard) {
+        GoalWizardSheet(
+            state = state,
+            onStart = { preset, target, weeks, constraints ->
+                onStartGoalPlan(preset, target, weeks, constraints)
+                showWizard = false
+            },
+            onCustomGoal = {
+                showWizard = false
+                showGoalSheet = true
+            },
+            onDismiss = { showWizard = false },
+        )
+    }
     if (showGoalSheet) {
         GoalSetupSheet(onSave = { type, target, weeks -> onSaveGoal(type, target, weeks); showGoalSheet = false }, onDismiss = { showGoalSheet = false })
+    }
+    if (showPlanSettings) {
+        PlanConstraintsSheet(
+            state = state,
+            onSave = { constraints ->
+                onSavePlanConstraints(constraints)
+                showPlanSettings = false
+            },
+            onDismiss = { showPlanSettings = false },
+        )
     }
 }
 

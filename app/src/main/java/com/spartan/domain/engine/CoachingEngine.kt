@@ -9,14 +9,32 @@ import com.spartan.domain.model.MetricType
 import com.spartan.domain.model.ReadinessBand
 import com.spartan.domain.model.ReadinessSnapshot
 import com.spartan.domain.model.TimeOfDay
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 /**
- * Options that tune a day's plan without changing the readiness signal itself.
+ * Options that tune a day's plan without changing the readiness signal itself. The defaults add
+ * nothing: a plan built with default options is exactly the readiness-only plan.
  */
 data class CoachingOptions(
     val maxActivities: Int = 4,
     val missedGoalYesterday: Boolean = false,
     val painFlag: Boolean = false,
+    /** Tonight's lights-out target; when set, the plan carries an "In bed by …" sleep anchor. */
+    val bedtime: BedtimePlan? = null,
+    /** The user's one primary goal; adds a goal-focus card for the goals that have one. */
+    val goalType: GoalType? = null,
+    /** What the user said they won't do, and the minutes a day they have. */
+    val constraints: PlanConstraints = PlanConstraints(),
+    /**
+     * The fewest checkable actions a day should hold (never more than [maxActivities]). A plan that
+     * is shorter after the cap and the time budget is topped up with small, gentle habits — never a
+     * training session. 0 = no floor.
+     */
+    val minActivities: Int = 0,
+    /** Write clock times as "22:40" instead of "10:40 PM", matching the device's 24-hour setting. */
+    val use24HourClock: Boolean = false,
 )
 
 /**
@@ -47,14 +65,17 @@ class CoachingEngine(
         options: CoachingOptions = CoachingOptions(),
     ): DailyPlan {
         val raw = source.recommend(readiness, options)
-        val activities = prioritizeAndCap(raw, options.maxActivities)
+        val capped = prioritizeAndCap(raw, options.maxActivities)
+        val fitted = options.constraints.minutesPerDay?.let { fitToBudget(capped, it) } ?: capped
+        val activities = topUp(fitted, readiness.dateEpochDay, options)
         val plan = DailyPlan(
             dateEpochDay = readiness.dateEpochDay,
-            headline = headlineFor(readiness),
+            headline = headlineFor(readiness, activities),
             band = readiness.band,
             activities = activities,
             safetyBanner = safetyBannerFor(readiness),
             isMock = readiness.isMock,
+            strainTarget = strainTargetFor(readiness, options, activities),
         )
         // Defensive: every string that can reach the user is validated here as well.
         plan.activities.forEach { activity ->
@@ -97,8 +118,104 @@ class CoachingEngine(
         return (mustKeep + picked).sortedBy { it.priority.ordinal }
     }
 
-    private fun headlineFor(readiness: ReadinessSnapshot): String = when {
+    /**
+     * Trim a capped plan to the user's minutes a day, least important first: optional cards, then
+     * the recommended rule cards, and the user's own goal card last — the latest card first within
+     * each. Required cards, the clinician referral, the main training session and the sleep anchor
+     * are never dropped — if those alone run over, the plan keeps them and the UI shows the honest
+     * total rather than quietly removing guidance.
+     */
+    private fun fitToBudget(activities: List<DailyActivity>, minutesPerDay: Int): List<DailyActivity> {
+        val kept = activities.toMutableList()
+        val mainId = mainSession(activities)?.id
+        fun droppable(a: DailyActivity) = a.priority != ActivityPriority.REQUIRED &&
+            a.ruleId != RuleIds.CLINICIAN_REFERRAL && a.id != mainId && a.ruleId != RuleIds.SLEEP_ANCHOR
+        while (kept.sumOf { it.estimatedMinutes } > minutesPerDay) {
+            val drop = kept.withIndex()
+                .filter { droppable(it.value) }
+                .minWithOrNull(compareBy<IndexedValue<DailyActivity>>({ dropTier(it.value) }, { -it.index }))
+                ?.value ?: break
+            kept.remove(drop)
+        }
+        return kept
+    }
+
+    /** Budget drop order: 0 = an optional card, 1 = a recommended rule card, 2 = the goal's own card. */
+    private fun dropTier(activity: DailyActivity): Int = when {
+        activity.ruleId == RuleIds.GOAL_FOCUS -> 2
+        activity.priority == ActivityPriority.OPTIONAL -> 0
+        else -> 1
+    }
+
+    /**
+     * Lift a plan shorter than [CoachingOptions.minActivities] (never past the cap) with small,
+     * gentle habits from the [ActionPlaybook], in a fixed order. A habit is only added when it
+     * covers a need the plan doesn't already (no second card of the same kind), the user's won't-do
+     * list allows it, and it fits what is left of the time budget. Never a training session, and on a
+     * pain or check-in day no movement at all — those days stay restful. Stale days are topped up too.
+     */
+    private fun topUp(activities: List<DailyActivity>, day: Long, options: CoachingOptions): List<DailyActivity> {
+        val floor = minOf(options.minActivities, options.maxActivities)
+        if (activities.size >= floor) return activities
+        val avoid = options.constraints.avoid
+        val restful = activities.any { it.ruleId == RuleIds.PAIN_DELOAD || it.ruleId == RuleIds.CLINICIAN_REFERRAL }
+        val out = activities.toMutableList()
+        for ((metric, action) in TOP_UPS) {
+            if (out.size >= floor) break
+            val minutesLeft = options.constraints.minutesPerDay?.let { it - out.sumOf { a -> a.estimatedMinutes } }
+            val movement = action.category in MOVEMENT_CATEGORIES
+            val allowed = when {
+                out.any { it.category == action.category } || ActionPlaybook.isPlanned(action, out) -> false
+                action.category == ActivityCategory.BREATHWORK && AvoidOption.BREATHWORK in avoid -> false
+                movement && restful -> false
+                movement && action.time == TimeOfDay.MORNING && AvoidOption.MORNING_SESSIONS in avoid -> false
+                minutesLeft != null && action.minutes > minutesLeft -> false
+                else -> true
+            }
+            if (allowed) out += topUpActivity(action, metric, day)
+        }
+        return out
+    }
+
+    private fun topUpActivity(action: SuggestedAction, metric: MetricType, day: Long) = DailyActivity(
+        id = "$day:${action.key}",
+        title = action.title,
+        category = action.category,
+        priority = ActivityPriority.OPTIONAL,
+        whyItMatters = action.why,
+        relatedMetric = metric,
+        instructions = action.steps,
+        estimatedMinutes = action.minutes,
+        intensity = action.intensity,
+        bestTimeOfDay = action.time,
+        ruleId = RuleIds.DAILY_HABIT,
+    )
+
+    /**
+     * The day's strain target, read from the session actually planned so the two never disagree:
+     * none on a stale day (no verdict to target), Light on a pain day, otherwise the main session's
+     * zone — hard → High, moderate → Moderate, easy → Light.
+     */
+    private fun strainTargetFor(readiness: ReadinessSnapshot, options: CoachingOptions, activities: List<DailyActivity>): StrainZone? = when {
+        readiness.isStale -> null
+        options.painFlag -> StrainZone.LIGHT
+        else -> when (mainSession(activities)?.intensity) {
+            Intensity.HARD -> StrainZone.HIGH
+            Intensity.MODERATE -> StrainZone.MODERATE
+            Intensity.EASY, Intensity.REST -> StrainZone.LIGHT
+            null -> null
+        }
+    }
+
+    /** The day's main training card: the band session, or the pain / stale card that stands in for it. */
+    private fun mainSession(activities: List<DailyActivity>): DailyActivity? =
+        activities.firstOrNull { it.ruleId in TRAINING_RULES }
+
+    private fun headlineFor(readiness: ReadinessSnapshot, activities: List<DailyActivity>): String = when {
         readiness.isStale -> "Let's ease in while Spartan waits for today's data."
+        // A pain or check-in day never gets "make today count" — the plan on it stays gentle.
+        activities.any { it.ruleId == RuleIds.PAIN_DELOAD || it.ruleId == RuleIds.CLINICIAN_REFERRAL } ->
+            "Take it gently today and notice how you feel."
         readiness.band == ReadinessBand.PRIMED -> "You're primed. Make today count."
         readiness.band == ReadinessBand.BALANCED -> "Balanced day. Steady, quality work."
         readiness.band == ReadinessBand.EASY -> "Go lighter today and protect recovery."
@@ -111,7 +228,33 @@ class CoachingEngine(
         else ->
             "This is wellness and fitness guidance, not medical advice. Stop and seek care for pain, illness, or unusual symptoms."
     }
+
+    private companion object {
+        /** Rules whose card is the day's main training session (or the pain / stale stand-in for it). */
+        val TRAINING_RULES = setOf(
+            RuleIds.GOOD_RECOVERY_GREENLIGHT, RuleIds.LOW_RECOVERY, RuleIds.PAIN_DELOAD, RuleIds.STALE_DATA_FALLBACK,
+            RuleIds.CONCERNING_VITAL_EASY,
+        )
+
+        /**
+         * The gentle habits a short plan is topped up with, in the order they are offered: morning
+         * daylight, a stretch, slow breathing, water, a caffeine cutoff. Each keeps the metric it
+         * belongs to in the playbook.
+         */
+        val TOP_UPS: List<Pair<MetricType, SuggestedAction>> = listOf(
+            MetricType.SLEEP_PERFORMANCE to "morning-light",
+            MetricType.DAY_STRAIN to "stretch-reset",
+            MetricType.HRV_RMSSD to "breathing",
+            MetricType.RESTING_HEART_RATE to "hydrate",
+            MetricType.SLEEP_PERFORMANCE to "caffeine-cutoff",
+        ).mapNotNull { (metric, key) -> ActionPlaybook.forMetric(metric).firstOrNull { it.key == key }?.let { metric to it } }
+    }
 }
+
+/** Cards that are a workout, so "no morning workouts" applies to them. */
+private val MOVEMENT_CATEGORIES = setOf(
+    ActivityCategory.MOBILITY, ActivityCategory.ZONE2, ActivityCategory.STRENGTH, ActivityCategory.MOVEMENT,
+)
 
 /** Stable rule identifiers, carried on each activity for provenance and analytics. */
 object RuleIds {
@@ -126,6 +269,14 @@ object RuleIds {
     const val HYDRATION_BASELINE = "HYDRATION_BASELINE"
     const val STALE_DATA_FALLBACK = "STALE_DATA_FALLBACK"
     const val CLINICIAN_REFERRAL = "CLINICIAN_REFERRAL"
+    const val GOAL_FOCUS = "GOAL_FOCUS"
+    const val SLEEP_ANCHOR = "SLEEP_ANCHOR"
+
+    /** The easy walk that stands in for the band session on a good-recovery day with a concerning vital. */
+    const val CONCERNING_VITAL_EASY = "CONCERNING_VITAL_EASY"
+
+    /** A small, gentle habit that tops a short plan up to the daily minimum. */
+    const val DAILY_HABIT = "DAILY_HABIT"
 }
 
 class RuleBasedRecommendationSource(
@@ -135,6 +286,7 @@ class RuleBasedRecommendationSource(
     override fun recommend(readiness: ReadinessSnapshot, options: CoachingOptions): List<DailyActivity> {
         val out = mutableListOf<DailyActivity>()
         val day = readiness.dateEpochDay
+        val avoid = options.constraints.avoid
 
         val referral = clinicianReferral(readiness, day)
         val concerning = referral != null
@@ -147,13 +299,20 @@ class RuleBasedRecommendationSource(
         // a primed pain day used to green-light hard strength next to "gentle, comfortable
         // movement only", and a no-data day used to prescribe a moderate session anyway.)
         if (!options.painFlag && !readiness.isStale) {
-            when (readiness.band) {
-                ReadinessBand.REST, ReadinessBand.EASY -> out += lowRecoveryBlock(readiness, day)
-                // A concerning vital suppresses hard training even on a primed day — safety over strain.
-                ReadinessBand.PRIMED -> out += if (concerning) balancedSession(readiness, day) else greenlight(readiness, day)
-                ReadinessBand.BALANCED -> out += balancedSession(readiness, day)
+            when {
+                readiness.band == ReadinessBand.REST || readiness.band == ReadinessBand.EASY ->
+                    out += lowRecoveryBlock(readiness, day)
+                // A concerning vital takes even a primed day down to an easy walk — safety over strain —
+                // so the check-in's "take it easy" and the strain target match the session planned.
+                concerning -> out += easyCheckInSession(day)
+                // A user who won't do strength training gets the steady aerobic session instead.
+                readiness.band == ReadinessBand.PRIMED && AvoidOption.STRENGTH_TRAINING !in avoid ->
+                    out += greenlight(readiness, day)
+                else -> out += balancedSession(readiness, day)
             }
         }
+        // Right after the training block, so the cap's first pass reaches tonight's anchor early.
+        options.bedtime?.let { out += sleepAnchor(it, day, options.use24HourClock) }
 
         if (highStrainLowRecovery(readiness)) out += activeRecovery(day)
         if (poorSleep(readiness)) out += sleepHygiene(readiness, day)
@@ -163,9 +322,16 @@ class RuleBasedRecommendationSource(
         if (readiness.isStale) out += staleFallback(day)
 
         out += hydration(day)
+        // After every rule card: a goal card shares its slug with the matching rule card, so the
+        // cap's de-dupe keeps the rule version (and its reasoning) when both apply.
+        options.goalType?.let { goalFocus(it, day) }?.let { out += it }
+
+        val shaped = out
+            .filterNot { AvoidOption.BREATHWORK in avoid && it.category == ActivityCategory.BREATHWORK }
+            .map { if (AvoidOption.MORNING_SESSIONS in avoid) awayFromMorning(it) else it }
 
         // Sanitize as we build so a bad string fails fast at the rule that produced it.
-        return out.onEach { a ->
+        return shaped.onEach { a ->
             safetyEngine.sanitize(a.title); safetyEngine.sanitize(a.whyItMatters)
             a.instructions.forEach(safetyEngine::sanitize); a.safetyNote?.let(safetyEngine::sanitize)
         }
@@ -183,6 +349,14 @@ class RuleBasedRecommendationSource(
 
     private fun elevatedRhrTrend(r: ReadinessSnapshot): Boolean =
         (r.rhrVsBaseline ?: 0.0) >= 5.0
+
+    /** No morning workouts: optional movement cards move to midday; required ones keep their slot. */
+    private fun awayFromMorning(a: DailyActivity): DailyActivity =
+        if (a.priority != ActivityPriority.REQUIRED && a.category in MOVEMENT_CATEGORIES && a.bestTimeOfDay == TimeOfDay.MORNING) {
+            a.copy(bestTimeOfDay = TimeOfDay.MIDDAY)
+        } else {
+            a
+        }
 
     // --- activity builders ---------------------------------------------------
     private fun lowRecoveryBlock(r: ReadinessSnapshot, day: Long): List<DailyActivity> = listOf(
@@ -210,6 +384,16 @@ class RuleBasedRecommendationSource(
                 "Finish feeling like you could keep going."),
             minutes = 25, intensity = Intensity.MODERATE, time = TimeOfDay.AFTERNOON, note = null),
     )
+
+    /** The day's only session when a vital is outside the user's usual on a good-recovery day. */
+    private fun easyCheckInSession(day: Long): DailyActivity = activity(day, "zone2-walk",
+        "15-minute easy walk", ActivityCategory.ZONE2, ActivityPriority.RECOMMENDED,
+        RuleIds.CONCERNING_VITAL_EASY, MetricType.RECOVERY_SCORE,
+        why = "A reading is outside your usual range today, so easy movement keeps you active without adding strain.",
+        steps = listOf("Walk at a conversational pace.", "Keep effort easy — you should be able to talk.",
+            "Stop and rest if you feel unwell."),
+        minutes = 15, intensity = Intensity.EASY, time = TimeOfDay.MIDDAY,
+        note = "Skip hard training today and notice how you feel.")
 
     private fun greenlight(r: ReadinessSnapshot, day: Long): List<DailyActivity> = listOf(
         activity(day, "strength", "35-minute strength session", ActivityCategory.STRENGTH,
@@ -276,6 +460,69 @@ class RuleBasedRecommendationSource(
         steps = listOf("Drink a glass of water now.", "Keep water nearby and sip through the day."),
         minutes = 1, intensity = Intensity.REST, time = TimeOfDay.ANYTIME, note = null)
 
+    /**
+     * Tonight's anchor: "In bed by 10:40 PM" (or "22:40" on a 24-hour device). The why says it is the
+     * user's own bedtime when it is — checked first, since a user bedtime can also know its hours —
+     * or names the night it plans for: the estimated need, which already counts recent short nights
+     * when there is debt.
+     */
+    private fun sleepAnchor(bedtime: BedtimePlan, day: Long, use24HourClock: Boolean): DailyActivity {
+        val hours = bedtime.sleepHours
+        val why = when {
+            bedtime.fromUserBedtime ->
+                "Your own bedtime from your plan settings — a steady bedtime is one of the strongest sleep habits."
+            hours != null && bedtime.debtHours >= 0.25 ->
+                "Gives you about ${formatHoursMinutes(hours)} of sleep — your estimated need, which already counts recent short nights."
+            hours != null -> "Gives you about ${formatHoursMinutes(hours)} of sleep — your estimated need."
+            else -> "A steady bedtime helps protect tomorrow's recovery."
+        }
+        return activity(day, "sleep-anchor", "In bed by ${clock(bedtime.lightsOutMinute, use24HourClock)}",
+            ActivityCategory.SLEEP, ActivityPriority.RECOMMENDED, RuleIds.SLEEP_ANCHOR, MetricType.SLEEP_PERFORMANCE,
+            why = why,
+            steps = listOf("Start winding down at ${clock(bedtime.windDownMinute, use24HourClock)}.",
+                "Keep the room cool, dark, and quiet."),
+            minutes = 1, intensity = Intensity.REST, time = TimeOfDay.EVENING, note = null)
+    }
+
+    /**
+     * One card for the user's primary goal, reusing the slug of the rule card with the same idea so
+     * the two de-duplicate. Fitness has no extra card — the day's session already is the work.
+     * (Weight goals have no preset, so no card either.)
+     */
+    private fun goalFocus(goalType: GoalType, day: Long): DailyActivity? {
+        val preset = GoalPreset.forGoalType(goalType) ?: return null
+        val lead = "Part of your ${preset.label} goal:"
+        return when (preset) {
+            GoalPreset.SLEEP_BETTER -> activity(day, "winddown", "Sleep wind-down routine", ActivityCategory.SLEEP,
+                ActivityPriority.RECOMMENDED, RuleIds.GOAL_FOCUS, MetricType.SLEEP_PERFORMANCE,
+                why = "$lead a consistent wind-down helps you fall asleep faster and sleep deeper.",
+                steps = listOf("Dim screens 45 minutes before lights-out.", "Keep the room cool and dark.",
+                    "Same bedtime as last night, give or take 30 minutes."),
+                minutes = 20, intensity = Intensity.REST, time = TimeOfDay.EVENING, note = null)
+            GoalPreset.FEEL_STEADIER -> activity(day, "breathing", "5-minute breathing protocol", ActivityCategory.BREATHWORK,
+                ActivityPriority.RECOMMENDED, RuleIds.GOAL_FOCUS, MetricType.HRV_RMSSD,
+                why = "$lead slow, exhale-led breathing is a simple daily way to practice downshifting.",
+                steps = listOf("Sit comfortably.", "Inhale 4 seconds, exhale 6 seconds.",
+                    "Repeat for 5 minutes, relaxing the shoulders."),
+                minutes = 5, intensity = Intensity.REST, time = TimeOfDay.EVENING, note = null)
+            GoalPreset.RECOVER_WELL -> activity(day, "mobility", "10-minute mobility flow", ActivityCategory.MOBILITY,
+                ActivityPriority.RECOMMENDED, RuleIds.GOAL_FOCUS, MetricType.RECOVERY_SCORE,
+                why = "$lead gentle range-of-motion work supports recovery without adding load.",
+                steps = listOf("Move through hips, ankles, upper back, and shoulders.",
+                    "Slow, controlled reps — never force the end range."),
+                minutes = 10, intensity = Intensity.EASY, time = TimeOfDay.MORNING,
+                note = "Keep it comfortable. Stop and rest if anything is painful.")
+            GoalPreset.GET_FITTER -> null
+        }
+    }
+
+    /** Clock time the way the rest of the app writes it: "10:40 PM", or "22:40" on a 24-hour device. */
+    private fun clock(minuteOfDay: Int, use24HourClock: Boolean): String {
+        val minute = Math.floorMod(minuteOfDay, 24 * 60)
+        val pattern = if (use24HourClock) "HH:mm" else "h:mm a"
+        return LocalTime.of(minute / 60, minute % 60).format(DateTimeFormatter.ofPattern(pattern, Locale.getDefault()))
+    }
+
     private fun staleFallback(day: Long): DailyActivity = activity(day, "connect-whoop",
         "Ease in with a mobility flow", ActivityCategory.MOBILITY, ActivityPriority.RECOMMENDED,
         RuleIds.STALE_DATA_FALLBACK, MetricType.RECOVERY_SCORE,
@@ -294,9 +541,11 @@ class RuleBasedRecommendationSource(
         val rhrVeryHigh = r.restingHeartRate != null && r.restingHeartRate >= 100.0
         if (!respHigh && !rhrVeryHigh) return null
         val metric = if (respHigh) MetricType.RESPIRATORY_RATE else MetricType.RESTING_HEART_RATE
+        // A carried-forward (stale) day still holds an earlier day's readings — never call them today's.
+        val readings = if (r.isStale) "your most recent readings" else "today's readings"
         return activity(day, "clinician", "Check in with how you feel", ActivityCategory.RECOVERY,
             ActivityPriority.REQUIRED, RuleIds.CLINICIAN_REFERRAL, metric,
-            why = "One or more of today's readings is outside your usual range. This is not a diagnosis, and one reading is not a conclusion.",
+            why = "One or more of $readings is outside your usual range. This is not a diagnosis, and one reading is not a conclusion.",
             steps = listOf("Notice any symptoms like illness, unusual fatigue, or feeling unwell.",
                 "Rest and take it easy today.",
                 "If readings stay unusual or you have symptoms, consider consulting a qualified clinician."),

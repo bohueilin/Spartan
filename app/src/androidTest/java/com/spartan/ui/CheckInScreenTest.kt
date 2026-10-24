@@ -5,6 +5,8 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertWidthIsAtLeast
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -23,8 +25,8 @@ import org.junit.runner.RunWith
 /**
  * Compose smoke + accessibility assertions against the REAL app in its default mock mode — the
  * deterministic sample WHOOP data acts as the test fixture, so no Hilt test doubles are needed.
- * Covers: onboarding → daily check-in renders a plan; a11y contract (labeled checkboxes,
- * 48dp touch targets) on the hero screen.
+ * Covers: onboarding → daily check-in renders a plan; the morning verdict as colour + word +
+ * number; a11y contract (labeled checkboxes, 48dp touch targets) on the hero screen.
  */
 @RunWith(AndroidJUnit4::class)
 class CheckInScreenTest {
@@ -94,6 +96,23 @@ class CheckInScreenTest {
         composeRule.waitUntil(5_000) {
             composeRule.onAllNodesWithText("Skipped for today").fetchSemanticsNodes().isEmpty()
         }
+    }
+
+    @Test
+    fun verdictCard_statesColourWordAndNumber_inSampleMode() {
+        completeOnboardingIfShown()
+        awaitTodaysPlan()
+        // The sample day's completed cycle scores 42: a Ready verdict, Yellow. Status is never colour
+        // alone, so the card must say the word and the number in text.
+        val verdict = "Yellow · 42%"
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithText(verdict).fetchSemanticsNodes().isNotEmpty()
+        }
+        // TalkBack hears the same verdict as one stop, with the provenance the chip shows sighted users.
+        composeRule.onNode(hasText(verdict) and hasContentDescription("Recovery Yellow, 42 percent", substring = true))
+            .assertExists()
+        composeRule.onNode(hasText(verdict) and hasContentDescription("Sample data", substring = true))
+            .assertExists()
     }
 
     @Test

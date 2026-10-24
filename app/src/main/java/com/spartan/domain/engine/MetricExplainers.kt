@@ -39,7 +39,7 @@ object MetricExplainers {
                 "Training load from the previous day or two.",
                 "Alcohol, late meals, and dehydration.",
                 "Stress, travel, and irregular schedules.",
-                "Getting sick, sometimes a day or two before you feel it.",
+                "Illness or feeling run down.",
             ),
             whatGoodLooksLike = "There is no prize for a perfect score every day. A good pattern " +
                 "is recovery that swings with your training and bounces back within a day or " +

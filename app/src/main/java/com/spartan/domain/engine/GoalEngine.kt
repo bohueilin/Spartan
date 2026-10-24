@@ -10,9 +10,9 @@ import kotlin.math.ceil
  * readings. A goal that asks for too much is never refused rudely — the engine counter-offers
  * the nearest safe version (docs/COACH_DESIGN.md §4). Pure Kotlin, fully unit-tested.
  */
-enum class GoalType { WEIGHT_LOSS, SLEEP_RECOVERY, STRESS_RESILIENCE }
+enum class GoalType { WEIGHT_LOSS, SLEEP_RECOVERY, STRESS_RESILIENCE, FITNESS, RECOVERY }
 
-enum class GoalStatus { ACTIVE, COMPLETED, ABANDONED }
+enum class GoalStatus { ACTIVE, PAUSED, COMPLETED, ABANDONED }
 
 /** A recurring high-pressure window the user declared (e.g. Tue/Thu 11:00–12:00). */
 data class PressureWindow(
@@ -27,9 +27,15 @@ data class PressureWindow(
 data class Goal(
     val id: String,
     val type: GoalType,
-    /** WEIGHT_LOSS: pounds to lose. SLEEP_RECOVERY: percent improvement. STRESS: sessions/week. */
+    /**
+     * WEIGHT_LOSS: pounds to lose. SLEEP_RECOVERY: percent improvement. STRESS_RESILIENCE,
+     * FITNESS and RECOVERY: sessions/week.
+     */
     val targetValue: Double,
-    /** Captured at creation from the user's data (start weight lb / baseline sleep perf %). */
+    /**
+     * Captured at creation from the user's data (start weight kg / baseline sleep perf % /
+     * HRV ms / resting heart rate bpm / recovery %). Habit goals show it as context only.
+     */
     val baselineValue: Double?,
     val startEpochDay: Long,
     val targetEpochDay: Long,
@@ -76,6 +82,12 @@ object GoalEngine {
     /** Recovery/sleep-performance gains beyond ~5%/week vs baseline are not realistic asks. */
     const val MAX_SLEEP_GAIN_PERCENT_PER_WEEK = 5.0
 
+    /** Training sessions a week Spartan will plan: at least one rest day, always. */
+    const val MAX_TRAINING_SESSIONS_PER_WEEK = 6
+
+    /** Recovery sessions a week Spartan will plan: one a day is plenty. */
+    const val MAX_RECOVERY_SESSIONS_PER_WEEK = 7
+
     fun validate(requested: Goal): GoalValidation {
         if (requested.targetValue <= 0.0) return GoalValidation.Invalid("Pick a target above zero.")
         if (requested.targetEpochDay <= requested.startEpochDay) {
@@ -113,8 +125,23 @@ object GoalEngine {
                 }
             }
             GoalType.STRESS_RESILIENCE -> GoalValidation.Ok(requested)
+            GoalType.FITNESS -> capWeeklySessions(
+                requested, MAX_TRAINING_SESSIONS_PER_WEEK,
+                why = "Rest days are where fitness is built — Spartan plans at most " +
+                    "$MAX_TRAINING_SESSIONS_PER_WEEK sessions a week.",
+            )
+            GoalType.RECOVERY -> capWeeklySessions(
+                requested, MAX_RECOVERY_SESSIONS_PER_WEEK,
+                why = "One recovery session a day is plenty — Spartan plans at most " +
+                    "$MAX_RECOVERY_SESSIONS_PER_WEEK a week.",
+            )
         }
     }
+
+    /** Habit goals ask for sessions a week; above [max] the nearest safe version is [max] itself. */
+    private fun capWeeklySessions(requested: Goal, max: Int, why: String): GoalValidation =
+        if (requested.targetValue <= max) GoalValidation.Ok(requested)
+        else GoalValidation.Adjusted(adjusted = requested.copy(targetValue = max.toDouble()), why = why)
 
     /** Plan emphasis for the active goal; the recovery-gated daily engine still owns the floor. */
     fun planModifiers(goal: Goal?, windows: List<PressureWindow>): GoalPlanModifiers = when (goal?.type) {
@@ -132,38 +159,53 @@ object GoalEngine {
             emphasizeWindDown = true,
             preWindowBreathwork = windows,
         )
+        GoalType.FITNESS -> GoalPlanModifiers(
+            extraZone2MinutesPerWeek = 30,
+            protectStrengthSessions = 2,
+            preWindowBreathwork = windows,
+        )
+        GoalType.RECOVERY -> GoalPlanModifiers(
+            emphasizeWindDown = true,
+            preWindowBreathwork = windows,
+        )
     }
 
     /**
      * Progress from the user's own readings. [readings] are raw entries; the relevant metric is
      * trailing-7-day averaged so a single odd day never whipsaws the goal card. Weight readings
      * are stored in kg and converted here, because goals speak pounds.
-     * [breathworkThisWeek] feeds the STRESS_RESILIENCE habit goal (sessions completed this week).
+     * [breathworkThisWeek], [trainingSessionsThisWeek] and [recoverySessionsThisWeek] feed the
+     * STRESS_RESILIENCE, FITNESS and RECOVERY habit goals (sessions completed this week).
      */
     fun progress(
         goal: Goal,
         readings: List<MetricReading>,
         todayEpochDay: Long,
         breathworkThisWeek: Int = 0,
+        trainingSessionsThisWeek: Int = 0,
+        recoverySessionsThisWeek: Int = 0,
     ): GoalProgress {
         val timeFraction = ((todayEpochDay - goal.startEpochDay).toDouble() /
             (goal.targetEpochDay - goal.startEpochDay).coerceAtLeast(1)).coerceIn(0.0, 1.0)
         val remainingWeeks = ceil((goal.targetEpochDay - todayEpochDay) / 7.0).toInt().coerceAtLeast(0)
 
-        // Stress resilience is a habit goal: showing up this week IS the progress; the HRV trend
-        // rides along as context, never as a pass/fail judgment.
-        if (goal.type == GoalType.STRESS_RESILIENCE) {
+        // Stress resilience, fitness and recovery are habit goals: showing up this week IS the
+        // progress; the body signal (HRV, resting HR, recovery) rides along as context, never as
+        // a pass/fail judgment.
+        val sessionsThisWeek = when (goal.type) {
+            GoalType.STRESS_RESILIENCE -> breathworkThisWeek
+            GoalType.FITNESS -> trainingSessionsThisWeek
+            GoalType.RECOVERY -> recoverySessionsThisWeek
+            GoalType.WEIGHT_LOSS, GoalType.SLEEP_RECOVERY -> null
+        }
+        if (sessionsThisWeek != null) {
             val weeklyTarget = goal.targetValue.coerceAtLeast(1.0)
-            val fraction = (breathworkThisWeek / weeklyTarget).coerceIn(0.0, 1.0)
-            val hrvNow = trailingAverage(readings, MetricType.HRV_RMSSD, todayEpochDay)
-            val hrvNote = if (goal.baselineValue != null && hrvNow != null) {
-                val d = hrvNow - goal.baselineValue
-                " · HRV ${if (d >= 0) "+" else ""}${roundTo1(d)} ms vs baseline"
-            } else ""
+            val fraction = (sessionsThisWeek / weeklyTarget).coerceIn(0.0, 1.0)
             return GoalProgress(
                 fraction = fraction, timeFraction = timeFraction,
                 onTrack = fraction >= 0.5 || timeFraction < 0.2,
-                summary = "$breathworkThisWeek of ${weeklyTarget.toInt()} calm sessions this week$hrvNote",
+                summary = "$sessionsThisWeek of ${weeklyTarget.toInt()} ${habitNoun(goal.type)} this week" +
+                    contextNote(goal, readings, todayEpochDay),
             )
         }
 
@@ -200,11 +242,32 @@ object GoalEngine {
         return GoalProgress(fraction = fraction, timeFraction = timeFraction, onTrack = onTrack, summary = summary)
     }
 
-    /** The reading type that measures each goal. */
+    /** The reading type that measures each goal (habit goals: the context metric shown beside it). */
     fun metricFor(type: GoalType): MetricType = when (type) {
         GoalType.WEIGHT_LOSS -> MetricType.WEIGHT
         GoalType.SLEEP_RECOVERY -> MetricType.SLEEP_PERFORMANCE
         GoalType.STRESS_RESILIENCE -> MetricType.HRV_RMSSD
+        GoalType.FITNESS -> MetricType.RESTING_HEART_RATE
+        GoalType.RECOVERY -> MetricType.RECOVERY_SCORE
+    }
+
+    private fun habitNoun(type: GoalType): String = when (type) {
+        GoalType.FITNESS -> "training sessions"
+        GoalType.RECOVERY -> "recovery sessions"
+        else -> "calm sessions"
+    }
+
+    /** " · resting HR -1.5 bpm vs baseline" — context beside a habit goal, empty without both numbers. */
+    private fun contextNote(goal: Goal, readings: List<MetricReading>, todayEpochDay: Long): String {
+        val baseline = goal.baselineValue ?: return ""
+        val now = trailingAverage(readings, metricFor(goal.type), todayEpochDay) ?: return ""
+        val d = now - baseline
+        val (label, unit) = when (goal.type) {
+            GoalType.FITNESS -> "resting HR" to " bpm"
+            GoalType.RECOVERY -> "recovery" to "%"
+            else -> "HRV" to " ms"
+        }
+        return " · $label ${if (d >= 0) "+" else ""}${roundTo1(d)}$unit vs baseline"
     }
 
     /**

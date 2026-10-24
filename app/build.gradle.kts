@@ -138,6 +138,9 @@ dependencies {
     implementation("com.google.android.play:review-ktx:2.0.2") // in-app review prompt
     implementation("androidx.health.connect:connect-client:1.1.0") // HC adapter (flag-gated off)
     implementation("androidx.glance:glance-appwidget:1.1.1") // home-screen "next activity" widget
+    // One-shot state-change animations (res/raw: completion_morph, morning_reveal). 6.6.2 is the
+    // Dec 2024 release, matching compose-bom 2024.12.01; it only floors Compose at BOM 2024.02.01.
+    implementation("com.airbnb.android:lottie-compose:6.6.2")
 
     // Phase 2 — real integrations. Unused in the default mock build; enabled behind USE_MOCK_* flags.
     implementation("androidx.security:security-crypto:1.1.0") // Keystore-backed EncryptedSharedPreferences
@@ -160,6 +163,10 @@ dependencies {
     testImplementation("org.robolectric:robolectric:4.14.1")
     testImplementation("androidx.test:core-ktx:1.6.1")
     testImplementation("androidx.work:work-testing:2.10.0")
+    // Robolectric Compose tests (Lottie one-shot + reduce-motion). ComponentActivity comes from the
+    // debug-only ui-test-manifest; LottieMomentsTest registers it itself for release-variant runs.
+    testImplementation(composeBom)
+    testImplementation("androidx.compose.ui:ui-test-junit4")
 
     // Instrumentation (device/emulator; compiled in CI, run in the emulator job).
     androidTestImplementation("androidx.test.ext:junit:1.3.0")

@@ -4,6 +4,8 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -33,18 +35,25 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.spartan.R
 import com.spartan.domain.engine.ActionPlaybook
+import com.spartan.domain.engine.MetricGlossary
+import com.spartan.domain.engine.RecoveryZone
 import com.spartan.domain.engine.Signal
 import com.spartan.domain.engine.SignalEngine
 import com.spartan.domain.engine.SignalPosition
+import com.spartan.domain.engine.SleepNeed
+import com.spartan.domain.engine.StrainZone
 import com.spartan.domain.engine.SuggestedAction
+import com.spartan.domain.engine.Trend
+import com.spartan.domain.engine.formatHoursMinutes
 import com.spartan.domain.model.ClinicalStatus
-import com.spartan.domain.model.DailyActivity
 import com.spartan.domain.model.InsightCard
 import com.spartan.domain.model.MetricAssessment
 import com.spartan.domain.model.MetricType
@@ -57,9 +66,13 @@ import com.spartan.ui.components.SpartanCard
 import com.spartan.ui.components.Sparkline
 import com.spartan.ui.components.StatusPill
 import com.spartan.ui.components.Tone
+import com.spartan.ui.components.WellnessFooter
 import com.spartan.ui.components.metricIcon
 import com.spartan.ui.components.toneColor
 import com.spartan.ui.theme.Spacing
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -67,8 +80,23 @@ import kotlin.math.roundToInt
 private val WEARABLE = SignalEngine.DAILY.toSet() + MetricType.ENERGY_KCAL + MetricType.SLEEP_DURATION
 
 /**
- * Insights: every signal read against the user's own normal, what it means in one sentence, and
- * the single most useful thing to do about it — one tap from today's plan.
+ * Days the glossary trend looks back over ("rising over 7 days"; fewer when the readings cover
+ * fewer days), and readings the card's sparkline shows.
+ */
+private const val TREND_DAYS = 7
+
+/** A previous reading within this many days of today is named by its weekday ("on Tue"), else by its date. */
+private const val WEEKDAY_NAME_DAYS = 6L
+
+/**
+ * Metrics whose population reference is shown, second and labelled. Never HRV (there is no
+ * population "good" HRV), and strain's zone scale is not a population range.
+ */
+private val POPULATION_NOTE_METRICS = setOf(MetricType.RESTING_HEART_RATE, MetricType.RESPIRATORY_RATE)
+
+/**
+ * Insights: every signal in one human sentence first, then its number against the user's own
+ * usual and trend, and the single most useful thing to do about it — one tap from today's plan.
  */
 @Composable
 fun InsightsScreen(
@@ -100,7 +128,7 @@ fun InsightsScreen(
             } else {
                 item(key = "signals-header") { SectionHeader(stringResource(R.string.insights_signals)) }
                 items(state.signals, key = { it.metric.name }) { signal ->
-                    SignalCard(signal, state.todayActivities, onOpenMetric, onAddAction)
+                    SignalCard(signal, state, onOpenMetric, onAddAction)
                 }
             }
 
@@ -139,46 +167,67 @@ fun InsightsScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = Spacing.lg),
                 )
+                WellnessFooter()
             }
         }
     }
 }
 
-/** One signal: status against the user's normal, the trend, what it means, and what to do. */
+/**
+ * One signal, human language before numbers (research §1.5.4): the glossary name and its one
+ * sentence; the value and status; the user's usual, the trend and metric-specific context; the
+ * week's sparkline; then what it means today and what to do. TalkBack hears the numbers as one
+ * summary sentence — the sparkline stays decorative.
+ */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SignalCard(
     signal: Signal,
-    today: List<DailyActivity>,
+    state: MainUiState,
     onOpenMetric: (MetricType) -> Unit,
     onAddAction: (SuggestedAction, MetricType) -> Unit,
 ) {
     val (status, tone) = signalStatus(signal)
     val color = toneColor(tone)
+    val facts = glossaryFacts(signal, state)
     val action = ActionPlaybook.forMetric(signal.metric).firstOrNull()
     SpartanCard(
         onClick = { onOpenMetric(signal.metric) },
-        onClickLabel = stringResource(R.string.checkin_open_metric, signal.metric.label),
+        onClickLabel = stringResource(R.string.checkin_open_metric, facts.name),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconTile(metricIcon(signal.metric), color)
             Spacer(Modifier.width(Spacing.md))
-            Column(Modifier.weight(1f)) {
-                Text(signal.metric.label, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
-                Text(normalRangeLabel(signal), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
+            Text(facts.name, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
         }
-        Row(Modifier.padding(top = Spacing.lg), verticalAlignment = Alignment.CenterVertically) {
-            Column {
+        facts.sentence?.let {
+            Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(top = Spacing.md))
+        }
+        Column(Modifier.padding(top = Spacing.lg).clearAndSetSemantics { contentDescription = facts.summary }) {
+            // Wraps rather than squeezes: at large font sizes the pill drops under the value.
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+                verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+            ) {
                 Text(
-                    formatMetricValue(signal.latest, signal.metric),
+                    facts.value,
                     style = MaterialTheme.typography.headlineMedium,
                     color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.align(Alignment.CenterVertically),
                 )
-                StatusPill(status, tone, Modifier.padding(top = Spacing.xs))
+                StatusPill(status, tone, Modifier.align(Alignment.CenterVertically))
             }
-            Spacer(Modifier.width(Spacing.xl))
-            Sparkline(signal.history, color, Modifier.weight(1f), signal.normalLow, signal.normalHigh, height = 56.dp)
+            GlossaryFactLines(facts)
         }
+        facts.populationNote?.let { GlossaryPopulationNote(it, Modifier.padding(top = Spacing.md)) }
+        Sparkline(
+            signal.history.takeLast(TREND_DAYS),
+            color,
+            Modifier.padding(top = Spacing.md),
+            signal.normalLow,
+            signal.normalHigh,
+            height = 56.dp,
+        )
         Text(
             SignalEngine.meaning(signal),
             style = MaterialTheme.typography.bodyMedium,
@@ -187,10 +236,154 @@ private fun SignalCard(
         )
         if (action != null) {
             HorizontalDivider(Modifier.padding(vertical = Spacing.lg), color = MaterialTheme.colorScheme.outlineVariant)
-            ActionLine(action, ActionPlaybook.isPlanned(action, today)) { onAddAction(action, signal.metric) }
+            ActionLine(action, ActionPlaybook.isPlanned(action, state.todayActivities)) { onAddAction(action, signal.metric) }
         }
     }
 }
+
+/**
+ * What a coached metric's number is always shown with (research §3.1–3.3), ready to render:
+ * [usualLine] is the user's usual plus the trend, [contextLine] the metric-specific addition
+ * ("58% yesterday", "7h 40m of about 8h 10m needed"), [populationNote] the labelled population
+ * reference for resting heart rate and respiratory rate only, and [summary] the one TalkBack
+ * sentence for all of the numbers.
+ */
+internal data class GlossaryFacts(
+    val name: String,
+    val sentence: String?,
+    val value: String,
+    val usualLine: String,
+    val contextLine: String?,
+    val populationNote: String?,
+    val summary: String,
+)
+
+/**
+ * The glossary presentation of [signal]: personal usual first, a direction-only trend (never better
+ * or worse), metric-specific context, and a population reference second where one is meaningful.
+ */
+@Composable
+internal fun glossaryFacts(signal: Signal, state: MainUiState): GlossaryFacts {
+    val metric = signal.metric
+    val entry = MetricGlossary.entry(metric)
+    val name = entry?.name ?: metric.label
+    val value = glossaryValue(signal.latest, metric)
+    val low = signal.normalLow
+    val high = signal.normalHigh
+    // The calendar days the trend's readings actually cover, so gaps in wear are never called "7 days".
+    val trendDays = MetricGlossary.trendSpanDays(signal, TREND_DAYS)
+    val trend = when (MetricGlossary.trend(signal, TREND_DAYS)) {
+        Trend.RISING -> pluralStringResource(R.plurals.glossary_trend_rising, trendDays, trendDays)
+        Trend.FALLING -> pluralStringResource(R.plurals.glossary_trend_falling, trendDays, trendDays)
+        Trend.STEADY -> pluralStringResource(R.plurals.glossary_trend_steady, trendDays, trendDays)
+        Trend.LEARNING -> null
+    }
+    val needed = SignalEngine.MIN_BASELINE_DAYS
+    val (usual, comparison) = if (low == null || high == null) {
+        pluralStringResource(R.plurals.glossary_usual_learning, needed, signal.baselineDays, needed) to
+            pluralStringResource(R.plurals.glossary_a11y_learning, needed, name, value, signal.baselineDays, needed)
+    } else {
+        val lowText = if (metric == MetricType.SLEEP_DEBT) formatHoursMinutes(low) else formatNumber(low, metric)
+        val highText = glossaryValue(high, metric)
+        val comparisonRes = when (signal.position) {
+            SignalPosition.ABOVE -> R.string.glossary_a11y_above
+            SignalPosition.BELOW -> R.string.glossary_a11y_below
+            else -> R.string.glossary_a11y_within
+        }
+        stringResource(R.string.glossary_usual, stringResource(R.string.glossary_range, lowText, highText)) to
+            stringResource(comparisonRes, name, value, lowText, highText)
+    }
+    val context = glossaryContext(signal, state)
+    val dot = stringResource(R.string.glossary_separator)
+    return GlossaryFacts(
+        name = name,
+        sentence = entry?.sentence,
+        value = value,
+        usualLine = listOfNotNull(usual, trend).joinToString(dot),
+        contextLine = context.takeIf { it.isNotEmpty() }?.joinToString(dot),
+        populationNote = entry?.populationNote?.takeIf { metric in POPULATION_NOTE_METRICS },
+        summary = (listOfNotNull(comparison, trend) + context).joinToString(stringResource(R.string.glossary_a11y_separator)),
+    )
+}
+
+/** The metric-specific addition next to a coached number; empty when the metric has none. */
+@Composable
+private fun glossaryContext(signal: Signal, state: MainUiState): List<String> = when (signal.metric) {
+    MetricType.RECOVERY_SCORE -> listOfNotNull(
+        stringResource(R.string.glossary_zone, RecoveryZone.of(signal.latest.roundToInt()).label),
+        MetricGlossary.previousValue(signal)?.let { previousReadingLine(signal, formatMetricValue(it, signal.metric)) },
+    )
+    MetricType.SLEEP_PERFORMANCE -> listOfNotNull(
+        sleepGotVsNeeded(signal, state)?.let { (slept, need) ->
+            stringResource(R.string.glossary_sleep_got_of_need, formatHoursMinutes(slept), formatHoursMinutes(need))
+        },
+    )
+    MetricType.SLEEP_DEBT -> listOf(stringResource(R.string.glossary_debt_payback))
+    MetricType.DAY_STRAIN -> listOfNotNull(
+        stringResource(R.string.glossary_zone, StrainZone.of(signal.latest).label),
+        state.strainTarget?.let { stringResource(R.string.glossary_strain_target, it.label, it.low, it.high) },
+    )
+    else -> emptyList()
+}
+
+/**
+ * The reading before the latest, named by its real day: "58% yesterday" only when it is dated the
+ * day before the latest reading and the latest is today's; otherwise "58% on Tue" (or "on Oct 3"
+ * past a week), and "Previous reading 58%" when the signal carries no dates.
+ */
+@Composable
+private fun previousReadingLine(signal: Signal, value: String): String {
+    val previous = MetricGlossary.previousDate(signal)
+        ?: return stringResource(R.string.glossary_recovery_previous, value)
+    val today = LocalDate.now()
+    if (MetricGlossary.previousIsYesterday(signal) && signal.dates.lastOrNull() == today) {
+        return stringResource(R.string.glossary_recovery_yesterday, value)
+    }
+    val pattern = if (ChronoUnit.DAYS.between(previous, today) in 0L..WEEKDAY_NAME_DAYS) "EEE" else "MMM d"
+    val day = previous.format(DateTimeFormatter.ofPattern(pattern, Locale.getDefault()))
+    return stringResource(R.string.glossary_recovery_on_day, value, day)
+}
+
+/**
+ * Hours got and hours needed for the newest night: the synced night when the plan has both,
+ * otherwise the newest sleep-duration reading with the need estimated from this [performance].
+ * Null when either is unknown — the comparison is never against a fixed 8 hours.
+ */
+private fun sleepGotVsNeeded(performance: Signal, state: MainUiState): Pair<Double, Double>? {
+    val slept = state.sleptHours
+    val need = state.sleepNeedHours
+    if (slept != null && need != null) return slept to need
+    val logged = SignalEngine.signal(MetricType.SLEEP_DURATION, state.readings)?.latest ?: return null
+    val estimated = SleepNeed.neededHours(logged, performance.latest.roundToInt()) ?: return null
+    return logged to estimated
+}
+
+/** The usual-and-trend line, then any metric-specific context. Wraps at any font size, never clipped. */
+@Composable
+internal fun GlossaryFactLines(facts: GlossaryFacts) {
+    Text(
+        facts.usualLine,
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(top = Spacing.sm),
+    )
+    facts.contextLine?.let {
+        Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(top = Spacing.xs))
+    }
+}
+
+/** A population reference, second and labelled as such, so it never reads as the user's target. */
+@Composable
+internal fun GlossaryPopulationNote(note: String, modifier: Modifier = Modifier) {
+    Column(modifier) {
+        Text(stringResource(R.string.glossary_population_label), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(note, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
+    }
+}
+
+/** A coached value as shown: sleep debt in hours and minutes ("1h 10m"), everything else as [formatMetricValue]. */
+private fun glossaryValue(value: Double, metric: MetricType): String =
+    if (metric == MetricType.SLEEP_DEBT) formatHoursMinutes(value) else formatMetricValue(value, metric)
 
 /** "TRY · 5-minute breathing protocol · 5 min" with an Add button, or a calm "In today's plan". */
 @Composable
@@ -297,9 +490,12 @@ internal fun signalStatus(signal: Signal): Pair<String, Tone> {
 internal fun normalRangeLabel(signal: Signal): String {
     val low = signal.normalLow
     val high = signal.normalHigh
-    if (low == null || high == null) return stringResource(R.string.signal_learning_days, signal.baselineDays, SignalEngine.MIN_BASELINE_DAYS)
+    if (low == null || high == null) {
+        val needed = SignalEngine.MIN_BASELINE_DAYS
+        return pluralStringResource(R.plurals.signal_learning_days, needed, signal.baselineDays, needed)
+    }
     val range = "${formatNumber(low, signal.metric)}–${formatMetricValue(high, signal.metric)}"
-    return stringResource(R.string.signal_normal_range, range, signal.baselineDays)
+    return pluralStringResource(R.plurals.signal_normal_range, signal.baselineDays, range, signal.baselineDays)
 }
 
 /** Metrics that read as whole numbers; everything else keeps one decimal when it has one. */

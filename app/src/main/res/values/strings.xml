@@ -2,7 +2,6 @@
     <string name="app_name">Spartan</string>
 
     <!-- Check-in -->
-    <string name="checkin_building_plan">Building today\'s plan…</string>
     <string name="checkin_completed">Completed</string>
     <string name="checkin_connect_prompt_body_real">Connect WHOOP to personalize your plan.</string>
     <string name="checkin_connect_prompt_body_sample">You\'re viewing sample data. Connect to personalize your plan with your real recovery, sleep, and strain.</string>
@@ -13,16 +12,10 @@
     <string name="checkin_open_metric">Open %1$s details</string>
     <string name="checkin_urgency_due">Due today</string>
     <string name="checkin_urgency_overdue">Overdue</string>
-    <string name="checkin_footer_disclaimer">Spartan offers wellness and fitness guidance, not medical advice. For any health concern, contact a qualified clinician.</string>
+    <string name="wellness_disclaimer">Spartan is a general-wellness planner. It shows trends from your WHOOP data and suggests daily actions. It is not a medical device and does not diagnose, treat or prevent any condition. Talk to a qualified clinician about symptoms, persistent changes, or before starting a new intense training program.</string>
     <string name="checkin_minutes_time_of_day">~%1$d min · %2$s</string>
     <string name="checkin_not_completed">Not completed</string>
     <string name="checkin_progress_a11y">%1$d of %2$d activities done</string>
-    <string name="checkin_readiness">Readiness</string>
-    <string name="checkin_recovery_a11y">Recovery %1$s, %2$s</string>
-    <string name="checkin_recovery_a11y_sample">%1$s, sample data</string>
-    <string name="checkin_recovery_caption">recovery</string>
-    <string name="checkin_recovery_not_available">not available</string>
-    <string name="checkin_recovery_percent">%1$d percent</string>
     <string name="checkin_rescheduled">Rescheduled</string>
     <string name="checkin_reminders_offer_body">A quiet nudge when it is time for an activity. You choose the hours, and you can turn them off anytime.</string>
     <string name="checkin_reminders_offer_dismiss">Not now</string>
@@ -104,12 +97,8 @@
     <string name="checkin_mark_not_done">Mark as not done</string>
     <string name="tonight_eyebrow">TONIGHT</string>
     <string name="tonight_title">Lights out by %1$s</string>
-    <string name="tonight_duration">%1$dh %2$02dm</string>
-    <string name="tonight_duration_hours">%1$dh</string>
     <string name="tonight_title_late">Lights out soon</string>
     <string name="tonight_body_late">Your target was %1$s. Every minute of sleep tonight still counts — keep the wind-down short.</string>
-    <string name="tonight_body">Start winding down at %1$s for about %2$s of sleep.</string>
-    <string name="tonight_body_debt">Start winding down at %1$s for about %2$s of sleep. That pays down part of your %3$s h of sleep debt.</string>
 
     <!-- Metric detail (redesign) -->
     <string name="detail_trend_title">Last %1$d readings</string>
@@ -171,14 +160,22 @@
     <string name="insights_in_plan">In today\'s plan</string>
     <string name="insights_read_more">Read more</string>
     <string name="insights_show_less">Show less</string>
-    <string name="insights_footer">Ranges here are your own recent history, not a diagnosis. For any health concern, talk with a qualified clinician.</string>
+    <string name="insights_footer">Your usual ranges come from your own recent history; general references are labelled. None of this is a diagnosis.</string>
     <string name="signal_learning">Learning your normal</string>
     <string name="signal_within">Your normal</string>
     <string name="signal_better">Better than usual</string>
     <string name="signal_higher">Higher than usual</string>
     <string name="signal_lower">Lower than usual</string>
-    <string name="signal_normal_range">Your normal %1$s · %2$d days</string>
-    <string name="signal_learning_days">%1$d of %2$d days to learn your normal</string>
+    <!-- Quantity: %2$d, the days behind the range -->
+    <plurals name="signal_normal_range">
+        <item quantity="one">Your normal %1$s · %2$d day</item>
+        <item quantity="other">Your normal %1$s · %2$d days</item>
+    </plurals>
+    <!-- Quantity: %2$d, the days needed to learn a normal -->
+    <plurals name="signal_learning_days">
+        <item quantity="one">%1$d of %2$d day to learn your normal</item>
+        <item quantity="other">%1$d of %2$d days to learn your normal</item>
+    </plurals>
 
     <!-- Common -->
     <string name="common_back">Back</string>

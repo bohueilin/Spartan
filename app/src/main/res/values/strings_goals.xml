@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Goal wizard: four steps in one bottom sheet, never a blank form (research §4.1) -->
+    <string name="wizard_step_of">Step %1$d of %2$d</string>
+    <string name="wizard_next">Next</string>
+    <string name="wizard_start">Start this plan</string>
+
+    <!-- Step 1: one primary goal -->
+    <string name="wizard_pick_title">Pick one goal</string>
+    <string name="wizard_pick_body">One focus at a time is easier to keep. You can change it at any weekly check-in.</string>
+    <string name="wizard_preset_sleep_body">More of the sleep you need, on a steadier schedule.</string>
+    <string name="wizard_preset_fitter_body">Build your aerobic base and strength a little at a time.</string>
+    <string name="wizard_preset_steadier_body">Short calm sessions that help you downshift.</string>
+    <string name="wizard_preset_recover_body">Mobility, wind-downs and easy days that help you bounce back.</string>
+    <string name="wizard_custom_goal">Set a custom goal</string>
+
+    <!-- Step 2: SMART, anchored to the user's own recent average -->
+    <string name="wizard_smart_title">Make it specific</string>
+    <string name="wizard_smart_anchored">This starts from your own recent average, not an ideal. Nudge it until it feels doable.</string>
+    <!-- Sample-data build: the anchor is the sample series' average, never "your own" -->
+    <string name="wizard_smart_anchored_sample">This starts from the sample data\'s recent average, not yours. Connect WHOOP to start from your own. Nudge it until it feels doable.</string>
+    <string name="wizard_smart_learning">Spartan is still learning your usual, so this starts from a typical default. Nudge it until it feels doable.</string>
+    <string name="wizard_smart_sleep_note">Sleep performance is how much of the sleep you need you actually got. WHOOP estimates that need for you each night, so the target is yours, not a fixed number of hours.</string>
+    <string name="wizard_target_label">Target</string>
+    <string name="wizard_target_sleep_value">%1$d%% of the sleep you need</string>
+    <string name="wizard_target_lower">Lower the target</string>
+    <string name="wizard_target_higher">Raise the target</string>
+    <string name="wizard_weeks_label">Review in</string>
+    <string name="wizard_weeks_fewer">Fewer weeks</string>
+    <string name="wizard_weeks_more">More weeks</string>
+    <plurals name="wizard_sessions_week">
+        <item quantity="one">%1$d session a week</item>
+        <item quantity="other">%1$d sessions a week</item>
+    </plurals>
+    <plurals name="wizard_weeks">
+        <item quantity="one">%1$d week</item>
+        <item quantity="other">%1$d weeks</item>
+    </plurals>
+
+    <!-- Step 3: constraints, all optional -->
+    <string name="wizard_constraints_title">Fit it around your life</string>
+    <string name="wizard_constraints_body">All optional. The plan works around what you tell it.</string>
+    <string name="wizard_time_title">Time you have a day</string>
+    <string name="wizard_minutes_chip">%1$d min</string>
+    <string name="wizard_no_limit">No limit</string>
+    <string name="wizard_sleep_window_title">Your usual sleep window</string>
+    <!-- Times are never pre-filled: "Add" only starts the stepper from the most recent real WHOOP night -->
+    <string name="wizard_sleep_window_add_hint">Add starts from the times of your most recent WHOOP sleep, so you only need to adjust them.</string>
+    <string name="wizard_bedtime_target_note">A bedtime you set here becomes your lights-out target each night.</string>
+    <string name="wizard_bedtime">Usual bedtime</string>
+    <string name="wizard_wake">Usual wake time</string>
+    <string name="wizard_time_not_set">Not set</string>
+    <string name="wizard_time_add">Add</string>
+    <string name="wizard_time_clear">Clear</string>
+    <string name="wizard_bedtime_add_a11y">Add your usual bedtime</string>
+    <string name="wizard_bedtime_clear_a11y">Clear your usual bedtime</string>
+    <string name="wizard_bedtime_earlier">Bedtime 15 minutes earlier</string>
+    <string name="wizard_bedtime_later">Bedtime 15 minutes later</string>
+    <string name="wizard_wake_add_a11y">Add your usual wake time</string>
+    <string name="wizard_wake_clear_a11y">Clear your usual wake time</string>
+    <string name="wizard_wake_earlier">Wake time 15 minutes earlier</string>
+    <string name="wizard_wake_later">Wake time 15 minutes later</string>
+    <string name="wizard_limits_label">Limits or injuries</string>
+    <string name="wizard_limits_support">Optional. Spartan shows this back on training activities — it doesn\'t interpret it. For pain or an injury, talk with a clinician.</string>
+    <string name="wizard_avoid_title">Things you won\'t do</string>
+    <!-- A won't-do the chosen goal is built on: "Breathing exercises: part of Feel steadier, so not available here…" -->
+    <string name="wizard_avoid_conflict">%1$s: part of %2$s, so not available here. Pick another goal to leave this out.</string>
+
+    <!-- Step 4: week one only -->
+    <string name="wizard_preview_title">Your first week</string>
+    <string name="wizard_preview_item">%1$s · %2$d× this week · %3$d min</string>
+    <string name="wizard_preview_item_untimed">%1$s · %2$d× this week</string>
+    <string name="wizard_preview_weekly_note">Just this week for now. Each week a quick check-in asks whether to keep it, change it, or pause it.</string>
+
+    <!-- Weekly check-in on Progress: keep / change / pause, no score, no streak reset (research §4.4) -->
+    <string name="wizard_checkin_title">Your weekly check-in</string>
+    <string name="wizard_checkin_body">A missed week means the goal needs adjusting, not you. How should next week go?</string>
+    <string name="wizard_checkin_keep">Keep it</string>
+    <string name="wizard_checkin_change">Change it</string>
+    <string name="wizard_checkin_pause">Pause</string>
+
+    <!-- Goal card states and goal titles for every goal type -->
+    <string name="wizard_goal_paused">Paused · %1$s</string>
+    <string name="wizard_goal_paused_body">It isn\'t steering your plan right now. Pick it back up whenever it suits you.</string>
+    <string name="wizard_goal_resume">Resume</string>
+    <string name="wizard_goal_new">Set a new goal</string>
+    <string name="wizard_goal_change">Change goal</string>
+    <string name="wizard_goal_title_weight">Lose weight · %1$d lb</string>
+    <string name="wizard_goal_title_sleep">Sleep better · +%1$d%% sleep performance</string>
+    <!-- The absolute target the wizard promised, when the goal's baseline is known -->
+    <string name="wizard_goal_title_sleep_target">Sleep better · %1$d%% of your sleep need</string>
+    <plurals name="wizard_goal_title_stress">
+        <item quantity="one">Feel steadier · %1$d calm session a week</item>
+        <item quantity="other">Feel steadier · %1$d calm sessions a week</item>
+    </plurals>
+    <plurals name="wizard_goal_title_fitness">
+        <item quantity="one">Get fitter · %1$d training session a week</item>
+        <item quantity="other">Get fitter · %1$d training sessions a week</item>
+    </plurals>
+    <plurals name="wizard_goal_title_recovery">
+        <item quantity="one">Recover well · %1$d recovery session a week</item>
+        <item quantity="other">Recover well · %1$d recovery sessions a week</item>
+    </plurals>
+    <!-- Plan settings on You: the wizard's constraints step on its own, without touching the goal -->
+    <string name="wizard_plan_settings_title">Plan settings</string>
+    <string name="wizard_plan_settings_subtitle">Time a day, sleep window, limits and things you won\'t do</string>
+    <string name="wizard_plan_settings_save">Save plan settings</string>
+
+    <!-- Custom-goal form label for sessions-a-week goals (the form itself never offers them) -->
+    <string name="wizard_custom_target_sessions">Sessions per week</string>
+</resources>

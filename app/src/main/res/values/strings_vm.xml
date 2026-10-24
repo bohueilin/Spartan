@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Goal wizard + weekly check-in feedback from MainViewModel. Supportive, never shaming. -->
+    <string name="vm_goal_plan_started">Goal set. Tomorrow\'s plan starts leaning toward it; today\'s stays as it is.</string>
+    <string name="vm_goal_plan_started_adjusted">%1$s Goal set: tomorrow\'s plan starts leaning toward it.</string>
+    <string name="vm_weekly_kept">Kept for another week. Steady beats perfect.</string>
+    <string name="vm_weekly_paused">Goal paused. If the week got away from you, the goal needs adjusting, not you. Resume it from Progress anytime.</string>
+    <string name="vm_goal_resumed">Goal resumed. Tomorrow\'s plan leans toward it again.</string>
+</resources>

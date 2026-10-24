@@ -5,6 +5,7 @@ import com.spartan.domain.engine.SafetyEngine
 import com.spartan.domain.engine.Signal
 import com.spartan.domain.engine.SignalEngine
 import com.spartan.domain.engine.SignalPosition
+import com.spartan.domain.engine.SleepNeed
 import com.spartan.domain.engine.SleepPlanner
 import com.spartan.domain.model.ActivityPriority
 import com.spartan.domain.model.DailyActivity
@@ -102,6 +103,7 @@ class SignalsTest {
         val s = SignalEngine.signal(MetricType.RESTING_HEART_RATE, readings)!!
         assertEquals(59.0, s.latest, 1e-9)
         assertEquals(6, s.history.size)
+        assertEquals((0L..5L).map { day0.plusDays(it) }, s.dates)
     }
 
     @Test
@@ -109,6 +111,24 @@ class SignalsTest {
         val s = SignalEngine.signal(MetricType.HRV_RMSSD, series(MetricType.HRV_RMSSD, *DoubleArray(45) { 50.0 + it }))!!
         assertEquals(31, s.history.size)
         assertEquals(30, s.baselineDays)
+        // The dates stay parallel to the capped history, ending on the latest day.
+        assertEquals(31, s.dates.size)
+        assertEquals(day0.plusDays(14), s.dates.first())
+        assertEquals(day0.plusDays(44), s.dates.last())
+    }
+
+    @Test
+    fun datesFollowTheReadings_gapsIncluded() {
+        // Readings on days 0, 3 and 4 only: the dates say so, oldest first, even when given out of order.
+        val readings = listOf(4L to 61.0, 0L to 55.0, 3L to 58.0).map { (d, v) ->
+            MetricReading(MetricType.HRV_RMSSD, v, day0.plusDays(d), id = d)
+        } + MetricReading(MetricType.HRV_RMSSD, null, day0.plusDays(5)) // an empty entry adds no day
+        val s = SignalEngine.signal(MetricType.HRV_RMSSD, readings)!!
+        assertEquals(SignalPosition.LEARNING, s.position)
+        assertEquals(listOf(55.0, 58.0, 61.0), s.history)
+        assertEquals(listOf(day0, day0.plusDays(3), day0.plusDays(4)), s.dates)
+        // Signals built by hand carry no dates unless given.
+        assertTrue(Signal(MetricType.HRV_RMSSD, 1.0, listOf(1.0), null, null, SignalPosition.LEARNING).dates.isEmpty())
     }
 
     @Test
@@ -170,42 +190,142 @@ class SignalsTest {
         assertFalse(ActionPlaybook.isPlanned(action, listOf(item("1:hydration", "Hydration reminder"))))
     }
 
+    // --- SleepNeed ---------------------------------------------------------------------------
+
+    @Test
+    fun sleepNeedIsHoursSleptOverPerformance() {
+        // 7h at 85% of need → about 8h 14m needed.
+        assertEquals(7.0 / 0.85, SleepNeed.neededHours(7.0, 85)!!, 1e-9)
+        assertEquals(7.0 / 0.99, SleepNeed.neededHours(7.0, 99)!!, 1e-9)
+    }
+
+    @Test
+    fun sleepNeedIsUnknownAtWhoopsHundredPercentCap() {
+        // At 100% the need is only known to be at most the hours slept, so no need is claimed.
+        assertNull(SleepNeed.neededHours(9.75, 100))
+        assertNull(SleepNeed.neededHours(7.0, 100))
+        assertNull(SleepNeed.neededHours(8.25, 110))
+    }
+
+    @Test
+    fun sleepNeedNeedsBothValuesAndPositiveInputs() {
+        assertNull(SleepNeed.neededHours(null, 85))
+        assertNull(SleepNeed.neededHours(7.0, null))
+        assertNull(SleepNeed.neededHours(0.0, 85))
+        assertNull(SleepNeed.neededHours(-1.0, 85))
+        assertNull(SleepNeed.neededHours(7.0, 0))
+        assertNull(SleepNeed.neededHours(7.0, -10))
+        assertNull(SleepNeed.neededHours(Double.NaN, 85))
+    }
+
+    @Test
+    fun implausibleSleepNeedIsDropped() {
+        assertNull(SleepNeed.neededHours(7.0, 40))   // 17.5 h
+        assertNull(SleepNeed.neededHours(3.0, 90))   // 3h 20m
+        assertEquals(4.0, SleepNeed.neededHours(2.0, 50)!!, 1e-9)   // bounds are inclusive
+        assertEquals(14.0, SleepNeed.neededHours(7.0, 50)!!, 1e-9)
+    }
+
     // --- SleepPlanner -----------------------------------------------------------------------
 
     @Test
-    fun noDataMeansEightHoursBeforeASevenAmWake() {
-        val plan = SleepPlanner.tonight(null, null)
-        assertEquals(23 * 60, plan.lightsOutMinute)
-        assertEquals(22 * 60 + 15, plan.windDownMinute)
-        assertEquals(8.0, plan.sleepHours, 1e-9)
+    fun noNeedAndNoUserBedtimeMeansNoTarget() {
+        // Never an invented 8-hour default: without the user's own need there is no target.
+        assertNull(SleepPlanner.tonight(null, null, null))
+        assertNull(SleepPlanner.tonight(7 * 60, 1.0, null))
+        assertNull(SleepPlanner.tonight(null, 0.0, 8.0)) // need known, wake unknown
+    }
+
+    @Test
+    fun lightsOutComesFromTheUsersOwnNeed() {
+        val need = 8.0 + 10.0 / 60 // 8h 10m
+        val plan = SleepPlanner.tonight(7 * 60, 0.0, need)!!
+        assertEquals(22 * 60 + 50, plan.lightsOutMinute)
+        assertEquals(22 * 60 + 5, plan.windDownMinute)
+        assertEquals(need, plan.sleepHours!!, 1e-9)
+        assertEquals(need, plan.needHours!!, 1e-9)
         assertEquals(0.0, plan.debtHours, 1e-9)
+        assertFalse(plan.fromUserBedtime)
+        // A shorter need moves lights-out later — the target follows the person, not a constant.
+        assertEquals(23 * 60 + 30, SleepPlanner.tonight(7 * 60, 0.0, 7.5)!!.lightsOutMinute)
     }
 
     @Test
-    fun debtAddsAtMostOneHourInOneNight() {
-        val plan = SleepPlanner.tonight(7 * 60, 1.8)
-        assertEquals(9.0, plan.sleepHours, 1e-9)
-        assertEquals(22 * 60, plan.lightsOutMinute)
+    fun debtIsShownButNeverCountedTwice() {
+        // WHOOP's sleep need already includes paying back recent short nights.
+        val plan = SleepPlanner.tonight(7 * 60, 1.8, 8.0)!!
+        assertEquals(8.0, plan.sleepHours!!, 1e-9)
+        assertEquals(23 * 60, plan.lightsOutMinute)
         assertEquals(1.8, plan.debtHours, 1e-9)
+        assertEquals(8.0, plan.needHours!!, 1e-9)
     }
 
     @Test
-    fun partialDebtAndEarlyWake() {
-        val plan = SleepPlanner.tonight(6 * 60 + 30, 0.5)
-        assertEquals(8.5, plan.sleepHours, 1e-9)
+    fun aLargerNeedAndEarlyWakeMoveLightsOutEarlier() {
+        val plan = SleepPlanner.tonight(6 * 60 + 30, 0.5, 8.5)!!
+        assertEquals(8.5, plan.sleepHours!!, 1e-9)
         assertEquals(22 * 60, plan.lightsOutMinute)
+    }
+
+    @Test
+    fun theUsersWakeTimeOverridesTheObservedOne() {
+        val plan = SleepPlanner.tonight(7 * 60, 0.0, 8.0, userWakeMinute = 6 * 60)!!
+        assertEquals(22 * 60, plan.lightsOutMinute)
+        // A user wake time alone is enough when the observed one is missing.
+        assertEquals(22 * 60, SleepPlanner.tonight(null, 0.0, 8.0, userWakeMinute = 6 * 60)!!.lightsOutMinute)
+    }
+
+    @Test
+    fun theUsersBedtimeWinsOverAComputedOne() {
+        // Need 8h and wake 7:00 would give 11:00 PM, but the user said 11:30 PM: the plan honours it.
+        val plan = SleepPlanner.tonight(7 * 60, 0.4, 8.0, userBedtimeMinute = 23 * 60 + 30)!!
+        assertTrue(plan.fromUserBedtime)
+        assertEquals(23 * 60 + 30, plan.lightsOutMinute)
+        assertEquals(22 * 60 + 45, plan.windDownMinute)
+        assertEquals(7.5, plan.sleepHours!!, 1e-9) // 11:30 PM → 7:00 AM, the night it actually plans for
+        assertEquals(8.0, plan.needHours!!, 1e-9)  // the need is kept alongside, never invented
+        assertEquals(0.4, plan.debtHours, 1e-9)
+        // The user's wake time sets the length of that night too.
+        assertEquals(8.0, SleepPlanner.tonight(7 * 60, null, null, userBedtimeMinute = 22 * 60, userWakeMinute = 6 * 60)!!.sleepHours!!, 1e-9)
+        // A bedtime equal to the wake time is no night at all: no hours claimed.
+        assertNull(SleepPlanner.tonight(7 * 60, null, null, userBedtimeMinute = 7 * 60)!!.sleepHours)
+    }
+
+    @Test
+    fun withoutANeedTheUsersOwnBedtimeIsTheTarget() {
+        val plan = SleepPlanner.tonight(7 * 60, 1.2, null, userBedtimeMinute = 22 * 60 + 33)!!
+        assertTrue(plan.fromUserBedtime)
+        assertEquals(22 * 60 + 30, plan.lightsOutMinute) // rounded down to five minutes
+        assertEquals(21 * 60 + 45, plan.windDownMinute)
+        assertEquals(8.5, plan.sleepHours!!, 1e-9) // 10:30 PM → 7:00 AM
+        assertNull(plan.needHours)
+        assertEquals(1.2, plan.debtHours, 1e-9)
+
+        // A known need without any wake time also falls back to the bedtime, and keeps the need.
+        val noWake = SleepPlanner.tonight(null, null, 8.0, userBedtimeMinute = 22 * 60)!!
+        assertTrue(noWake.fromUserBedtime)
+        assertEquals(8.0, noWake.needHours!!, 1e-9)
+        assertEquals(0.0, noWake.debtHours, 1e-9)
+    }
+
+    @Test
+    fun aBedtimeJustAfterMidnightWindsDownTheEveningBefore() {
+        val plan = SleepPlanner.tonight(null, null, null, userBedtimeMinute = 20)!!
+        assertEquals(20, plan.lightsOutMinute)
+        assertEquals(23 * 60 + 35, plan.windDownMinute)
     }
 
     @Test
     fun lightsOutRoundsDownToFiveMinutesAndNegativeDebtIsIgnored() {
-        val plan = SleepPlanner.tonight(7 * 60 + 3, -2.0)
+        val plan = SleepPlanner.tonight(7 * 60 + 3, -2.0, 8.0)!!
         assertEquals(23 * 60, plan.lightsOutMinute) // 23:03 → 23:00
         assertEquals(0.0, plan.debtHours, 1e-9)
+        assertEquals(8.0, plan.sleepHours!!, 1e-9)
     }
 
     @Test
     fun pastLightsOutCoversTheNightButNotTheNextDay() {
-        val plan = SleepPlanner.tonight(7 * 60, 0.0) // lights out 23:00
+        val plan = SleepPlanner.tonight(7 * 60, 0.0, 8.0)!! // lights out 23:00
         assertFalse(SleepPlanner.isPastLightsOut(plan, 22 * 60))      // before target
         assertFalse(SleepPlanner.isPastLightsOut(plan, 23 * 60))      // exactly on time
         assertTrue(SleepPlanner.isPastLightsOut(plan, 23 * 60 + 30))  // late

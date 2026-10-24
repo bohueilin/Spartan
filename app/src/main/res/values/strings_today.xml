@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Today screen (CheckInScreen): verdict, plan, why today, tonight. -->
+<resources>
+    <!-- Joins: separators live here, not in code. -->
+    <string name="today_join_dot">%1$s · %2$s</string>
+    <string name="today_join_sentence">%1$s. %2$s</string>
+
+    <!-- Freshness: where today's numbers come from and how far they reach. Only a WHOOP CSV import
+         stamps a time, so the time is labelled as an import, never as a sync. -->
+    <string name="today_fresh_sample">Sample data</string>
+    <string name="today_fresh_imported">Imported %1$s</string>
+    <string name="today_fresh_through_today">Data through today\'s cycle</string>
+    <string name="today_fresh_through_yesterday">Data through yesterday</string>
+    <string name="today_fresh_through_date">Data through %1$s</string>
+    <string name="today_fresh_cycle_in_progress">Today\'s cycle is still in progress</string>
+    <string name="today_fresh_refresh_failed">Couldn\'t refresh just now</string>
+
+    <!-- Ready verdict: one headline per band, then colour + word + number. A plan holding back for a
+         pain flag or a check-in prompt gets the gentle headline whatever the band. -->
+    <string name="today_verdict_primed">Ready for a big day</string>
+    <string name="today_verdict_balanced">A steady day</string>
+    <string name="today_verdict_easy">Take it a bit easier</string>
+    <string name="today_verdict_rest">Recovery day — rest is the plan</string>
+    <string name="today_verdict_gentle">Take it gently today</string>
+    <string name="today_zone_value">%1$s · %2$d%%</string>
+    <string name="today_zone_a11y">Recovery %1$s, %2$d percent</string>
+    <string name="today_vs_up">Up from %1$d%% yesterday</string>
+    <string name="today_vs_down">Down from %1$d%% yesterday</string>
+    <string name="today_vs_same">Same as yesterday</string>
+    <string name="today_strain_range">Strain target %1$d–%2$d · %3$s</string>
+    <string name="today_strain_range_a11y">Strain target %1$d to %2$d, %3$s</string>
+    <string name="today_strain_under">Strain target under %1$d · %2$s</string>
+    <string name="today_strain_under_a11y">Strain target under %1$d, %2$s</string>
+    <string name="today_bed_by">Bed by %1$s</string>
+
+    <!-- Pending verdict: no colour, no number, never a guess. -->
+    <string name="today_pending_title">Plan pending</string>
+    <string name="today_pending_fallback">No verdict yet — Spartan waits for a completed WHOOP cycle rather than guessing.</string>
+    <string name="today_pending_cycle_rule">A WHOOP cycle runs from sleep to sleep, so today\'s recovery is scored after you wake.</string>
+
+    <!-- Today's plan -->
+    <string name="today_plan_next">Next up</string>
+    <string name="today_plan_show_more">Show %1$d more</string>
+    <string name="today_plan_show_less">Show less</string>
+
+    <!-- Why today? -->
+    <string name="today_why_title">Why today?</string>
+    <string name="today_why_expand">Show why</string>
+    <string name="today_why_collapse">Hide why</string>
+    <string name="today_why_expanded">Expanded</string>
+    <string name="today_why_collapsed">Collapsed</string>
+    <string name="today_why_data">See the data behind this</string>
+
+    <!-- Tonight: hours got vs hours needed, never a fixed eight hours. -->
+    <string name="today_tonight_no_target_title">No bedtime target yet</string>
+    <string name="today_tonight_no_target_body">Spartan sets tonight\'s target after a night of WHOOP sleep data, or once you add your usual bedtime in your plan settings.</string>
+    <string name="today_tonight_wind_down_need">Start winding down at %1$s for about %2$s of sleep — your estimated need.</string>
+    <string name="today_tonight_wind_down_user">Start winding down at %1$s. Lights-out is the usual bedtime from your plan settings.</string>
+    <string name="today_tonight_wind_down">Start winding down at %1$s.</string>
+    <string name="today_tonight_last_night">Last night: %1$s of about %2$s needed</string>
+    <string name="today_tonight_debt">About %1$s of sleep debt — pay it back over a few nights, not one.</string>
+
+    <!-- Activity sheet: the user's own limits note, shown back verbatim. -->
+    <string name="today_limits_note">Your note: %1$s. Skip anything that aggravates it — and talk with a clinician about pain or an injury.</string>
+</resources>

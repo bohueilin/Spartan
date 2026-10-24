@@ -5,6 +5,7 @@ import com.spartan.domain.engine.MetricExplainers
 import com.spartan.domain.engine.SafetyEngine
 import com.spartan.domain.model.MetricType
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -87,6 +88,17 @@ class MetricExplainersTest {
                 explainer.whatMovesIt.size in 3..5,
             )
         }
+    }
+
+    @Test
+    fun noExplainer_claimsToSpotIllnessBeforeYouFeelIt() {
+        val predictive = Regex("""before you (feel|notice|know)|early warning|predict|days? before""", RegexOption.IGNORE_CASE)
+        MetricExplainers.all.forEach { explainer ->
+            allStrings(explainer).forEach { copy ->
+                assertFalse("predictive illness copy on ${explainer.metric}: \"$copy\"", predictive.containsMatchIn(copy))
+            }
+        }
+        assertTrue(MetricExplainers.forMetric(MetricType.RECOVERY_SCORE)!!.whatMovesIt.contains("Illness or feeling run down."))
     }
 
     @Test

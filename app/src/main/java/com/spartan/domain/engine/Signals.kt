@@ -7,6 +7,7 @@ import com.spartan.domain.model.Intensity
 import com.spartan.domain.model.MetricReading
 import com.spartan.domain.model.MetricType
 import com.spartan.domain.model.TimeOfDay
+import java.time.LocalDate
 import kotlin.math.roundToInt
 
 /** Where today's reading sits against the user's own recent normal range. */
@@ -16,6 +17,7 @@ enum class SignalPosition { ABOVE, WITHIN, BELOW, LEARNING }
  * One daily signal read against the user's own history rather than a population table.
  * [normalLow]..[normalHigh] is the middle half (25th–75th percentile) of the prior readings, so a
  * single odd night moves it very little. [history] runs oldest → newest and ends with [latest].
+ * [dates] is the day of each [history] value, in the same order; empty when the days are unknown.
  */
 data class Signal(
     val metric: MetricType,
@@ -24,6 +26,7 @@ data class Signal(
     val normalLow: Double?,
     val normalHigh: Double?,
     val position: SignalPosition,
+    val dates: List<LocalDate> = emptyList(),
 ) {
     /** Days of history behind the normal range (the latest reading is not part of it). */
     val baselineDays: Int get() = history.size - 1
@@ -60,15 +63,17 @@ object SignalEngine {
 
     fun signal(metric: MetricType, readings: List<MetricReading>): Signal? {
         // One value per day — the newest entry wins, so a re-sync never double-counts a day.
-        val series = readings
+        val days = readings
             .filter { it.type == metric && it.value != null }
             .sortedWith(compareBy({ it.recordedAt }, { it.id }))
             .associateBy { it.recordedAt }
-            .values.mapNotNull { it.value }
+            .mapNotNull { (day, reading) -> reading.value?.let { day to it } }
             .takeLast(WINDOW_DAYS + 1)
+        val series = days.map { it.second }
+        val dates = days.map { it.first }
         val latest = series.lastOrNull() ?: return null
         val prior = series.dropLast(1).sorted()
-        if (prior.size < MIN_BASELINE_DAYS) return Signal(metric, latest, series, null, null, SignalPosition.LEARNING)
+        if (prior.size < MIN_BASELINE_DAYS) return Signal(metric, latest, series, null, null, SignalPosition.LEARNING, dates)
         val low = percentile(prior, 0.25)
         val high = percentile(prior, 0.75)
         val position = when {
@@ -76,7 +81,7 @@ object SignalEngine {
             latest < low -> SignalPosition.BELOW
             else -> SignalPosition.WITHIN
         }
-        return Signal(metric, latest, series, low, high, position)
+        return Signal(metric, latest, series, low, high, position, dates)
     }
 
     /**
@@ -249,36 +254,85 @@ object ActionPlaybook {
         today.any { it.title.equals(action.title, ignoreCase = true) || it.id.endsWith(":add:${action.key}") }
 }
 
-/** Tonight's sleep target: when to start winding down and when the lights go out. */
+/**
+ * Last night's sleep need, estimated from WHOOP's own ratio. WHOOP's Sleep Performance is hours
+ * slept / hours needed, so need ≈ slept ÷ performance. This is an estimate — not WHOOP's exact
+ * Sleep Need, whose inputs (baseline, strain, debt, naps) are not in the data Spartan reads.
+ */
+object SleepNeed {
+    /** Anything outside this is a rounding artefact or a bad reading, not a sleep need. */
+    private val PLAUSIBLE_HOURS = 4.0..14.0
+
+    /**
+     * Hours needed from [sleptHours] and [performancePercent]; null when either is missing or
+     * non-positive, or the result is implausible. No need is better than an invented one.
+     * WHOOP caps performance at 100%, so at 100 the need is only known to be at most the hours
+     * slept — unknown, so null rather than "need = slept".
+     */
+    fun neededHours(sleptHours: Double?, performancePercent: Int?): Double? {
+        if (sleptHours == null || performancePercent == null || sleptHours <= 0.0) return null
+        if (performancePercent <= 0 || performancePercent >= 100) return null
+        return (sleptHours / (performancePercent / 100.0)).takeIf { it in PLAUSIBLE_HOURS }
+    }
+}
+
+/**
+ * Tonight's sleep target: when to start winding down and when the lights go out. [sleepHours] is
+ * the night it plans for: the estimated need, or — when the target is the user's own bedtime —
+ * the time from that bedtime to the wake time (null without a wake time). [needHours] is the
+ * estimated need, if known. [debtHours] is shown alongside, never added on top: WHOOP's sleep
+ * need already counts recent short nights.
+ */
 data class BedtimePlan(
     val windDownMinute: Int,
     val lightsOutMinute: Int,
-    val sleepHours: Double,
+    val sleepHours: Double?,
     val debtHours: Double,
+    val needHours: Double?,
+    /** True when the target is the bedtime the user gave in plan settings, not one Spartan derived. */
+    val fromUserBedtime: Boolean = false,
 )
 
+/**
+ * Tonight's lights-out: the bedtime the user gave, else one from their own sleep need — never a
+ * fixed eight hours. With neither, Spartan sets no target.
+ */
 object SleepPlanner {
-    /** A typical adult need; the plan adds part of any debt on top. */
-    const val NEED_HOURS = 8.0
-
-    /** Never ask for more than an extra hour in one night — debt is repaid over several. */
-    private const val MAX_PAYBACK_HOURS = 1.0
-    private const val DEFAULT_WAKE_MINUTE = 7 * 60
     private const val WIND_DOWN_MINUTES = 45
 
-    fun tonight(wakeMinuteOfDay: Int?, sleepDebtHours: Double?): BedtimePlan {
+    /**
+     * [userWakeMinute] (from plan settings) wins over the observed [wakeMinuteOfDay]. The user's
+     * [userBedtimeMinute] is the target as given — the plan works around what they said — and
+     * [BedtimePlan.sleepHours] is then the time from it to the wake time. Without one, a wake time
+     * and [needHours] give lights-out = wake − need. Debt is not added again: WHOOP's sleep need
+     * (which [needHours] is estimated from) already includes paying it back, so adding it twice
+     * would push bedtime unrealistically early. With neither, null.
+     */
+    fun tonight(
+        wakeMinuteOfDay: Int?,
+        sleepDebtHours: Double?,
+        needHours: Double?,
+        userBedtimeMinute: Int? = null,
+        userWakeMinute: Int? = null,
+    ): BedtimePlan? {
         val debt = (sleepDebtHours ?: 0.0).coerceAtLeast(0.0)
-        val hours = NEED_HOURS + debt.coerceAtMost(MAX_PAYBACK_HOURS)
-        val wake = wakeMinuteOfDay ?: DEFAULT_WAKE_MINUTE
-        // Rounded down to five minutes: "10:40 PM" reads as a plan, "10:43 PM" as a calculation.
-        val lightsOut = Math.floorMod(wake - (hours * 60).roundToInt(), MINUTES_PER_DAY) / 5 * 5
-        return BedtimePlan(
-            windDownMinute = Math.floorMod(lightsOut - WIND_DOWN_MINUTES, MINUTES_PER_DAY),
-            lightsOutMinute = lightsOut,
-            sleepHours = hours,
-            debtHours = debt,
-        )
+        val wake = userWakeMinute ?: wakeMinuteOfDay
+        if (userBedtimeMinute != null) {
+            val lightsOut = roundDown(userBedtimeMinute)
+            val inBed = wake?.let { Math.floorMod(it - lightsOut, MINUTES_PER_DAY) / 60.0 }?.takeIf { it > 0.0 }
+            return BedtimePlan(windDown(lightsOut), lightsOut, inBed, debt, needHours, fromUserBedtime = true)
+        }
+        if (needHours != null && wake != null) {
+            val lightsOut = roundDown(wake - (needHours * 60).roundToInt())
+            return BedtimePlan(windDown(lightsOut), lightsOut, needHours, debt, needHours)
+        }
+        return null
     }
+
+    // Rounded down to five minutes: "10:40 PM" reads as a plan, "10:43 PM" as a calculation.
+    private fun roundDown(minute: Int): Int = Math.floorMod(minute, MINUTES_PER_DAY) / 5 * 5
+
+    private fun windDown(lightsOut: Int): Int = Math.floorMod(lightsOut - WIND_DOWN_MINUTES, MINUTES_PER_DAY)
 
     /**
      * True from lights-out until six hours after it: the target has passed but the night is still

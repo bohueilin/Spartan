@@ -24,12 +24,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.spartan.R
 import com.spartan.domain.engine.ActionPlaybook
 import com.spartan.domain.engine.MetricExplainers
+import com.spartan.domain.engine.MetricGlossary
 import com.spartan.domain.engine.SignalEngine
 import com.spartan.domain.engine.SuggestedAction
 import com.spartan.domain.engine.TrainingProfile
@@ -47,6 +50,7 @@ import com.spartan.ui.components.SpartanCard
 import com.spartan.ui.components.Sparkline
 import com.spartan.ui.components.StatusPill
 import com.spartan.ui.components.Tone
+import com.spartan.ui.components.WellnessFooter
 import com.spartan.ui.components.metricIcon
 import com.spartan.ui.components.toneColor
 import com.spartan.ui.theme.Spacing
@@ -58,8 +62,10 @@ import java.util.Locale
 private val WEARABLE_DETAIL = SignalEngine.DAILY.toSet() + MetricType.ENERGY_KCAL + MetricType.SLEEP_DURATION
 
 /**
- * One metric, laid out like a listing: the number and where it sits, its trend, what it means,
- * how to move it, and a sticky bar that puts the best action into today's plan.
+ * One metric, laid out like a listing (level 2 → level 3): for a coached WHOOP metric, its one
+ * human sentence, then the number against the user's usual and trend; its chart, what it means,
+ * how to move it, and the raw entries last. A sticky bar puts the best action into today's plan.
+ * Lab metrics keep their clinical-range presentation.
  */
 @Composable
 fun MetricDetailScreen(
@@ -78,9 +84,12 @@ fun MetricDetailScreen(
     val explainer = MetricExplainers.forMetric(type)
     val training = VideoLibrary.recommend(type, TrainingProfile(ageYears = state.userAgeYears, offTargetMetrics = state.offTargetMetrics))
     val dateFormat = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(Locale.getDefault())
+    // Coached WHOOP metrics carry a plain-language glossary entry; labs and body metrics do not.
+    val glossary = MetricGlossary.entry(type)
+    val title = glossary?.name ?: type.label
 
     DetailScaffold(
-        title = type.label,
+        title = title,
         onBack = onBack,
         bottomBar = topAction?.let { action ->
             { StickyActionBar(action, ActionPlaybook.isPlanned(action, state.todayActivities)) { onAddAction(action, type) } }
@@ -88,30 +97,46 @@ fun MetricDetailScreen(
     ) {
         item(key = "hero") {
             val tone = signal?.let { signalStatus(it).second } ?: assessment?.let { clinicalTone(it.clinicalStatus) } ?: Tone.NEUTRAL
+            val facts = if (signal != null && glossary != null) glossaryFacts(signal, state) else null
             Column(Modifier.padding(top = Spacing.sm)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconTile(metricIcon(type), toneColor(tone), size = 52.dp)
                     Spacer(Modifier.weight(1f))
                     if (state.whoopIsMock && type in WEARABLE_DETAIL) SampleDataChip()
                 }
-                Text(
-                    (signal?.latest ?: assessment?.reading?.value)?.let { formatMetricValue(it, type) } ?: stringResource(R.string.common_pending),
-                    style = MaterialTheme.typography.displaySmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(top = Spacing.lg),
-                )
-                if (signal != null) {
+                // Human language before numbers: the one sentence leads, even before the first reading.
+                glossary?.let {
+                    Text(it.sentence, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(top = Spacing.lg))
+                }
+                if (signal != null && facts != null) {
                     val (status, statusTone) = signalStatus(signal)
-                    Row(Modifier.padding(top = Spacing.sm), verticalAlignment = Alignment.CenterVertically) {
-                        StatusPill(status, statusTone)
-                        Spacer(Modifier.width(Spacing.sm))
-                        Text(normalRangeLabel(signal), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    // TalkBack hears the value, usual, trend and context as one sentence.
+                    Column(Modifier.padding(top = Spacing.lg).clearAndSetSemantics { contentDescription = facts.summary }) {
+                        Text(facts.value, style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.onSurface)
+                        StatusPill(status, statusTone, Modifier.padding(top = Spacing.sm))
+                        GlossaryFactLines(facts)
                     }
-                } else if (assessment != null) {
-                    Row(Modifier.padding(top = Spacing.sm), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                        StatusPill(stringResource(statusLabelRes(assessment.clinicalStatus)), clinicalTone(assessment.clinicalStatus))
-                        if (assessment.targetStatus != TargetStatus.NO_TARGET && assessment.targetStatus != TargetStatus.PENDING) {
-                            StatusPill(stringResource(targetLabelRes(assessment.targetStatus)), Tone.NEUTRAL)
+                    facts.populationNote?.let { GlossaryPopulationNote(it, Modifier.padding(top = Spacing.md)) }
+                } else {
+                    Text(
+                        (signal?.latest ?: assessment?.reading?.value)?.let { formatMetricValue(it, type) } ?: stringResource(R.string.common_pending),
+                        style = MaterialTheme.typography.displaySmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(top = Spacing.lg),
+                    )
+                    if (signal != null) {
+                        val (status, statusTone) = signalStatus(signal)
+                        Row(Modifier.padding(top = Spacing.sm), verticalAlignment = Alignment.CenterVertically) {
+                            StatusPill(status, statusTone)
+                            Spacer(Modifier.width(Spacing.sm))
+                            Text(normalRangeLabel(signal), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    } else if (assessment != null) {
+                        Row(Modifier.padding(top = Spacing.sm), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                            StatusPill(stringResource(statusLabelRes(assessment.clinicalStatus)), clinicalTone(assessment.clinicalStatus))
+                            if (assessment.targetStatus != TargetStatus.NO_TARGET && assessment.targetStatus != TargetStatus.PENDING) {
+                                StatusPill(stringResource(targetLabelRes(assessment.targetStatus)), Tone.NEUTRAL)
+                            }
                         }
                     }
                 }
@@ -204,7 +229,7 @@ fun MetricDetailScreen(
 
         if (explainer != null) {
             item(key = "about") {
-                SectionHeader(stringResource(R.string.detail_about, type.label))
+                SectionHeader(stringResource(R.string.detail_about, title))
                 Text(explainer.whatItIs, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
                 AboutBlock(stringResource(R.string.explainer_what_moves_it)) {
                     explainer.whatMovesIt.forEach {
@@ -241,6 +266,7 @@ fun MetricDetailScreen(
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             }
         }
+        item(key = "wellness") { WellnessFooter() }
     }
 }
 

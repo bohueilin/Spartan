@@ -9,7 +9,6 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
 
 /**
  * Spartan visual language: calm, confident, high-contrast. A white (light) or near-black (dark)
@@ -86,12 +85,14 @@ private val DarkColors: ColorScheme = darkColorScheme(
     inversePrimary = Color(0xFF0B685C),
 )
 
+// Every role reads its radius from [Radius], so hand-drawn shapes (the completion morph) and the
+// theme's shape roles can never drift apart.
 private val SpartanShapes = Shapes(
-    extraSmall = RoundedCornerShape(8.dp),
-    small = RoundedCornerShape(12.dp),
-    medium = RoundedCornerShape(16.dp),
+    extraSmall = RoundedCornerShape(Radius.chip),
+    small = RoundedCornerShape(Radius.tile),
+    medium = RoundedCornerShape(Radius.medium),
     large = RoundedCornerShape(Radius.card),
-    extraLarge = RoundedCornerShape(28.dp),
+    extraLarge = RoundedCornerShape(Radius.extraLarge),
 )
 
 @Composable

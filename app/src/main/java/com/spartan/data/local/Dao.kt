@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import com.spartan.domain.model.ActivityCategory
 import com.spartan.domain.model.ActivityStatus
 import com.spartan.domain.model.MetricType
 import kotlinx.coroutines.flow.Flow
@@ -103,6 +104,10 @@ interface HealthDao {
     @Query("SELECT * FROM daily_activities WHERE dateEpochDay = :day ORDER BY priority ASC, estimatedMinutes ASC")
     fun observeActivitiesForDay(day: Long): Flow<List<DailyActivityEntity>>
 
+    /** One-shot read of a day's activities, for the sync's check of what is already saved. */
+    @Query("SELECT * FROM daily_activities WHERE dateEpochDay = :day")
+    suspend fun activitiesForDay(day: Long): List<DailyActivityEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertActivity(activity: DailyActivityEntity)
 
@@ -174,6 +179,19 @@ interface HealthDao {
     )
     suspend fun completedBreathworkCount(startDay: Long, endDay: Long): Int
 
+    /**
+     * Completed sessions in [categories] in the window — a fitness or recovery habit goal's
+     * check-offs. The "In bed by …" sleep anchor and the clinician check-in are not sessions, so
+     * they never count, whatever their category.
+     */
+    @Query(
+        "SELECT COUNT(*) FROM daily_activities " +
+            "WHERE status = 'DONE' AND category IN (:categories) " +
+            "AND ruleId NOT IN ('SLEEP_ANCHOR', 'CLINICIAN_REFERRAL') " +
+            "AND dateEpochDay BETWEEN :startDay AND :endDay",
+    )
+    suspend fun completedActivityCount(categories: Set<ActivityCategory>, startDay: Long, endDay: Long): Int
+
     // --- Imported WHOOP data cleanup (disconnect / delete-all) ---
     @Query("DELETE FROM whoop_cycles")
     suspend fun deleteWhoopCycles()
@@ -228,6 +246,10 @@ interface HealthDao {
 
     @Query("SELECT * FROM daily_reflections ORDER BY dateEpochDay DESC LIMIT 30")
     fun observeRecentReflections(): Flow<List<DailyReflectionEntity>>
+
+    /** Every saved reflection, newest first — the export carries all of them, not a recent page. */
+    @Query("SELECT * FROM daily_reflections ORDER BY dateEpochDay DESC")
+    fun observeAllReflections(): Flow<List<DailyReflectionEntity>>
 
     @Query("SELECT * FROM daily_reflections WHERE dateEpochDay = :day")
     suspend fun reflectionForDay(day: Long): DailyReflectionEntity?

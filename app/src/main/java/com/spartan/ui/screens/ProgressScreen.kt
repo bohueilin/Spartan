@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -20,7 +22,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.EventNote
+import androidx.compose.material.icons.outlined.EventRepeat
 import androidx.compose.material.icons.outlined.Flag
+import androidx.compose.material.icons.outlined.PauseCircleOutline
 import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -31,29 +35,39 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.spartan.R
+import com.spartan.domain.engine.Goal
+import com.spartan.domain.engine.GoalPlanning
+import com.spartan.domain.engine.GoalPreset
 import com.spartan.domain.engine.GoalType
+import com.spartan.domain.engine.PlanConstraints
 import com.spartan.domain.engine.ProjectionEngine
+import com.spartan.domain.engine.WeeklyDecision
 import com.spartan.domain.model.MetricType
 import com.spartan.ui.components.IconTile
 import com.spartan.ui.components.ListRow
 import com.spartan.ui.components.PageGutter
 import com.spartan.ui.components.PrimaryButton
 import com.spartan.ui.components.ScreenTitle
+import com.spartan.ui.components.SecondaryButton
 import com.spartan.ui.components.SectionHeader
 import com.spartan.ui.components.SpartanCard
 import com.spartan.ui.components.Sparkline
 import com.spartan.ui.components.StatusPill
 import com.spartan.ui.components.Tone
+import com.spartan.ui.components.WellnessFooter
 import com.spartan.ui.components.toneColor
 import com.spartan.ui.theme.Radius
 import com.spartan.ui.theme.Spacing
@@ -66,9 +80,12 @@ import kotlin.math.roundToInt
 private val TRENDS = listOf(MetricType.RECOVERY_SCORE, MetricType.HRV_RMSSD, MetricType.SLEEP_PERFORMANCE)
 
 /**
- * Progress: the goal you are working toward, how this week went, where your signals are heading,
- * what your own reflections revealed, and the one thing to focus on next week.
+ * Progress: the weekly check-in when one is due, the goal you are working toward, how this week
+ * went, where your signals are heading, what your own reflections revealed, and the one thing to
+ * focus on next week. Goals are set and changed in [GoalWizardSheet]; a custom goal still opens
+ * [GoalSetupSheet]. A trends screen, so it ends with the wellness disclaimer.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ProgressScreen(
     state: MainUiState,
@@ -77,8 +94,17 @@ fun ProgressScreen(
     onDismissGoalNotice: () -> Unit,
     onOpenMetric: (MetricType) -> Unit,
     onOpenTrainingWeek: () -> Unit,
+    onStartGoalPlan: (GoalPreset, Double, Int, PlanConstraints) -> Unit = { _, _, _, _ -> },
+    onWeeklyDecision: (WeeklyDecision) -> Unit = {},
+    onResumeGoal: (String) -> Unit = {},
 ) {
-    var showGoalSheet by remember { mutableStateOf(false) }
+    var showGoalSheet by rememberSaveable { mutableStateOf(false) }
+    var showWizard by rememberSaveable { mutableStateOf(false) }
+    var wizardPreset by rememberSaveable { mutableStateOf<GoalPreset?>(null) }
+    fun openWizard(preset: GoalPreset?) {
+        wizardPreset = preset
+        showWizard = true
+    }
     val review = state.review
     val range = remember {
         val fmt = DateTimeFormatter.ofPattern("MMM d", Locale.getDefault())
@@ -113,7 +139,19 @@ fun ProgressScreen(
                     }
                 }
             }
-            item(key = "goal") { GoalCard(state, onSetGoal = { showGoalSheet = true }, onAbandon = onAbandonGoal) }
+            val dueGoal = state.activeGoal?.takeIf { state.weeklyReviewDue }
+            if (dueGoal != null) {
+                item(key = "weekly-check-in") {
+                    WeeklyCheckInCard(dueGoal, state.goalProgress?.summary) { decision ->
+                        // "Change it" only opens the wizard: the check-in counts once a new goal starts,
+                        // so backing out of the sheet keeps this card for when the user is ready.
+                        if (decision == WeeklyDecision.CHANGE) openWizard(GoalPreset.forGoalType(dueGoal.type)) else onWeeklyDecision(decision)
+                    }
+                }
+            }
+            item(key = "goal") {
+                GoalCard(state, onOpenWizard = { openWizard(it) }, onAbandon = onAbandonGoal, onResume = onResumeGoal)
+            }
 
             item(key = "week-header") { SectionHeader(stringResource(R.string.progress_this_week)) }
             item(key = "stats") {
@@ -177,13 +215,27 @@ fun ProgressScreen(
                 item(key = "trends-header") { SectionHeader(stringResource(R.string.progress_trends)) }
                 items(trends, key = { "trend-" + it.metric.name }) { signal ->
                     val (status, tone) = signalStatus(signal)
-                    SpartanCard(onClick = { onOpenMetric(signal.metric) }, onClickLabel = stringResource(R.string.checkin_open_metric, signal.metric.label)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Text(signal.metric.label, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
-                                Text(formatMetricValue(signal.latest, signal.metric), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface)
+                    // The same value + usual + trend as Insights; the sparkline stays decorative, so
+                    // TalkBack hears the numbers as one sentence.
+                    val facts = glossaryFacts(signal, state)
+                    SpartanCard(onClick = { onOpenMetric(signal.metric) }, onClickLabel = stringResource(R.string.checkin_open_metric, facts.name)) {
+                        Column(Modifier.clearAndSetSemantics { contentDescription = facts.summary }) {
+                            Text(facts.name, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+                            // Wraps rather than squeezes: at large font sizes the pill drops under the value.
+                            FlowRow(
+                                Modifier.padding(top = Spacing.xs),
+                                horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+                                verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+                            ) {
+                                Text(
+                                    facts.value,
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.align(Alignment.CenterVertically),
+                                )
+                                StatusPill(status, tone, Modifier.align(Alignment.CenterVertically))
                             }
-                            StatusPill(status, tone)
+                            GlossaryFactLines(facts)
                         }
                         Sparkline(signal.history, toneColor(tone), Modifier.padding(top = Spacing.md), signal.normalLow, signal.normalHigh, height = 72.dp)
                     }
@@ -206,9 +258,26 @@ fun ProgressScreen(
                     )
                 }
             }
+
+            item(key = "wellness") { WellnessFooter() }
         }
     }
 
+    if (showWizard) {
+        GoalWizardSheet(
+            state = state,
+            initialPreset = wizardPreset,
+            onStart = { preset, target, weeks, constraints ->
+                onStartGoalPlan(preset, target, weeks, constraints)
+                showWizard = false
+            },
+            onCustomGoal = {
+                showWizard = false
+                showGoalSheet = true
+            },
+            onDismiss = { showWizard = false },
+        )
+    }
     if (showGoalSheet) {
         GoalSetupSheet(
             onSave = { type, target, weeks ->
@@ -244,48 +313,124 @@ private fun ReviewList(title: String, lines: List<String>, tone: Tone) {
     }
 }
 
-/** The goal you are working toward, or a clear invitation to set one. */
+/**
+ * The weekly re-plan (research §4.1, §4.4): keep it, change it, or pause it. No score and no
+ * streak reset — a missed week is a goal-design problem, never the user's failure.
+ */
 @Composable
-internal fun GoalCard(state: MainUiState, onSetGoal: () -> Unit, onAbandon: (String) -> Unit) {
-    val goal = state.activeGoal
+private fun WeeklyCheckInCard(goal: Goal, summary: String?, onDecision: (WeeklyDecision) -> Unit) {
     SpartanCard {
-        if (goal == null) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconTile(Icons.Outlined.Flag, MaterialTheme.colorScheme.primary)
-                Spacer(Modifier.width(Spacing.lg))
-                Text(stringResource(R.string.progress_goal_empty_title), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
-            }
-            Text(stringResource(R.string.coach_goal_intro), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = Spacing.md))
-            PrimaryButton(stringResource(R.string.coach_set_goal), onSetGoal, Modifier.fillMaxWidth().padding(top = Spacing.lg))
-        } else {
-            Text(stringResource(R.string.coach_goal_section), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-            Row(Modifier.padding(top = Spacing.xs), verticalAlignment = Alignment.CenterVertically) {
-                Text(goalTitle(goal.type, goal.targetValue), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconTile(Icons.Outlined.EventRepeat, MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.width(Spacing.lg))
+            Text(
+                stringResource(R.string.wizard_checkin_title),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f).semantics { heading() },
+            )
+        }
+        Text(goalTitle(goal), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(top = Spacing.md))
+        summary?.let {
+            Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = Spacing.xs))
+        }
+        Text(stringResource(R.string.wizard_checkin_body), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(top = Spacing.md))
+        PrimaryButton(stringResource(R.string.wizard_checkin_keep), { onDecision(WeeklyDecision.KEEP) }, Modifier.fillMaxWidth().padding(top = Spacing.lg))
+        SecondaryButton(stringResource(R.string.wizard_checkin_change), { onDecision(WeeklyDecision.CHANGE) }, Modifier.fillMaxWidth().padding(top = Spacing.sm))
+        TextButton(onClick = { onDecision(WeeklyDecision.PAUSE) }, modifier = Modifier.fillMaxWidth().padding(top = Spacing.xs)) {
+            Text(stringResource(R.string.wizard_checkin_pause), style = MaterialTheme.typography.labelLarge)
+        }
+    }
+}
+
+/**
+ * The goal you are working toward, a paused goal waiting for you, or a clear invitation to set
+ * one. [onOpenWizard] opens the goal wizard, pre-selected on a preset when changing a goal.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun GoalCard(
+    state: MainUiState,
+    onOpenWizard: (GoalPreset?) -> Unit,
+    onAbandon: (String) -> Unit,
+    onResume: (String) -> Unit,
+) {
+    val goal = state.activeGoal
+    val paused = state.pausedGoal
+    SpartanCard {
+        when {
+            goal != null -> {
+                Text(stringResource(R.string.coach_goal_section), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                Row(Modifier.padding(top = Spacing.xs), verticalAlignment = Alignment.CenterVertically) {
+                    Text(goalTitle(goal), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
+                    state.goalProgress?.let { p ->
+                        StatusPill(stringResource(if (p.onTrack) R.string.coach_goal_on_track else R.string.coach_goal_behind), if (p.onTrack) Tone.POSITIVE else Tone.CAUTION)
+                    }
+                }
                 state.goalProgress?.let { p ->
-                    StatusPill(stringResource(if (p.onTrack) R.string.coach_goal_on_track else R.string.coach_goal_behind), if (p.onTrack) Tone.POSITIVE else Tone.CAUTION)
+                    LinearProgressIndicator(
+                        progress = { p.fraction.coerceIn(0.0, 1.0).toFloat() },
+                        modifier = Modifier.fillMaxWidth().padding(top = Spacing.lg).height(8.dp).clip(CircleShape).clearAndSetSemantics {},
+                        trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        drawStopIndicator = {},
+                    )
+                    Text(p.summary, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = Spacing.sm))
+                }
+                FlowRow(Modifier.padding(top = Spacing.xs), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    TextButton(onClick = { onOpenWizard(GoalPreset.forGoalType(goal.type)) }) {
+                        Text(stringResource(R.string.wizard_goal_change), style = MaterialTheme.typography.labelLarge)
+                    }
+                    TextButton(onClick = { onAbandon(goal.id) }) {
+                        Text(stringResource(R.string.coach_goal_abandon), style = MaterialTheme.typography.labelLarge)
+                    }
                 }
             }
-            state.goalProgress?.let { p ->
-                LinearProgressIndicator(
-                    progress = { p.fraction.coerceIn(0.0, 1.0).toFloat() },
-                    modifier = Modifier.fillMaxWidth().padding(top = Spacing.lg).height(8.dp).clip(CircleShape).clearAndSetSemantics {},
-                    trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                    drawStopIndicator = {},
-                )
-                Text(p.summary, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = Spacing.sm))
+            paused != null -> {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconTile(Icons.Outlined.PauseCircleOutline, MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.width(Spacing.lg))
+                    Text(
+                        stringResource(R.string.wizard_goal_paused, goalTitle(paused)),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                Text(stringResource(R.string.wizard_goal_paused_body), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = Spacing.md))
+                PrimaryButton(stringResource(R.string.wizard_goal_resume), { onResume(paused.id) }, Modifier.fillMaxWidth().padding(top = Spacing.lg))
+                SecondaryButton(stringResource(R.string.wizard_goal_new), { onOpenWizard(null) }, Modifier.fillMaxWidth().padding(top = Spacing.sm))
             }
-            TextButton(onClick = { onAbandon(goal.id) }, modifier = Modifier.padding(top = Spacing.xs)) {
-                Text(stringResource(R.string.coach_goal_abandon), style = MaterialTheme.typography.labelLarge)
+            else -> {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconTile(Icons.Outlined.Flag, MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(Spacing.lg))
+                    Text(stringResource(R.string.progress_goal_empty_title), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+                }
+                Text(stringResource(R.string.coach_goal_intro), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = Spacing.md))
+                PrimaryButton(stringResource(R.string.coach_set_goal), { onOpenWizard(null) }, Modifier.fillMaxWidth().padding(top = Spacing.lg))
             }
         }
     }
 }
 
+/**
+ * "Get fitter · 3 training sessions a week": a goal's name and target, for every goal type. A sleep
+ * goal shows the absolute target the wizard promised ("85% of your sleep need"), and the stored gain
+ * only when its baseline is unknown.
+ */
 @Composable
-private fun goalTitle(type: GoalType, target: Double): String = when (type) {
-    GoalType.WEIGHT_LOSS -> "${stringResource(R.string.coach_goal_type_weight)} · ${target.toInt()} lb"
-    GoalType.SLEEP_RECOVERY -> "${stringResource(R.string.coach_goal_type_sleep)} · +${target.toInt()}%"
-    GoalType.STRESS_RESILIENCE -> "${stringResource(R.string.coach_goal_type_stress)} · ${target.toInt()}/wk"
+internal fun goalTitle(goal: Goal): String {
+    // roundToInt() throws on NaN; a corrupt stored target must not crash the card.
+    val n = if (goal.targetValue.isNaN()) 0 else goal.targetValue.roundToInt()
+    return when (goal.type) {
+        GoalType.WEIGHT_LOSS -> stringResource(R.string.wizard_goal_title_weight, n)
+        GoalType.SLEEP_RECOVERY -> GoalPlanning.sleepTargetPercent(goal)?.takeIf { it.isFinite() }
+            ?.let { stringResource(R.string.wizard_goal_title_sleep_target, it.roundToInt()) }
+            ?: stringResource(R.string.wizard_goal_title_sleep, n)
+        GoalType.STRESS_RESILIENCE -> pluralStringResource(R.plurals.wizard_goal_title_stress, n, n)
+        GoalType.FITNESS -> pluralStringResource(R.plurals.wizard_goal_title_fitness, n, n)
+        GoalType.RECOVERY -> pluralStringResource(R.plurals.wizard_goal_title_recovery, n, n)
+    }
 }
 
 /** Illustrative eight-week ranges at the current consistency — always with the disclaimer. */

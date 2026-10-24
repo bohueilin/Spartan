@@ -30,10 +30,6 @@ class CoachEnginesTest {
         ReferenceRanges.topFive.forEach { metric ->
             assertNotNull("band missing for $metric", ReferenceRanges.bandFor(metric, 44, SexAtBirth.MALE))
         }
-        // HRV bands decline with age.
-        val hrv20s = ReferenceRanges.bandFor(MetricType.HRV_RMSSD, 25, SexAtBirth.MALE)!!
-        val hrv60s = ReferenceRanges.bandFor(MetricType.HRV_RMSSD, 65, SexAtBirth.MALE)!!
-        assertTrue(hrv20s.typicalHigh!! > hrv60s.typicalHigh!!)
         // Women's typical RHR band sits a touch higher than men's, same bracket.
         val rhrF = ReferenceRanges.bandFor(MetricType.RESTING_HEART_RATE, 44, SexAtBirth.FEMALE)!!
         val rhrM = ReferenceRanges.bandFor(MetricType.RESTING_HEART_RATE, 44, SexAtBirth.MALE)!!
@@ -55,7 +51,30 @@ class CoachEnginesTest {
         val rhr = ReferenceRanges.bandFor(MetricType.RESTING_HEART_RATE, null, SexAtBirth.UNSPECIFIED)!!
         assertTrue(rhr.education.startsWith("Typical resting heart rate for adults sits around"))
         val hrv = ReferenceRanges.bandFor(MetricType.HRV_RMSSD, 44, SexAtBirth.FEMALE)!!
-        assertTrue(hrv.education.contains("cohort medians for adults aged 40–49 span"))
+        assertTrue(hrv.education.contains("among adults aged 40–49 it drifts down"))
+    }
+
+    @Test
+    fun referenceRanges_hrv_hasNoPopulationNumbers_atAnyAge() {
+        for (age in listOf(null, 25, 44, 65)) {
+            for (sex in SexAtBirth.entries) {
+                val hrv = ReferenceRanges.bandFor(MetricType.HRV_RMSSD, age, sex)!!
+                assertNull(hrv.typicalLow)
+                assertNull(hrv.typicalHigh)
+                assertNull(hrv.fitnessForwardLow)
+                assertNull(hrv.fitnessForwardHigh)
+                assertFalse(
+                    "HRV education quotes an ms number: ${hrv.education}",
+                    Regex("""\d\s*ms\b""").containsMatchIn(hrv.education),
+                )
+                assertTrue(hrv.education.contains("your own usual range"))
+            }
+        }
+        // Bracket-aware: the only digits are the age bracket itself.
+        val adults = ReferenceRanges.bandFor(MetricType.HRV_RMSSD, null, SexAtBirth.UNSPECIFIED)!!
+        assertFalse(Regex("""\d""").containsMatchIn(adults.education))
+        assertTrue(ReferenceRanges.bandFor(MetricType.HRV_RMSSD, 22, SexAtBirth.MALE)!!.education.contains("aged 18–29"))
+        assertTrue(ReferenceRanges.bandFor(MetricType.HRV_RMSSD, 65, SexAtBirth.MALE)!!.education.contains("aged 60+"))
     }
 
     @Test

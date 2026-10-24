@@ -74,7 +74,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.spartan.R
@@ -116,6 +115,20 @@ fun SpartanCard(
     ) {
         Column(Modifier.padding(contentPadding), content = content)
     }
+}
+
+/**
+ * The general-wellness disclaimer that closes every plan and trends screen (research §3.4): what
+ * Spartan is, what it is not, and when to talk to a clinician. One string, so no screen drifts.
+ */
+@Composable
+fun WellnessFooter(modifier: Modifier = Modifier) {
+    Text(
+        stringResource(R.string.wellness_disclaimer),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = modifier.padding(top = Spacing.xl),
+    )
 }
 
 /** Top-of-tab title block: a confident headline, an optional supporting line, optional trailing slot. */
@@ -175,16 +188,19 @@ fun toneColor(tone: Tone): Color {
     }
 }
 
-/** A compact status label on a tinted pill. Text carries the meaning, colour only reinforces it. */
+/**
+ * A compact status label on a tinted pill. Text carries the meaning, colour only reinforces it.
+ * Long labels ("Scheduled for 5:30 PM (sample calendar)") and large font sizes wrap rather than
+ * clip, so the shape is shapes.small: pill-like on one line, a soft rectangle on two.
+ */
 @Composable
 fun StatusPill(text: String, tone: Tone, modifier: Modifier = Modifier) {
     val color = toneColor(tone)
-    Surface(shape = CircleShape, color = color.copy(alpha = 0.14f), modifier = modifier) {
+    Surface(shape = MaterialTheme.shapes.small, color = color.copy(alpha = 0.14f), modifier = modifier) {
         Text(
             text,
             style = MaterialTheme.typography.labelMedium,
             color = color,
-            maxLines = 1,
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
         )
     }
@@ -219,8 +235,9 @@ fun ListRow(
             Spacer(Modifier.width(Spacing.lg))
             Column(Modifier.weight(1f)) {
                 Text(title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+                // Wraps, never ellipsizes: goal state and progress must stay readable at 200% font.
                 subtitle?.let {
-                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)

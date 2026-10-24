@@ -12,8 +12,10 @@ import com.spartan.domain.model.MetricType
  * Sources (encoded conservatively as bands, not diagnoses):
  *  - Resting HR: AHA adult span 60–100 bpm; large wearable-cohort percentiles by age/sex show
  *    typical 58–72 with fitness-forward 50–62; women a few bpm higher on average.
- *  - HRV (RMSSD): wearable-cohort medians decline with age (~3–5%/decade); mid-30s ms is a
- *    typical 40s median. Highly individual — bands are wide by design.
+ *  - HRV (RMSSD): deliberately NO population band. Wearable-cohort medians decline with age
+ *    (~3–5%/decade) and vary so widely between people that no meaningful "good" range exists,
+ *    so the band carries bracket-aware education only and HRV is read against the user's own
+ *    usual range.
  *  - Sleep duration: AASM/NSF consensus 7–9 h for adults 18–64.
  *  - Sleep consistency: sleep-regularity literature associates ±30–45 min bed/wake windows
  *    with better outcomes; WHOOP expresses this as a 0–100 consistency score (≥70 is a solid
@@ -106,25 +108,14 @@ object ReferenceRanges {
         )
     }
 
-    private fun hrv(ageYears: Int?): ReferenceBand {
-        // Cohort medians by age bracket; deliberately wide and framed as medians, not targets.
-        val (lo, hi) = when (ageYears) {
-            null -> 25.0 to 75.0
-            in 0..29 -> 45.0 to 95.0
-            in 30..39 -> 35.0 to 80.0
-            in 40..49 -> 28.0 to 70.0
-            in 50..59 -> 22.0 to 60.0
-            else -> 18.0 to 50.0
-        }
-        return ReferenceBand(
-            metric = MetricType.HRV_RMSSD,
-            typicalLow = lo, typicalHigh = hi,
-            education = "HRV is the most individual number on this list — cohort medians for " +
-                "${cohortPhrase(ageYears, SexAtBirth.UNSPECIFIED)} span roughly ${lo.toInt()}–${hi.toInt()} ms and " +
-                "decline naturally with age. Judge yourself against your own baseline trend, " +
-                "not this table.",
-        )
-    }
+    // No population numbers at any age: HRV never gets a good/bad grade, only education.
+    private fun hrv(ageYears: Int?) = ReferenceBand(
+        metric = MetricType.HRV_RMSSD,
+        typicalLow = null, typicalHigh = null,
+        education = "HRV has no population 'good' number — it is highly individual, and " +
+            "among ${cohortPhrase(ageYears, SexAtBirth.UNSPECIFIED)} it drifts down naturally " +
+            "with age. Spartan reads yours only against your own usual range.",
+    )
 
     /**
      * Who a band describes, as a plural noun phrase that reads correctly in every combination:

@@ -13,10 +13,12 @@ import com.spartan.data.calendar.CalendarAuthManager
 import com.spartan.data.calendar.CalendarClient
 import com.spartan.data.export.LocalExportFormatter
 import com.spartan.data.local.ConnectionStatus
+import com.spartan.data.local.GoalEntity
 import com.spartan.data.local.IntegrationProvider
 import com.spartan.data.local.MetricEntryEntity
 import com.spartan.data.local.PlanWorkoutOverrideEntity
 import com.spartan.data.local.PreferencesStore
+import com.spartan.data.local.PressureWindowEntity
 import com.spartan.data.local.WhoopCycleDao
 import com.spartan.data.local.ReminderEntity
 import com.spartan.data.local.ReminderFrequency
@@ -35,7 +37,7 @@ import com.spartan.domain.engine.ActionPlaybook
 import com.spartan.domain.engine.BedtimePlan
 import com.spartan.domain.engine.Signal
 import com.spartan.domain.engine.SignalEngine
-import com.spartan.domain.engine.SleepPlanner
+import com.spartan.domain.engine.SleepNeed
 import com.spartan.domain.engine.SuggestedAction
 import com.spartan.domain.engine.Goal
 import com.spartan.domain.engine.GoalEngine
@@ -44,6 +46,16 @@ import com.spartan.domain.engine.GoalProgress
 import com.spartan.domain.engine.GoalStatus
 import com.spartan.domain.engine.GoalType
 import com.spartan.domain.engine.GoalValidation
+import com.spartan.domain.engine.GoalBaselines
+import com.spartan.domain.engine.GoalPlanning
+import com.spartan.domain.engine.GoalPreset
+import com.spartan.domain.engine.MorningVerdict
+import com.spartan.domain.engine.PlanConstraints
+import com.spartan.domain.engine.StrainZone
+import com.spartan.domain.engine.VerdictEngine
+import com.spartan.domain.engine.WeeklyDecision
+import com.spartan.domain.engine.WhyToday
+import com.spartan.domain.engine.WhyTodayEngine
 import com.spartan.domain.engine.InsightEngine
 import com.spartan.domain.engine.PressureWindow
 import com.spartan.domain.engine.SexAtBirth
@@ -91,6 +103,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.LocalTime
@@ -158,6 +171,41 @@ data class MainUiState(
     val pressureWindows: List<PressureWindow> = emptyList(),
     val weekdayEffects: List<WeekdayEffect> = emptyList(),
     val userSexAtBirth: SexAtBirth = SexAtBirth.UNSPECIFIED,
+    // Today: one verdict, one target, why today
+    /** Today's morning verdict, or Pending — never fabricated. Null only until the first sync settles. */
+    val verdict: MorningVerdict? = null,
+    /** The expandable "Why today?" explanation; null until the first sync settles. */
+    val whyToday: WhyToday? = null,
+    /** Today's strain target zone from the plan; null when the plan sets none (pending/holding plan). */
+    val strainTarget: StrainZone? = null,
+    /**
+     * Last night's hours asleep and the estimated need behind them, for "7h 40m of about 8h 10m".
+     * Only when the newest snapshot is today's night ([DailyPlanSync.lastNight]); null otherwise,
+     * so an older night is never labelled "Last night".
+     */
+    val sleptHours: Double? = null,
+    val sleepNeedHours: Double? = null,
+    /** Wake day of the newest cycle the plan is built on. */
+    val dataThroughEpochDay: Long? = null,
+    /**
+     * When WHOOP data was last imported — only the CSV import stamps this, so the UI labels it
+     * "Imported". Null when WHOOP is not connected or the data on screen is sample ([importedAtMillis]).
+     */
+    val lastSyncedAtMillis: Long? = null,
+    /** The cycle day the morning reveal last played for: it plays once per verdict, never on every visit. */
+    val morningRevealPlayedForDay: Long? = null,
+    // Goal wizard
+    /** Bed / wake minute of day from the newest WHOOP sleep, to pre-fill the wizard's sleep window. */
+    val observedBedMinute: Int? = null,
+    val observedWakeMinute: Int? = null,
+    /** What the user told the wizard about their time, limits, sleep window, and won't-dos. */
+    val planConstraints: PlanConstraints = PlanConstraints(),
+    /** The user's own recent averages the goal presets anchor to. */
+    val goalBaselines: GoalBaselines = GoalBaselines(),
+    /** A goal paused at a weekly check-in: it no longer steers the plan until resumed. */
+    val pausedGoal: Goal? = null,
+    /** True when the active goal has run a week since it started or since the last check-in. */
+    val weeklyReviewDue: Boolean = false,
 )
 
 /**
@@ -223,6 +271,69 @@ internal fun debriefRepeatsLog(
 }
 
 /**
+ * Today's verdict, or null while this session's first sync is still in flight — Today shows its
+ * loading state, never a guess. Once a sync has settled, success or failure, there is always an
+ * answer: with no readiness at all it is Pending(NO_DATA), or Pending(SYNC_FAILED) when the sync
+ * failed — a connected user offline is never told they have no data. [readinessToday] must already
+ * be carried forward to today, so a snapshot left over from yesterday reads as stale, not as today's.
+ */
+internal fun todayVerdict(
+    settled: Boolean,
+    readinessToday: ReadinessSnapshot?,
+    strainTarget: StrainZone?,
+    syncFailed: Boolean = false,
+): MorningVerdict? =
+    if (settled) VerdictEngine.verdict(readinessToday, strainTarget, syncFailed = syncFailed) else null
+
+/**
+ * When WHOOP data was last imported, for Today's freshness line. Only the CSV import stamps this
+ * time, so it is shown only while WHOOP is connected and the data on screen is real — never beside
+ * sample data, and never after a disconnect, where it would describe data no longer in use.
+ */
+internal fun importedAtMillis(lastSyncMillis: Long?, whoopConnected: Boolean, isSample: Boolean): Long? =
+    lastSyncMillis?.takeIf { whoopConnected && !isSample }
+
+/**
+ * Whether answering the weekly check-in with [decision] completes this week's review. Keep and
+ * pause do. Change does not: the review completes when the wizard saves the new goal (a fresh goal
+ * is its own check-in), so backing out of the wizard leaves the check-in due.
+ */
+internal fun completesWeeklyReview(decision: WeeklyDecision): Boolean = decision != WeeklyDecision.CHANGE
+
+/** Logged workout types that count toward a fitness goal's sessions. */
+internal val TRAINING_WORKOUTS: Set<WorkoutType> = setOf(WorkoutType.ZONE_2, WorkoutType.STRENGTH)
+
+/** Logged workout types that count toward a recovery goal's sessions. */
+internal val RECOVERY_WORKOUTS: Set<WorkoutType> = setOf(WorkoutType.MOBILITY)
+
+/**
+ * Sessions of [types] logged in the trailing week — today and the six days before, the same window
+ * the calm-session count uses — for a habit goal's "2 of 3 this week".
+ */
+internal fun sessionsThisWeek(logs: List<WorkoutLog>, todayEpochDay: Long, types: Set<WorkoutType>): Int =
+    logs.count { it.type in types && it.completedAt.toEpochDay() in (todayEpochDay - 6)..todayEpochDay }
+
+/** Today check-offs in these categories count toward a fitness goal's sessions. */
+internal val TRAINING_CATEGORIES: Set<ActivityCategory> = setOf(ActivityCategory.ZONE2, ActivityCategory.STRENGTH)
+
+/**
+ * Today check-offs in these categories count toward a recovery goal's sessions: mobility, the
+ * gentle recovery cards and the sleep wind-down. The "In bed by" anchor is not a session; the
+ * count itself leaves it out ([HealthRepository.completedActivityCount]).
+ */
+internal val RECOVERY_CATEGORIES: Set<ActivityCategory> =
+    setOf(ActivityCategory.MOBILITY, ActivityCategory.RECOVERY, ActivityCategory.SLEEP)
+
+/**
+ * A habit goal's sessions this week from the two places a session is recorded: Today check-offs
+ * ([checkOffs]) and logged workouts ([logged]). A debriefed check-off is in both, so the two are
+ * never added — the larger wins. That credits check-offs left un-debriefed (and wind-downs, which
+ * have no debrief) and sessions logged outside Today without counting one session twice; it can
+ * only undercount a week that mixes the two on different sessions.
+ */
+internal fun habitSessionsThisWeek(checkOffs: Int, logged: Int): Int = maxOf(checkOffs, logged)
+
+/**
  * Everything needed to put an activity back exactly as it was before a snooze/skip/reschedule.
  * Captured before the write so Undo is a true restore, not a guess at the prior state.
  */
@@ -284,13 +395,27 @@ data class CoachBundle(
     val goalProgress: GoalProgress? = null,
     val windows: List<PressureWindow> = emptyList(),
     val weekdayEffects: List<WeekdayEffect> = emptyList(),
+    val pausedGoal: Goal? = null,
+    val goalBaselines: GoalBaselines = GoalBaselines(),
+    val weeklyReviewDue: Boolean = false,
+    val planConstraints: PlanConstraints = PlanConstraints(),
+    /** Every saved goal and window as stored, for the export (which carries all of them). */
+    val goalRows: List<GoalEntity> = emptyList(),
+    val windowRows: List<PressureWindowEntity> = emptyList(),
+    /** The day of the last weekly goal check-in, for the export; null when there has been none. */
+    val lastGoalReviewDay: Long? = null,
 )
 
 private data class CheckInBundle(
     val activities: List<DailyActivity>,
     val plan: DailyPlan?,
     val readiness: ReadinessSnapshot?,
+    val latestSnapshot: WhoopSnapshot?,
+    /** True once this session's first sync has finished (either way); see [todayVerdict]. */
+    val syncSettled: Boolean,
     val whoopConnected: Boolean,
+    /** When WHOOP data last arrived; null when it never has. */
+    val whoopLastSyncMillis: Long?,
     val calendarConnected: Boolean,
     val consistencyDays7: Int,
     val consistencyFlags: List<Boolean>,
@@ -329,14 +454,39 @@ class MainViewModel @Inject constructor(
     /** Day-scoped activity flow that re-subscribes when the date rolls over. */
     private val dailyActivitiesFlow = todayFlow.flatMapLatest { repository.dailyActivities(it) }
     private val projectionEngine = ProjectionEngine()
-    private val generatedPlan = MutableStateFlow<DailyPlan?>(null)
-    private val readinessState = MutableStateFlow<ReadinessSnapshot?>(null)
-    private val latestSnapshot = MutableStateFlow<WhoopSnapshot?>(null)
 
-    /** Tonight's lights-out target from the observed wake time and carried sleep debt. */
-    val bedtimePlan: StateFlow<BedtimePlan> = latestSnapshot
-        .map { SleepPlanner.tonight(it?.wakeMinuteOfDay, it?.sleepDebtHours) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SleepPlanner.tonight(null, null))
+    /**
+     * What the last sync delivered, held as one value so Today never renders a half-applied sync (a
+     * new readiness beside the old plan). [settled] turns true once the session's first sync has
+     * finished, whether it succeeded or failed; until then there is no verdict to show.
+     */
+    private data class SyncedDay(
+        val plan: DailyPlan? = null,
+        val readiness: ReadinessSnapshot? = null,
+        val latestSnapshot: WhoopSnapshot? = null,
+        val bedtime: BedtimePlan? = null,
+        val settled: Boolean = false,
+    )
+
+    private val synced = MutableStateFlow(SyncedDay())
+
+    /**
+     * Tonight's lights-out target from the same inputs the daily sync plans with — last night's
+     * wake time, estimated sleep need and debt, and the bed / wake times the user gave — so this
+     * card and the plan's sleep anchor agree. The sync's own target wins while it is today's: it is
+     * the one today's anchor was built from. An older night never sizes the target (or its debt
+     * line); with stale data only the user's own times do. Null until there is enough for a target
+     * (never 8 hours).
+     */
+    val bedtimePlan: StateFlow<BedtimePlan?> = combine(
+        synced,
+        preferencesStore.planConstraints,
+        todayFlow,
+    ) { day, constraints, planningDay ->
+        day.bedtime?.takeIf { day.plan?.dateEpochDay == planningDay }
+            ?: DailyPlanSync.tonightFor(DailyPlanSync.lastNight(day.latestSnapshot, planningDay), constraints)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
     private val syncFailed = MutableStateFlow(false)
     private val reviewRequested = MutableStateFlow(false)
     private val refreshing = MutableStateFlow(false)
@@ -348,30 +498,74 @@ class MainViewModel @Inject constructor(
         else WhoopImportInfo(days = row.dayCount, firstDayEpoch = row.firstDay, lastDayEpoch = row.lastDay)
     }
 
+    /** The goal-side inputs, folded so the coach combine stays within its five. */
+    private data class GoalInputs(
+        val goals: List<GoalEntity>,
+        val logs: List<WorkoutLog>,
+        val lastReviewDay: Long?,
+        val constraints: PlanConstraints,
+    )
+
+    private val goalInputs = combine(
+        repository.goals,
+        repository.workoutLogs(),
+        preferencesStore.lastGoalReviewDay,
+        preferencesStore.planConstraints,
+    ) { goals, logs, lastReviewDay, constraints -> GoalInputs(goals, logs, lastReviewDay, constraints) }
+
     /** Goals + pressure windows + stress patterns for the Coach hub, all reactive. */
     private val coachFlow = combine(
-        repository.goals,
+        goalInputs,
         repository.pressureWindows,
         whoopCycleDao.observeRecentCycles(),
         repository.metrics,
         // Completing a calm session must move a stress goal's progress immediately: a one-shot
         // read here would only refresh when some other Coach input happened to change.
         dailyActivitiesFlow,
-    ) { goals, windows, cycles, metrics, _ ->
-        val activeGoal = goals.firstOrNull { it.status == GoalStatus.ACTIVE }?.toDomain()
+    ) { inputs, windows, cycles, metrics, _ ->
+        val day = today
+        val goals = inputs.goals.map { it.toDomain() }
+        val activeGoal = goals.firstOrNull { it.status == GoalStatus.ACTIVE }
         val readings = metrics.map {
             MetricReading(it.type, it.value, LocalDate.ofEpochDay(it.recordedAtEpochDay), it.note, it.id)
         }
-        val breathworkThisWeek = repository.completedBreathworkCount(today - 6, today)
+        val breathworkThisWeek = repository.completedBreathworkCount(day - 6, day)
         CoachBundle(
             activeGoal = activeGoal,
             goalProgress = activeGoal?.let {
-                GoalEngine.progress(it, readings, today, breathworkThisWeek)
+                GoalEngine.progress(
+                    goal = it,
+                    readings = readings,
+                    todayEpochDay = day,
+                    breathworkThisWeek = breathworkThisWeek,
+                    // Check-offs and logged workouts, never both for one session (see habitSessionsThisWeek).
+                    trainingSessionsThisWeek = habitSessionsThisWeek(
+                        checkOffs = repository.completedActivityCount(TRAINING_CATEGORIES, day - 6, day),
+                        logged = sessionsThisWeek(inputs.logs, day, TRAINING_WORKOUTS),
+                    ),
+                    recoverySessionsThisWeek = habitSessionsThisWeek(
+                        checkOffs = repository.completedActivityCount(RECOVERY_CATEGORIES, day - 6, day),
+                        logged = sessionsThisWeek(inputs.logs, day, RECOVERY_WORKOUTS),
+                    ),
+                )
             },
             windows = windows.map { it.toDomain() },
             weekdayEffects = StressPatterns.weekdayEffects(
                 cycles.sortedBy { it.dateEpochDay }.map { it.toWhoopSnapshot() },
             ),
+            // Goals arrive newest first, so the first paused one is the most recent.
+            pausedGoal = goals.firstOrNull { it.status == GoalStatus.PAUSED },
+            goalBaselines = GoalPlanning.baselines(
+                readings = readings,
+                logs = inputs.logs,
+                calmSessionsLast28Days = repository.completedBreathworkCount(day - 27, day),
+                todayEpochDay = day,
+            ),
+            weeklyReviewDue = GoalPlanning.isWeeklyReviewDue(activeGoal, inputs.lastReviewDay, day),
+            planConstraints = inputs.constraints,
+            goalRows = inputs.goals,
+            windowRows = windows,
+            lastGoalReviewDay = inputs.lastReviewDay,
         )
     }
 
@@ -480,13 +674,23 @@ class MainViewModel @Inject constructor(
             repository.planOverrides,
             whoopImportInfoFlow,
             coachFlow,
-            repository.reflections,
+            // All of them, not the recent page: the export carries every reflection, and the
+            // weekly review picks its own window out of them.
+            repository.allReflections,
         ) { base, overrides, importInfo, coach, reflections ->
             base.copy(
                 planOverrides = overrides,
                 whoopImportInfo = importInfo,
                 coach = coach,
-                reflections = reflections.map { DailyReflection(it.dateEpochDay, ReflectionMood.valueOf(it.mood), it.note) },
+                // A mood this version doesn't know is left out of the review, never a crash; the
+                // export below still carries the row as stored.
+                reflections = reflections.mapNotNull { row ->
+                    ReflectionMood.entries.firstOrNull { it.name == row.mood }
+                        ?.let { DailyReflection(row.dateEpochDay, it, row.note) }
+                },
+                // Export is a privacy control: everything the user saved leaves with it, goals,
+                // pressure windows, the wizard's plan settings, reflections and the last weekly
+                // check-in included.
                 exportText = LocalExportFormatter.format(
                     profile = base.profile,
                     metrics = base.rawMetrics,
@@ -494,6 +698,11 @@ class MainViewModel @Inject constructor(
                     workouts = base.rawWorkouts,
                     planOverrides = overrides,
                     reminders = base.reminders,
+                    goals = coach.goalRows,
+                    pressureWindows = coach.windowRows,
+                    planConstraints = coach.planConstraints,
+                    reflections = reflections,
+                    lastGoalReviewDay = coach.lastGoalReviewDay,
                 ),
             )
         }
@@ -507,17 +716,19 @@ class MainViewModel @Inject constructor(
     private val checkInBundle = combine(
         dailyActivitiesFlow,
         repository.connections,
-        generatedPlan,
-        readinessState,
+        synced,
         consistencyFlow,
-    ) { entities, connections, plan, readiness, (consistencyCount, consistencyBits) ->
+    ) { entities, connections, syncedDay, (consistencyCount, consistencyBits) ->
         CheckInBundle(
             activities = entities.map { it.toDomain() },
-            plan = plan,
-            readiness = readiness,
+            plan = syncedDay.plan,
+            readiness = syncedDay.readiness,
+            latestSnapshot = syncedDay.latestSnapshot,
+            syncSettled = syncedDay.settled,
             whoopConnected = connections.any {
                 it.provider == IntegrationProvider.WHOOP && it.status == ConnectionStatus.CONNECTED
             },
+            whoopLastSyncMillis = connections.firstOrNull { it.provider == IntegrationProvider.WHOOP }?.lastSyncMillis,
             calendarConnected = connections.any {
                 it.provider == IntegrationProvider.GOOGLE_CALENDAR && it.status == ConnectionStatus.CONNECTED
             },
@@ -526,22 +737,29 @@ class MainViewModel @Inject constructor(
         )
     }
 
-    /** The two notification preferences, paired so the uiState combine stays within its five inputs. */
-    private data class NotificationPrefs(val denied: Boolean, val offerSettled: Boolean)
+    /** The small preferences Today reads, bundled so the uiState combine stays within its five inputs. */
+    private data class PrefsBundle(
+        val onboardingComplete: Boolean,
+        val notificationDenied: Boolean,
+        val offerSettled: Boolean,
+        val morningRevealPlayedDay: Long?,
+    )
 
-    private val notificationPrefs = combine(
+    private val prefsBundle = combine(
+        preferencesStore.onboardingComplete,
         preferencesStore.notificationPermissionDenied,
         preferencesStore.remindersOfferSettled,
-    ) { denied, settled -> NotificationPrefs(denied, settled) }
+        preferencesStore.morningRevealPlayedDay,
+    ) { onboarding, denied, offerSettled, revealDay -> PrefsBundle(onboarding, denied, offerSettled, revealDay) }
 
     val uiState: StateFlow<MainUiState> = combine(
-        preferencesStore.onboardingComplete,
-        notificationPrefs,
+        prefsBundle,
         healthBundle,
         checkInBundle,
         transientFlags,
-    ) { onboardingComplete, notifPrefs, health, checkIn, transients ->
-        val notificationDenied = notifPrefs.denied
+    ) { prefs, health, checkIn, transients ->
+        val onboardingComplete = prefs.onboardingComplete
+        val notificationDenied = prefs.notificationDenied
         val (syncDidFail, reviewWanted, whoopImport, goalNoticeText, refreshBusy) = transients
         val latest = latestReadings(health.readings)
         val targetMap = health.targets.associateBy(TargetValue::metricType)
@@ -566,6 +784,19 @@ class MainViewModel @Inject constructor(
                 a.targetStatus == TargetStatus.ABOVE_PERSONAL_TARGET || a.targetStatus == TargetStatus.BELOW_PERSONAL_TARGET
         }.map { it.reading.type }.toSet()
         val isMockData = checkIn.plan?.isMock ?: whoopClient.isMock
+        // Today's verdict and its "why": built only from a sync that has settled, against today.
+        // After a failed sync past midnight the cached snapshot is yesterday's — carried forward it
+        // reads as stale (Pending), and yesterday's plan lends it no strain target.
+        val day = today
+        val readinessToday = checkIn.readiness?.let { DailyPlanSync.carryForward(it, day) }
+        // The sync always plans under the day it ran for, so a plan from any other day is not today's.
+        val planToday = checkIn.plan?.takeIf { it.dateEpochDay == day }
+        val signals = SignalEngine.signals(health.readings)
+        // Only today's night is "last night": an older snapshot (lagging sync, old import) is not.
+        val lastNight = DailyPlanSync.lastNight(checkIn.latestSnapshot, day)
+        val sleptHours = lastNight?.sleepDurationHours
+        val sleepNeedHours = SleepNeed.neededHours(sleptHours, lastNight?.sleepPerformance)
+        val verdict = todayVerdict(checkIn.syncSettled, readinessToday, planToday?.strainTarget, syncFailed = syncDidFail)
         MainUiState(
             onboardingComplete = onboardingComplete,
             notificationDenied = notificationDenied,
@@ -574,7 +805,7 @@ class MainViewModel @Inject constructor(
             // launch, and never again once the user has answered either way.
             showRemindersOffer = shouldOfferReminders(
                 hasActivities = checkIn.activities.isNotEmpty(),
-                offerSettled = notifPrefs.offerSettled,
+                offerSettled = prefs.offerSettled,
                 permissionGranted = reminderScheduler.hasNotificationPermission(),
             ),
             profile = health.profile,
@@ -598,7 +829,7 @@ class MainViewModel @Inject constructor(
             readinessBand = checkIn.readiness?.band,
             recoveryScore = checkIn.readiness?.recoveryScore,
             readinessNotes = checkIn.readiness?.trendNotes.orEmpty(),
-            signals = SignalEngine.signals(health.readings),
+            signals = signals,
             planSafetyBanner = checkIn.plan?.safetyBanner,
             whoopIsMock = isMockData,
             whoopConnected = checkIn.whoopConnected,
@@ -631,6 +862,24 @@ class MainViewModel @Inject constructor(
                     ?: latestValue(health.readings, MetricType.RECOVERY_SCORE)?.toInt(),
                 consistencyDays7 = checkIn.consistencyDays7,
             ),
+            verdict = verdict,
+            whyToday = verdict?.let {
+                WhyTodayEngine.explain(readinessToday, it, planToday, signals, sleptHours, sleepNeedHours)
+            },
+            strainTarget = planToday?.strainTarget,
+            sleptHours = sleptHours,
+            sleepNeedHours = sleepNeedHours,
+            dataThroughEpochDay = checkIn.readiness?.cycleEpochDay,
+            lastSyncedAtMillis = importedAtMillis(checkIn.whoopLastSyncMillis, checkIn.whoopConnected, isMockData),
+            morningRevealPlayedForDay = prefs.morningRevealPlayedDay,
+            observedBedMinute = checkIn.latestSnapshot?.bedMinuteOfDay,
+            observedWakeMinute = checkIn.latestSnapshot?.wakeMinuteOfDay,
+            planConstraints = health.coach.planConstraints,
+            // Goals anchor to the user's own average; sample data is nobody's average, so the
+            // wizard falls back to its labelled "still learning" defaults instead.
+            goalBaselines = if (isMockData) GoalBaselines() else health.coach.goalBaselines,
+            pausedGoal = health.coach.pausedGoal,
+            weeklyReviewDue = health.coach.weeklyReviewDue,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MainUiState())
 
@@ -679,12 +928,23 @@ class MainViewModel @Inject constructor(
         schedulePressureNudges()
         if (outcome.failed) {
             syncFailed.value = true
+            // Settled all the same, keeping the last-known day: a failed first sync with nothing
+            // cached reads as "couldn't reach WHOOP" (Pending SYNC_FAILED) — never as "no data
+            // yet", never as a verdict and never as endless loading.
+            synced.update { it.copy(settled = true) }
             return
         }
         syncFailed.value = false
-        readinessState.value = outcome.readiness
-        generatedPlan.value = outcome.plan
-        latestSnapshot.value = outcome.latestSnapshot
+        // Today's cycle replaced a holding plan: reminders armed for its snoozed or rescheduled
+        // items go with them, as after an import, or they would fire for items no longer planned.
+        outcome.replacedReminderIds.forEach(reminderScheduler::cancelActivityReminder)
+        synced.value = SyncedDay(
+            plan = outcome.plan,
+            readiness = outcome.readiness,
+            latestSnapshot = outcome.latestSnapshot,
+            bedtime = outcome.bedtime,
+            settled = true,
+        )
     }
 
     /**
@@ -744,33 +1004,115 @@ class MainViewModel @Inject constructor(
     /**
      * Validates and saves a goal. A too-aggressive ask is never refused — GoalEngine
      * counter-offers the nearest safe version, which is what gets saved, and [MainUiState.goalNotice]
-     * explains the adjustment. Any previously active goal is retired (one active goal at a time).
+     * explains the adjustment. Any active or paused goal is retired (one primary goal at a time).
      */
     fun saveGoal(type: GoalType, targetValue: Double, weeks: Int) {
         viewModelScope.launch {
-            val readings = uiState.value.readings
-            val requested = Goal(
-                id = java.util.UUID.randomUUID().toString(),
-                type = type,
-                targetValue = targetValue,
-                baselineValue = GoalEngine.baselineFor(type, readings, today),
-                startEpochDay = today,
-                targetEpochDay = today + weeks * 7L,
-            )
-            val (toSave, notice) = when (val v = GoalEngine.validate(requested)) {
-                is GoalValidation.Ok -> v.goal to "Goal set. The weekly plan now leans toward it."
-                is GoalValidation.Adjusted -> v.adjusted to v.why
-                is GoalValidation.Invalid -> {
-                    goalNotice.value = v.why
-                    return@launch
-                }
+            persistGoal(type, targetValue, weeks) { adjustedWhy ->
+                adjustedWhy ?: "Goal set. The weekly plan now leans toward it."
             }
-            repository.goals.first()
-                .filter { it.status == GoalStatus.ACTIVE }
-                .forEach { repository.updateGoalStatus(it.id, GoalStatus.ABANDONED) }
-            repository.upsertGoal(toSave.toEntity())
-            goalNotice.value = notice
         }
+    }
+
+    /**
+     * The goal wizard's finish: the user's constraints are saved first, then the goal through the
+     * same validated path as [saveGoal]. The baseline is the goal metric's own recent average
+     * ([GoalEngine.baselineFor]), not the wizard's display anchor. Today's plan is left as it is —
+     * reseeding would throw away check-offs — so the notice says the plan leans in from tomorrow.
+     */
+    fun startGoalPlan(preset: GoalPreset, targetValue: Double, weeks: Int, constraints: PlanConstraints) {
+        viewModelScope.launch {
+            preferencesStore.setPlanConstraints(constraints)
+            val saved = persistGoal(preset.goalType, targetValue, weeks) { adjustedWhy ->
+                adjustedWhy?.let { appContext.getString(R.string.vm_goal_plan_started_adjusted, it) }
+                    ?: appContext.getString(R.string.vm_goal_plan_started)
+            }
+            // A fresh goal is its own check-in: the next weekly review is a week from today.
+            if (saved) preferencesStore.setLastGoalReviewDay(today)
+        }
+    }
+
+    /** Plan settings edited outside the wizard (time a day, limits, sleep window, won't-dos). */
+    fun savePlanConstraints(constraints: PlanConstraints) {
+        viewModelScope.launch { preferencesStore.setPlanConstraints(constraints) }
+    }
+
+    /**
+     * The weekly keep / change / pause check-in. Keep and pause confirm with a kind snackbar and
+     * complete this week's review. Change only hands over to the wizard the UI opens: the review
+     * completes when [startGoalPlan] saves the new goal, so backing out of the wizard leaves the
+     * check-in due ([completesWeeklyReview]). A missed week is a goal-design problem, never the user's.
+     */
+    fun recordWeeklyDecision(decision: WeeklyDecision) {
+        viewModelScope.launch {
+            when (decision) {
+                WeeklyDecision.KEEP -> _messages.send(UserMessage(textRes = R.string.vm_weekly_kept))
+                WeeklyDecision.PAUSE -> {
+                    val active = repository.goals.first().firstOrNull { it.status == GoalStatus.ACTIVE }
+                    if (active != null) {
+                        repository.updateGoalStatus(active.id, GoalStatus.PAUSED)
+                        _messages.send(UserMessage(textRes = R.string.vm_weekly_paused))
+                    }
+                }
+                WeeklyDecision.CHANGE -> Unit
+            }
+            if (completesWeeklyReview(decision)) preferencesStore.setLastGoalReviewDay(today)
+        }
+    }
+
+    /** Brings a paused goal back as the one primary goal; any other active goal is retired. */
+    fun resumeGoal(id: String) {
+        viewModelScope.launch {
+            val goals = repository.goals.first()
+            if (goals.none { it.id == id }) return@launch
+            goals.filter { it.status == GoalStatus.ACTIVE && it.id != id }
+                .forEach { repository.updateGoalStatus(it.id, GoalStatus.ABANDONED) }
+            repository.updateGoalStatus(id, GoalStatus.ACTIVE)
+            preferencesStore.setLastGoalReviewDay(today)
+            _messages.send(UserMessage(textRes = R.string.vm_goal_resumed))
+        }
+    }
+
+    /** The morning reveal has played for [cycleEpochDay]'s verdict; it never replays for that day. */
+    fun markMorningRevealPlayed(cycleEpochDay: Long) {
+        viewModelScope.launch { preferencesStore.setMorningRevealPlayedDay(cycleEpochDay) }
+    }
+
+    /**
+     * Validates and saves a goal as the one primary goal; false when it was refused outright. A
+     * too-aggressive ask is saved as GoalEngine's nearest safe counter-offer, and any ACTIVE or
+     * PAUSED goal is retired. [notice] turns the counter-offer's explanation (null when the ask
+     * was saved as-is) into the confirmation copy.
+     */
+    private suspend fun persistGoal(
+        type: GoalType,
+        targetValue: Double,
+        weeks: Int,
+        notice: (adjustedWhy: String?) -> String,
+    ): Boolean {
+        val day = today
+        val requested = Goal(
+            id = java.util.UUID.randomUUID().toString(),
+            type = type,
+            targetValue = targetValue,
+            baselineValue = GoalEngine.baselineFor(type, repository.metricReadings().first(), day),
+            startEpochDay = day,
+            targetEpochDay = day + weeks * 7L,
+        )
+        val (toSave, adjustedWhy) = when (val v = GoalEngine.validate(requested)) {
+            is GoalValidation.Ok -> v.goal to null
+            is GoalValidation.Adjusted -> v.adjusted to v.why
+            is GoalValidation.Invalid -> {
+                goalNotice.value = v.why
+                return false
+            }
+        }
+        repository.goals.first()
+            .filter { it.status == GoalStatus.ACTIVE || it.status == GoalStatus.PAUSED }
+            .forEach { repository.updateGoalStatus(it.id, GoalStatus.ABANDONED) }
+        repository.upsertGoal(toSave.toEntity())
+        goalNotice.value = notice(adjustedWhy)
+        return true
     }
 
     fun abandonGoal(id: String) {
@@ -1058,7 +1400,7 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             val zone = ZoneId.systemDefault()
             val date = LocalDate.now()
-            val snap = latestSnapshot.value
+            val snap = synced.value.latestSnapshot
             val startMinuteOfDay = maxOf(8 * 60, (snap?.wakeMinuteOfDay ?: (8 * 60 - 30)) + 30)
                 // A very late imported wake time must not push the window start past the day's end;
                 // an inverted coerceIn range below would throw and take the process down.
@@ -1209,9 +1551,9 @@ class MainViewModel @Inject constructor(
 
     /** Clears the in-memory plan/readiness caches so erased data cannot survive on screen. */
     private fun resetTransientState() {
-        generatedPlan.value = null
-        readinessState.value = null
-        latestSnapshot.value = null
+        // Known-empty rather than loading: erasure has disarmed the background sync, so Today says
+        // "no data yet" (Pending) instead of the deleted verdict or a wait no sync will end.
+        synced.value = SyncedDay(settled = true)
         syncFailed.value = false
         whoopImportState.value = null
         goalNotice.value = null

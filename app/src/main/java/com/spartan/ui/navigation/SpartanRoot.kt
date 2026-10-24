@@ -215,6 +215,7 @@ fun SpartanRoot(
                     onDismissRemindersOffer = viewModel::settleRemindersOffer,
                     bedtime = bedtime,
                     onAddAction = viewModel::addAction,
+                    onMorningRevealPlayed = viewModel::markMorningRevealPlayed,
                 )
             }
             composable("insights") {
@@ -228,6 +229,9 @@ fun SpartanRoot(
                     onDismissGoalNotice = viewModel::dismissGoalNotice,
                     onOpenMetric = openMetric,
                     onOpenTrainingWeek = { navController.navigate("training") },
+                    onStartGoalPlan = viewModel::startGoalPlan,
+                    onWeeklyDecision = viewModel::recordWeeklyDecision,
+                    onResumeGoal = viewModel::resumeGoal,
                 )
             }
             composable("you") {
@@ -248,6 +252,8 @@ fun SpartanRoot(
                     onOpenReminders = { navController.navigate("reminders") },
                     onOpenPrivacy = { navController.navigate("privacy") },
                     onOpenDiagnostics = if (BuildConfig.DEBUG) { { navController.navigate("diagnostics") } } else null,
+                    onStartGoalPlan = viewModel::startGoalPlan,
+                    onSavePlanConstraints = viewModel::savePlanConstraints,
                 )
             }
             composable("detail/{type}") { entry ->

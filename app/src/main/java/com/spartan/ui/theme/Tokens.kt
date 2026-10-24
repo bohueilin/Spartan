@@ -9,6 +9,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.spartan.domain.engine.PlanUrgency
+import com.spartan.domain.engine.RecoveryZone
 import com.spartan.domain.model.ReadinessBand
 
 /**
@@ -26,10 +27,17 @@ object Spacing {
     val section = 32.dp // between page sections
 }
 
+/**
+ * Corner radii, the one source for both SpartanShapes (Theme.kt) and hand-drawn shapes: chip = shapes
+ * extraSmall, tile = small, medium = medium, card = large, extraLarge = extraLarge. The action
+ * row's completion morph runs medium → extraLarge (16 → 28dp), as the Lottie is authored.
+ */
 object Radius {
     val chip = 8.dp
     val tile = 12.dp
+    val medium = 16.dp
     val card = 20.dp
+    val extraLarge = 28.dp
 }
 
 object Motion {
@@ -55,13 +63,15 @@ fun rememberReducedMotion(): Boolean {
  * The single place readiness band → color is defined. Used by the ring, band label, and progress.
  * Theme-aware: the bright variants fail WCAG 3:1 on light surfaces (verified by the contrast
  * audit in docs/ACCESSIBILITY.md), so light mode uses darkened equivalents — all ≥4.5:1 on white
- * AND on their own 18%-alpha tinted chips (the urgency-chip case the original audit missed).
+ * AND on their own 14% (StatusPill) and 18% (urgency chip) alpha tints. primedLight was #0E7B43,
+ * which is 5.34:1 on white but only 4.39:1 on its 14% pill tint; #0B6E3D is 6.34:1 on white,
+ * 5.14:1 on the 14% tint and 4.83:1 on 18%.
  */
 object SpartanBands {
     val primedDark = Color(0xFF38D07E)
     val easyDark = Color(0xFFE7B25A)
     val restDark = Color(0xFFE67A5A)
-    val primedLight = Color(0xFF0E7B43)
+    val primedLight = Color(0xFF0B6E3D)
     val easyLight = Color(0xFF7C570E)
     val restLight = Color(0xFFA0381D)
 }
@@ -75,6 +85,20 @@ fun bandColor(band: ReadinessBand?): Color {
         ReadinessBand.EASY -> if (dark) SpartanBands.easyDark else SpartanBands.easyLight
         ReadinessBand.REST -> if (dark) SpartanBands.restDark else SpartanBands.restLight
         null -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+}
+
+/**
+ * WHOOP's recovery colour (Green / Yellow / Red) in the same verified-contrast semantic palette as
+ * [bandColor]. Always shown with its word and number — never colour alone.
+ */
+@Composable
+fun zoneColor(zone: RecoveryZone): Color {
+    val dark = isSystemInDarkTheme()
+    return when (zone) {
+        RecoveryZone.GREEN -> if (dark) SpartanBands.primedDark else SpartanBands.primedLight
+        RecoveryZone.YELLOW -> if (dark) SpartanBands.easyDark else SpartanBands.easyLight
+        RecoveryZone.RED -> if (dark) SpartanBands.restDark else SpartanBands.restLight
     }
 }
 

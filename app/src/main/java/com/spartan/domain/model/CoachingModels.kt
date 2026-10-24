@@ -1,5 +1,7 @@
 package com.spartan.domain.model
 
+import com.spartan.domain.engine.StrainZone
+
 /**
  * Spartan coaching domain models.
  *
@@ -77,6 +79,23 @@ data class ReadinessSnapshot(
     val trendNotes: List<String> = emptyList(),
     val isStale: Boolean = false,
     val isMock: Boolean = false,
+    /**
+     * Yesterday's recovery score, for "up from 58% yesterday"; null when unknown or when the newest
+     * earlier cycle is not from the day before (a day without the strap is not "yesterday").
+     */
+    val previousRecoveryScore: Int? = null,
+    /** Hours asleep last night (the sleep that opens this cycle); null when unknown. */
+    val sleepDurationHours: Double? = null,
+    /**
+     * Wake day of the WHOOP cycle these values come from. Equal to [dateEpochDay] until the
+     * snapshot is carried forward to a later day, where it still names the original cycle.
+     */
+    val cycleEpochDay: Long = dateEpochDay,
+    /**
+     * Wake day of the newest earlier cycle in the history (the one [dayStrainPrior] comes from), so
+     * copy can say "yesterday" only when it really was the day before; null without history.
+     */
+    val previousCycleEpochDay: Long? = null,
 ) {
     companion object {
         /**
@@ -89,7 +108,10 @@ data class ReadinessSnapshot(
             val hrvBaseline = priorSorted.mapNotNull { it.hrvMs }.takeIf { it.isNotEmpty() }?.average()
             val rhrBaseline = priorSorted.mapNotNull { it.restingHeartRate }.takeIf { it.isNotEmpty() }?.average()
             val rrBaseline = priorSorted.mapNotNull { it.respiratoryRate }.takeIf { it.isNotEmpty() }?.average()
-            val priorStrain = priorSorted.lastOrNull()?.dayStrain
+            val prior = priorSorted.lastOrNull()
+            val priorStrain = prior?.dayStrain
+            // Only the day before counts as "yesterday" — after a day without the strap there is none.
+            val yesterday = prior?.takeIf { it.dateEpochDay == today.dateEpochDay - 1 }
 
             val notes = mutableListOf<String>()
             val hrvDelta = if (today.hrvMs != null && hrvBaseline != null) today.hrvMs - hrvBaseline else null
@@ -117,6 +139,9 @@ data class ReadinessSnapshot(
                 trendNotes = notes,
                 isStale = today.recoveryScore == null,
                 isMock = today.isMock,
+                previousRecoveryScore = yesterday?.recoveryScore,
+                sleepDurationHours = today.sleepDurationHours,
+                previousCycleEpochDay = prior?.dateEpochDay,
             )
         }
     }
@@ -150,6 +175,8 @@ data class DailyPlan(
     val activities: List<DailyActivity>,
     val safetyBanner: String? = null,
     val isMock: Boolean = false,
+    /** Today's strain target, matching the plan's main training session; null when the plan sets none. */
+    val strainTarget: StrainZone? = null,
 ) {
     val totalEstimatedMinutes: Int get() = activities.sumOf { it.estimatedMinutes }
     val completedCount: Int get() = activities.count { it.status == ActivityStatus.DONE }

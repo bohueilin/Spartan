@@ -39,6 +39,8 @@ class DailyPlanRefreshWorker @AssistedInject constructor(
     override suspend fun doWork(): Result {
         val outcome = dailyPlanSync.sync(LocalDate.now().toEpochDay())
         DebugLog.log("worker", "daily refresh ${if (outcome.failed) "failed" else "ok"}")
+        // A replaced holding plan's snoozed / rescheduled rows are gone; their alarms must not fire.
+        outcome.replacedReminderIds.forEach(reminderScheduler::cancelActivityReminder)
         // Keep the home-screen widget showing the fresh plan.
         runCatching { NextActivityWidget().updateAll(applicationContext) }
         // Proactive morning digest at 07:15 (just after default quiet hours end): the plan headline

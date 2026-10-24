@@ -1,6 +1,6 @@
 # Spartan — Accessibility
 
-## Contrast audit (WCAG 2.x AA) — executed 2026-07-09, re-run 2026-08-11
+## Contrast audit (WCAG 2.x AA) — executed 2026-07-09, re-run 2026-08-11 and 2026-10-24
 
 Computed programmatically over the theme tokens in `ui/theme/Theme.kt` + `ui/theme/Tokens.kt`
 (relative-luminance contrast ratios; AA thresholds: 4.5:1 body text, 3:1 large text/graphics).
@@ -14,7 +14,7 @@ Computed programmatically over the theme tokens in `ui/theme/Theme.kt` + `ui/the
 | `primary` text / `surface` | 10.87:1 | ~~5.09:1~~ → **6.67:1** | PASS |
 | `tertiary` (safety notes) / `surface` | 9.34:1 | ~~4.72:1~~ → **6.51:1** | PASS |
 | `secondary` text / `surface` | 10.00:1 | 11.69:1 | PASS |
-| Band **primed** / `surface` | 8.98:1 | ~~2.00:1~~ → **5.34:1** | **FIXED** |
+| Band **primed** / `surface` | 8.98:1 | ~~2.00:1~~ → ~~5.34:1~~ → **6.34:1** | **FIXED** |
 | Band **easy** / `surface` | 9.34:1 | ~~1.92:1~~ → **6.51:1** | **FIXED** |
 | Band **rest** / `surface` | 6.24:1 | ~~2.88:1~~ → **6.82:1** | **FIXED** |
 
@@ -42,17 +42,42 @@ set (`ios/SpartanApp/Sources/SpartanApp.swift`) mirrors the same values. Light-m
 | Goal "Keep going" | `tertiary` on 14% tint / white card | ~~3.95:1~~ → **5.29:1** | **FIXED** |
 | DUE urgency | `easyLight` on 18% tint / white card | ~~4.12:1~~ → **5.00:1** | **FIXED** |
 | OVERDUE urgency | `restLight` on 18% tint / white card | ~~4.43:1~~ → **5.11:1** | **FIXED** |
+| POSITIVE status pill ("Better than usual", "On track", lab normal) | `primedLight` on 14% tint / white card | ~~4.39:1~~ → **5.14:1** | **FIXED** (2026-10-24) |
+| `primedLight` on an 18% tint | `primedLight` on 18% tint / white card | ~~4.14:1~~ → **4.83:1** | **FIXED** (2026-10-24) |
+| CAUTION / ALERT status pills | `easyLight` / `restLight` on 14% tint / white card | **5.31:1** / **5.47:1** | PASS |
+| INFO / NEUTRAL status pills | `primary` / `onSurfaceVariant` on 14% tint / white card | **5.40:1** / **6.17:1** | PASS |
 | White on `primary` (filled buttons) | — | ~~5.09:1~~ → **6.67:1** | PASS |
+
+**Finding + fix (2026-10-24):** `StatusPill` draws its label in the tone colour on a 14% tint of
+that colour. The light `primedLight` (`#0E7B43`) passed on white (5.34:1) but fell to 4.39:1 on its
+own pill, and the Tokens.kt comment claimed a check that had not covered it. `primedLight` is now
+`#0B6E3D` (6.34:1 on white). The same token is the GREEN recovery zone and the PRIMED band, so the
+verdict text, ring and Primed label darken with it. Dark-mode pills already passed (`primedDark` on
+its 14% tint over `surface`: 6.92:1). The iOS mirror (`spartanBandPrimed` in
+`ios/SpartanApp/Sources/SpartanApp.swift`) and `docs/VISUAL_AND_VIDEO_GUIDE.md` still list
+`#0E7B43` and need the same change.
+
+## Non-text contrast (WCAG 1.4.11, 3:1 for UI components)
+
+| Component | Pair | Dark | Light | Verdict |
+|---|---|---|---|---|
+| Unchecked action check ring (2dp) | ring on `surface` | ~~2.06:1~~ (`outline`) → **7.90:1** | ~~2.35:1~~ (`outline`) → **7.64:1** | **FIXED** (2026-10-24) |
+
+The unchecked ring is the only visual sign of the Today screen's main control, so it now uses
+`onSurfaceVariant`, the role M3's Checkbox uses for its unchecked border.
 
 ## Built-in accessibility contract (enforced in code/tests)
 
 - Every interactive element carries Compose `semantics` (`contentDescription`, `stateDescription`,
   `Role.Checkbox` on check-offs); the readiness ring merges descendants into one announcement.
-- 48dp minimum touch targets (checkbox hit area is 48dp around the 26dp visual;
+- 48dp minimum touch targets (checkbox hit area is 48dp around the 28dp ring, with a round,
+  unbounded 24dp-radius ripple that fills the target;
   `CheckInScreenTest.activityCheckbox_meetsTouchTargetMinimum` asserts it on device).
 - Color is never the only signal: band color is always paired with a text label ("Take it easy"),
   priority chips carry text, completed activities get strikethrough + "Completed" status text.
-- Dynamic type: all text uses the Material 3 type scale (sp); no fixed-height text containers.
+- Dynamic type: all text uses the Material 3 type scale (sp); no fixed-height text containers and
+  no truncation of key copy. `StatusPill`, the `ListRow` subtitle and the video card's title and
+  meta wrap instead of clipping or ellipsizing; the activity sheet's pills sit in a `FlowRow`.
   Font-scale previews at 1.5×/2.0× live in `ui/screens/FontScalePreviews.kt`.
 
 ## TalkBack test script (manual pass, ~10 min — run before each release)
