@@ -74,6 +74,118 @@ class WhoopCsvParserTest {
         assertEquals(7 * 60 + 40, row.wakeMinuteOfDay)
     }
 
+    // --- WHOOP's own sleep need ("Sleep need (min)") ---------------------------------------
+
+    @Test
+    fun cycles_sleepNeedColumn_parsesToHours() {
+        val csv = cyclesHeader + "\n" +
+            "2030-01-10 00:40:00,2030-01-11 01:00:00,UTC-07:00,75,58,82,33.50,96.00,9.5,2100,168,88," +
+            "2030-01-10 00:40:00,2030-01-10 07:40:00,80,14.8,390,420,180,90,120,30,540,90,93,85"
+        assertEquals(9.0, WhoopCsvParser.parse(csv)!!.cycles.single().sleepNeedHours!!, 1e-9) // 540 min
+    }
+
+    @Test
+    fun cycles_withoutTheSleepNeedColumn_needIsNull_andEveryOtherCellStillLandsByName() {
+        // An export without the column (older, or trimmed): the need is unknown, never a neighbour's value.
+        val header = cyclesHeader.replace(",Sleep need (min)", "")
+        val csv = header + "\n" +
+            "2030-01-10 00:40:00,2030-01-11 01:00:00,UTC-07:00,75,58,82,33.50,96.00,9.5,2100,168,88," +
+            "2030-01-10 00:40:00,2030-01-10 07:40:00,80,14.8,390,420,180,90,120,30,90,93,85"
+        val row = WhoopCsvParser.parse(csv)!!.cycles.single()
+        assertNull(row.sleepNeedHours)
+        assertEquals(1.5, row.sleepDebtHours!!, 1e-9) // 90 min, read from its own column
+        assertEquals(75, row.recoveryScore)
+    }
+
+    @Test
+    fun cycles_blankSleepNeedCell_isNull() {
+        val csv = cyclesHeader + "\n" +
+            "2030-01-10 00:40:00,2030-01-11 01:00:00,UTC-07:00,75,58,82,33.50,96.00,9.5,2100,168,88," +
+            "2030-01-10 00:40:00,2030-01-10 07:40:00,80,14.8,390,420,180,90,120,30,,90,93,85"
+        assertNull(WhoopCsvParser.parse(csv)!!.cycles.single().sleepNeedHours)
+    }
+
+    @Test
+    fun cycles_reorderedColumns_parseByHeaderName() {
+        // Same data, columns shuffled (and most of them absent): positions are never assumed.
+        val csv = "Sleep need (min),Wake onset,Recovery score %,Cycle start time,Sleep onset," +
+            "Asleep duration (min),Sleep performance %,Sleep debt (min)\n" +
+            "480,2030-01-10 07:40:00,75,2030-01-10 00:40:00,2030-01-10 00:40:00,390,80,90"
+        val parsed = WhoopCsvParser.parse(csv)!!
+        assertEquals(WhoopCsvKind.PHYSIOLOGICAL_CYCLES, parsed.kind)
+        val row = parsed.cycles.single()
+        assertEquals(day("2030-01-10"), row.dateEpochDay)
+        assertEquals(75, row.recoveryScore)
+        assertEquals(8.0, row.sleepNeedHours!!, 1e-9)
+        assertEquals(6.5, row.sleepDurationHours!!, 1e-9)
+        assertEquals(1.5, row.sleepDebtHours!!, 1e-9)
+        assertEquals(80, row.sleepPerformance)
+        assertEquals(40, row.bedMinuteOfDay)
+        assertEquals(7 * 60 + 40, row.wakeMinuteOfDay)
+        assertNull(row.hrvMs) // a column the file doesn't have
+    }
+
+    @Test
+    fun sleeps_sleepNeedParsed_withAndWithoutTheColumn() {
+        val withNeed = WhoopCsvParser.parse(
+            sleepsHeader + "\n" +
+                "2030-01-10 00:40:00,2030-01-11 01:00:00,UTC-07:00,2030-01-10 00:40:00,2030-01-10 07:18:00," +
+                "61,16.0,283,304,100,115,68,21,579,126,95,83,false",
+        )!!.sleeps.single()
+        assertEquals(9.65, withNeed.sleepNeedHours!!, 1e-9) // 579 min, rounded to 2 decimals
+        assertEquals(2.1, withNeed.sleepDebtHours!!, 1e-9) // 126 min
+
+        val withoutNeed = WhoopCsvParser.parse(
+            sleepsHeader.replace(",Sleep need (min)", "") + "\n" +
+                "2030-01-10 00:40:00,2030-01-11 01:00:00,UTC-07:00,2030-01-10 00:40:00,2030-01-10 07:18:00," +
+                "61,16.0,283,304,100,115,68,21,126,95,83,false",
+        )!!.sleeps.single()
+        assertNull(withoutNeed.sleepNeedHours)
+        assertEquals(2.1, withoutNeed.sleepDebtHours!!, 1e-9)
+        assertFalse(withoutNeed.nap)
+    }
+
+    @Test
+    fun merger_sleepNeed_prefersTheMainSleep_overTheNapAndTheCycleRow() {
+        val cycles = WhoopCsvParser.parse(
+            cyclesHeader + "\n" +
+                "2030-01-10 00:40:00,2030-01-11 01:00:00,UTC-07:00,75,58,82,33.50,96.00,9.5,2100,168,88," +
+                "2030-01-10 19:29:00,2030-01-10 20:27:00,80,14.8,390,420,180,90,120,30,540,90,93,85",
+        )!!
+        val sleeps = WhoopCsvParser.parse(
+            sleepsHeader + "\n" +
+                "2030-01-10 00:40:00,2030-01-11 01:00:00,UTC-07:00,2030-01-10 19:29:00,2030-01-10 20:27:00," +
+                "13,15.9,56,58,24,32,0,2,581,127,97,,true\n" +
+                "2030-01-10 00:40:00,2030-01-11 01:00:00,UTC-07:00,2030-01-10 00:40:00,2030-01-10 07:18:00," +
+                "61,16.0,283,304,100,115,68,21,579,126,95,83,false",
+        )!!
+
+        val joined = WhoopCsvMerger.merge(listOf(cycles, sleeps), importedAtMillis = 0L)
+        assertEquals(9.65, joined.cycles.single().sleepNeedHours!!, 1e-9) // main sleep, not the nap's 581
+        // It reaches the snapshot the plan is built from.
+        assertEquals(9.65, joined.snapshots.single().sleepNeedHours!!, 1e-9)
+
+        // Without sleeps.csv the cycle row's own need is used.
+        val cyclesOnly = WhoopCsvMerger.merge(listOf(cycles), importedAtMillis = 0L)
+        assertEquals(9.0, cyclesOnly.cycles.single().sleepNeedHours!!, 1e-9)
+
+        // A sleeps-only import keeps it too.
+        val sleepsOnly = WhoopCsvMerger.merge(listOf(sleeps), importedAtMillis = 0L)
+        assertEquals(9.65, sleepsOnly.cycles.single().sleepNeedHours!!, 1e-9)
+    }
+
+    @Test
+    fun merger_exportWithoutSleepNeed_leavesItNull() {
+        val cycles = WhoopCsvParser.parse(
+            cyclesHeader.replace(",Sleep need (min)", "") + "\n" +
+                "2030-01-10 00:40:00,2030-01-11 01:00:00,UTC-07:00,75,58,82,33.50,96.00,9.5,2100,168,88," +
+                "2030-01-10 00:40:00,2030-01-10 07:40:00,80,14.8,390,420,180,90,120,30,90,93,85",
+        )!!
+        val merged = WhoopCsvMerger.merge(listOf(cycles), importedAtMillis = 0L)
+        assertNull(merged.cycles.single().sleepNeedHours)
+        assertNull(merged.snapshots.single().sleepNeedHours)
+    }
+
     @Test
     fun cycles_noSleepCycle_blanksParseAsNull() {
         // Real exports contain cycles with no recorded sleep: recovery/HRV/sleep cells all blank.

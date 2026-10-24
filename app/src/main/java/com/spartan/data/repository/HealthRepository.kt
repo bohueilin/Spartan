@@ -36,7 +36,10 @@ import com.spartan.domain.model.WorkoutType
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.time.LocalDate
+import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -58,6 +61,42 @@ class HealthRepository @Inject constructor(
 
     /** Every saved reflection (not only the recent page above) — what the export carries. */
     val allReflections: Flow<List<DailyReflectionEntity>> = dao.observeAllReflections()
+
+    /**
+     * Serializes the whole-store writers — a daily sync's persist-and-seed, a CSV import, and full
+     * erasure — so an erasure can never interleave with (and then be refilled by) a sync that was
+     * already running. Not re-entrant: a block run under it must not call [deleteAllLocalData] or
+     * [writeUnlessErasedSince] again.
+     */
+    private val storeLock = Mutex()
+
+    /** Bumped when an erasure begins ([beginErasure]) and again when it wipes the store; see [erasureGeneration]. */
+    private val erasures = AtomicLong(0)
+
+    /**
+     * How many times the store has been erased. A writer reads it when it starts and hands it to
+     * [writeUnlessErasedSince]: if an erasure landed in between, its data is the user's deleted
+     * past and must not be written back.
+     */
+    val erasureGeneration: Long get() = erasures.get()
+
+    /**
+     * Marks an erasure as begun, the moment the user confirms it — before its slower teardown
+     * (cancelling scheduled work, clearing tokens) and before [deleteAllLocalData] can take the
+     * store lock. From here on every writer that read [erasureGeneration] earlier is refused, and
+     * one that checks it before a side effect (arming a reminder) skips it. Not suspending.
+     */
+    fun beginErasure() {
+        erasures.incrementAndGet()
+    }
+
+    /**
+     * Runs [block] holding the store lock, unless the store was erased since [generation] was read
+     * — then [block] never runs and the result is null. An erasure requested while [block] runs
+     * waits for it and then removes what it wrote.
+     */
+    suspend fun <T> writeUnlessErasedSince(generation: Long, block: suspend () -> T): T? =
+        storeLock.withLock { if (erasures.get() != generation) null else block() }
 
     fun dailyActivities(dateEpochDay: Long): Flow<List<DailyActivityEntity>> =
         dao.observeActivitiesForDay(dateEpochDay)
@@ -352,24 +391,35 @@ class HealthRepository @Inject constructor(
 
     suspend fun reflectionForDay(dateEpochDay: Long): DailyReflectionEntity? = dao.reflectionForDay(dateEpochDay)
 
+    /**
+     * Full erasure. Waits for an in-flight sync or import holding the store lock, then deletes
+     * everything in one transaction (never a half-erased store) and bumps [erasureGeneration], so a
+     * writer that started before this call and has not written yet never will. The caller marks
+     * the erasure first with [beginErasure]; this bumps again, for a writer that started between.
+     */
     suspend fun deleteAllLocalData() {
-        dao.deleteProfiles()
-        dao.deleteMetrics()
-        dao.deleteTargets()
-        dao.deleteWorkouts()
-        dao.deletePlanOverrides()
-        dao.deleteReminders()
-        dao.deleteReviews()
-        dao.deleteActivities()
-        dao.deleteConnections()
-        dao.deleteWhoopCycles()
-        dao.deleteWhoopWorkouts()
-        dao.deleteGoals()
-        dao.deletePressureWindows()
-        dao.deleteReflections()
-        // The user's right to erase includes the audit trail itself; leave a single fresh marker.
-        dao.deleteAuditEvents()
-        logAudit("DATA", "ALL_DATA_DELETED")
+        storeLock.withLock {
+            erasures.incrementAndGet()
+            database.withTransaction {
+                dao.deleteProfiles()
+                dao.deleteMetrics()
+                dao.deleteTargets()
+                dao.deleteWorkouts()
+                dao.deletePlanOverrides()
+                dao.deleteReminders()
+                dao.deleteReviews()
+                dao.deleteActivities()
+                dao.deleteConnections()
+                dao.deleteWhoopCycles()
+                dao.deleteWhoopWorkouts()
+                dao.deleteGoals()
+                dao.deletePressureWindows()
+                dao.deleteReflections()
+                // The user's right to erase includes the audit trail itself; leave a single fresh marker.
+                dao.deleteAuditEvents()
+                logAudit("DATA", "ALL_DATA_DELETED")
+            }
+        }
     }
 
     suspend fun exportTextSnapshot(): String {
@@ -401,5 +451,13 @@ class HealthRepository @Inject constructor(
         dao.upsertTarget(TargetEntity(metricType = MetricType.VITAMIN_D_25OH, minValue = 30.0, note = "Personal target"))
         dao.upsertTarget(TargetEntity(metricType = MetricType.RESTING_HEART_RATE, maxValue = 60.0, note = "Personal fitness target"))
         dao.upsertTarget(TargetEntity(metricType = MetricType.TG_HDL_RATIO, maxValue = 2.5, note = "Personal optimization target"))
+    }
+
+    companion object {
+        /**
+         * The note [WhoopMapper] stamps on readings from the sample feed (and the sample-cleanup
+         * queries match), so anything shown from them can say "Sample data".
+         */
+        const val SAMPLE_WHOOP_NOTE = "WHOOP (sample)"
     }
 }

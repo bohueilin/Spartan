@@ -42,7 +42,7 @@ set (`ios/SpartanApp/Sources/SpartanApp.swift`) mirrors the same values. Light-m
 | Goal "Keep going" | `tertiary` on 14% tint / white card | ~~3.95:1~~ → **5.29:1** | **FIXED** |
 | DUE urgency | `easyLight` on 18% tint / white card | ~~4.12:1~~ → **5.00:1** | **FIXED** |
 | OVERDUE urgency | `restLight` on 18% tint / white card | ~~4.43:1~~ → **5.11:1** | **FIXED** |
-| POSITIVE status pill ("Better than usual", "On track", lab normal) | `primedLight` on 14% tint / white card | ~~4.39:1~~ → **5.14:1** | **FIXED** (2026-10-24) |
+| POSITIVE status pill ("Better than usual", "On track") | `primedLight` on 14% tint / white card | ~~4.39:1~~ → **5.14:1** | **FIXED** (2026-10-24) |
 | `primedLight` on an 18% tint | `primedLight` on 18% tint / white card | ~~4.14:1~~ → **4.83:1** | **FIXED** (2026-10-24) |
 | CAUTION / ALERT status pills | `easyLight` / `restLight` on 14% tint / white card | **5.31:1** / **5.47:1** | PASS |
 | INFO / NEUTRAL status pills | `primary` / `onSurfaceVariant` on 14% tint / white card | **5.40:1** / **6.17:1** | PASS |
@@ -54,8 +54,14 @@ own pill, and the Tokens.kt comment claimed a check that had not covered it. `pr
 `#0B6E3D` (6.34:1 on white). The same token is the GREEN recovery zone and the PRIMED band, so the
 verdict text, ring and Primed label darken with it. Dark-mode pills already passed (`primedDark` on
 its 14% tint over `surface`: 6.92:1). The iOS mirror (`spartanBandPrimed` in
-`ios/SpartanApp/Sources/SpartanApp.swift`) and `docs/VISUAL_AND_VIDEO_GUIDE.md` still list
-`#0E7B43` and need the same change.
+`ios/SpartanApp/Sources/SpartanApp.swift`) and the palette table in
+`docs/VISUAL_AND_VIDEO_GUIDE.md` now use `#0B6E3D` too, so all three agree.
+
+Lab and manual blood-pressure statuses use the NEUTRAL pill (`onSurfaceVariant`, 6.17:1 above),
+whatever the clinical status. The status ("Clinical normal", "Above range", …) is said in words on
+the pill. Colouring an in-range value green or an out-of-range one amber would turn a clinical
+reference range into an alert. Only personal-baseline signals ("Better than usual") keep the
+POSITIVE / CAUTION tones.
 
 ## Non-text contrast (WCAG 1.4.11, 3:1 for UI components)
 
@@ -79,6 +85,11 @@ The unchecked ring is the only visual sign of the Today screen's main control, s
   no truncation of key copy. `StatusPill`, the `ListRow` subtitle and the video card's title and
   meta wrap instead of clipping or ellipsizing; the activity sheet's pills sit in a `FlowRow`.
   Font-scale previews at 1.5×/2.0× live in `ui/screens/FontScalePreviews.kt`.
+- One documented exception: navigation-bar labels (`SpartanRoot` `NavLabel`) follow the system-bar
+  convention and scale up to at most 1.3×, stepping down to the largest scale that keeps the word on
+  one line (never below the default size). A single word cannot reflow, so this keeps "Progress"
+  whole instead of breaking it mid-word at 200%. Ellipsis is only a last resort below 1.0× fit
+  (narrower than ~300dp). Everything else on screen follows the full font scale.
 
 ## TalkBack test script (manual pass, ~10 min — run before each release)
 

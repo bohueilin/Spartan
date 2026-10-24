@@ -23,6 +23,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import com.spartan.R
 import com.spartan.ui.components.DetailPage
 import com.spartan.ui.components.PrimaryButton
@@ -31,8 +34,11 @@ import com.spartan.ui.components.SpartanCard
 import com.spartan.ui.components.StatusPill
 import com.spartan.ui.components.Tone
 import com.spartan.ui.theme.Spacing
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 /**
  * Consent + integration management. Explains exactly what Spartan reads and why, in plain language,
@@ -75,7 +81,7 @@ fun ConnectionsScreen(
             onSecondaryAction = onImportWhoopCsv,
             // Disabled mid-import: a re-pick would be silently discarded by the one-at-a-time guard.
             secondaryActionEnabled = state.whoopImport?.inProgress != true,
-            secondaryActionHint = stringResource(R.string.connections_import_whoop_hint),
+            footer = { WhoopExportGuide(state) },
             // Only warn when there is imported data to lose; a sample-only disconnect is harmless.
             disconnectWarning = state.whoopImportInfo?.let {
                 stringResource(R.string.connections_disconnect_import_warning, it.days)
@@ -123,7 +129,8 @@ private fun IntegrationCard(
     secondaryActionLabel: String? = null,
     onSecondaryAction: (() -> Unit)? = null,
     secondaryActionEnabled: Boolean = true,
-    secondaryActionHint: String? = null,
+    /** Shown under the actions — WHOOP's export contract sits right beside its import button. */
+    footer: (@Composable () -> Unit)? = null,
     /** Copy for a confirm step when disconnecting also discards data the user imported. */
     disconnectWarning: String? = null,
 ) {
@@ -143,12 +150,7 @@ private fun IntegrationCard(
             }
             Text(body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(stringResource(R.string.connections_requests_label), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(top = Spacing.xs))
-            scopes.forEach {
-                Row {
-                    Text("•", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(end = Spacing.sm))
-                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
+            scopes.forEach { BulletLine(it) }
             Spacer(Modifier.height(Spacing.sm))
             if (connected) {
                 // Disconnecting also removes imported data, so it asks first when there is
@@ -163,10 +165,8 @@ private fun IntegrationCard(
             }
             if (secondaryActionLabel != null && onSecondaryAction != null) {
                 SecondaryButton(secondaryActionLabel, onSecondaryAction, Modifier.fillMaxWidth(), enabled = secondaryActionEnabled)
-                secondaryActionHint?.let {
-                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
             }
+            footer?.invoke()
         }
     }
     if (confirmDisconnect && disconnectWarning != null) {
@@ -251,5 +251,80 @@ private fun WhoopImportResultCard(import: WhoopImportUiState, onDismiss: () -> U
                 }
             }
         }
+    }
+}
+
+/**
+ * WHOOP's export contract in plain language (research §2.2, §6.2): how to request one, when the
+ * link arrives and expires, what Spartan reads, and what an export can't contain. Once data is
+ * imported it leads with when that data arrived and how far it reaches.
+ */
+@Composable
+private fun WhoopExportGuide(state: MainUiState) {
+    whoopFreshnessStamp(state)?.let {
+        Text(it, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(top = Spacing.xs))
+    }
+    Text(
+        stringResource(R.string.more_export_title),
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier.padding(top = Spacing.xs).semantics { heading() },
+    )
+    listOf(
+        R.string.more_export_step_request,
+        R.string.more_export_step_email,
+        R.string.more_export_step_limit,
+        R.string.more_export_step_reads,
+    ).forEach { BulletLine(stringResource(it)) }
+    ExportGaps()
+}
+
+/**
+ * What a WHOOP export doesn't include (research §2.3) — said up front, so Spartan never seems to
+ * promise a live chart or steps it cannot have. The API is not the export.
+ */
+@Composable
+internal fun ExportGaps() {
+    Text(
+        stringResource(R.string.more_export_missing_title),
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier.padding(top = Spacing.xs).semantics { heading() },
+    )
+    listOf(
+        R.string.more_export_missing_hr,
+        R.string.more_export_missing_strength,
+        R.string.more_export_missing_steps,
+    ).forEach { BulletLine(stringResource(it)) }
+}
+
+/**
+ * "Imported Oct 24, 6:42 AM · data through Thu, Oct 23": when the last WHOOP CSV import landed and
+ * the newest day it holds. Null without an import — sample data and API syncs never stamp one.
+ */
+@Composable
+internal fun whoopFreshnessStamp(state: MainUiState): String? {
+    val clock = clockFormatter()
+    val millis = state.lastSyncedAtMillis ?: return null
+    val imported = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault())
+    val date = imported.format(DateTimeFormatter.ofPattern("MMM d", Locale.getDefault()))
+    val time = imported.format(clock)
+    val through = state.whoopImportInfo?.lastDayEpoch ?: state.dataThroughEpochDay
+        ?: return stringResource(R.string.more_fresh_imported, date, time)
+    val day = LocalDate.ofEpochDay(through).format(DateTimeFormatter.ofPattern("EEE, MMM d", Locale.getDefault()))
+    return stringResource(R.string.more_fresh_imported_through, date, time, day)
+}
+
+/** One bulleted line; the bullet is decorative, so TalkBack reads only the text. */
+@Composable
+private fun BulletLine(text: String) {
+    Row {
+        Text(
+            "•",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(end = Spacing.sm).clearAndSetSemantics {},
+        )
+        Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

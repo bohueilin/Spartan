@@ -39,10 +39,6 @@ final class CoachEnginesTests: XCTestCase {
         for metric in ReferenceRanges.topFive {
             XCTAssertNotNil(ReferenceRanges.bandFor(metric, ageYears: 44, sex: .male), "band missing for \(metric)")
         }
-        // HRV bands decline with age.
-        let hrv20sHigh = try XCTUnwrap(ReferenceRanges.bandFor(.hrvRmssd, ageYears: 25, sex: .male)?.typicalHigh)
-        let hrv60sHigh = try XCTUnwrap(ReferenceRanges.bandFor(.hrvRmssd, ageYears: 65, sex: .male)?.typicalHigh)
-        XCTAssertTrue(hrv20sHigh > hrv60sHigh)
         // Women's typical RHR band sits a touch higher than men's, same bracket.
         let rhrFemaleLow = try XCTUnwrap(ReferenceRanges.bandFor(.restingHeartRate, ageYears: 44, sex: .female)?.typicalLow)
         let rhrMaleLow = try XCTUnwrap(ReferenceRanges.bandFor(.restingHeartRate, ageYears: 44, sex: .male)?.typicalLow)
@@ -66,7 +62,32 @@ final class CoachEnginesTests: XCTestCase {
         let rhr = try XCTUnwrap(ReferenceRanges.bandFor(.restingHeartRate, ageYears: nil, sex: .unspecified))
         XCTAssertTrue(rhr.education.hasPrefix("Typical resting heart rate for adults sits around"))
         let hrv = try XCTUnwrap(ReferenceRanges.bandFor(.hrvRmssd, ageYears: 44, sex: .female))
-        XCTAssertTrue(hrv.education.contains("cohort medians for adults aged 40–49 span"))
+        XCTAssertTrue(hrv.education.contains("among adults aged 40–49 it drifts down"))
+    }
+
+    func testReferenceRangesHrvHasNoPopulationNumbersAtAnyAge() throws {
+        let ages: [Int?] = [nil, 25, 44, 65]
+        for age in ages {
+            for sex in SexAtBirth.allCases {
+                let hrv = try XCTUnwrap(ReferenceRanges.bandFor(.hrvRmssd, ageYears: age, sex: sex))
+                XCTAssertNil(hrv.typicalLow)
+                XCTAssertNil(hrv.typicalHigh)
+                XCTAssertNil(hrv.fitnessForwardLow)
+                XCTAssertNil(hrv.fitnessForwardHigh)
+                XCTAssertNil(
+                    hrv.education.range(of: #"\d\s*ms\b"#, options: .regularExpression),
+                    "HRV education quotes an ms number: \(hrv.education)"
+                )
+                XCTAssertTrue(hrv.education.contains("your own usual range"))
+            }
+        }
+        // Bracket-aware: the only digits are the age bracket itself.
+        let adults = try XCTUnwrap(ReferenceRanges.bandFor(.hrvRmssd, ageYears: nil, sex: .unspecified))
+        XCTAssertNil(adults.education.range(of: #"\d"#, options: .regularExpression))
+        let twenties = try XCTUnwrap(ReferenceRanges.bandFor(.hrvRmssd, ageYears: 22, sex: .male))
+        XCTAssertTrue(twenties.education.contains("aged 18–29"))
+        let sixties = try XCTUnwrap(ReferenceRanges.bandFor(.hrvRmssd, ageYears: 65, sex: .male))
+        XCTAssertTrue(sixties.education.contains("aged 60+"))
     }
 
     func testReferenceRangesEducationCopyPassesSafetyEngine() throws {

@@ -13,7 +13,9 @@ import kotlin.math.round
  *  - A cycle's day is the calendar date the user WOKE UP (a cycle that starts 23:09 belongs to
  *    the next morning). When wake onset is blank, the cycle start date is the fallback.
  *  - Blank cells are common (no-sleep cycles, missing SpO2) and must parse to null, not fail.
- *  - Sleep debt / asleep durations are exported in minutes; Spartan models hours.
+ *  - Sleep debt / asleep durations / sleep need are exported in minutes; Spartan models hours.
+ *  - Columns are found by header name, never by position, and every non-key column is optional:
+ *    a column an export lacks (e.g. "Sleep need (min)") parses as null exactly like a blank cell.
  */
 object WhoopCsvParser {
 
@@ -79,6 +81,7 @@ object WhoopCsvParser {
                         sleepDebtHours = minutesToHours(row.cell("sleep debt (min)")),
                         bedMinuteOfDay = onset?.minuteOfDay(),
                         wakeMinuteOfDay = wake?.minuteOfDay(),
+                        sleepNeedHours = minutesToHours(row.cell(SLEEP_NEED)),
                     )
                 },
             )
@@ -106,6 +109,7 @@ object WhoopCsvParser {
                         sleepDebtHours = minutesToHours(row.cell("sleep debt (min)")),
                         bedMinuteOfDay = onset?.minuteOfDay(),
                         wakeMinuteOfDay = wake?.minuteOfDay(),
+                        sleepNeedHours = minutesToHours(row.cell(SLEEP_NEED)),
                     )
                 },
             )
@@ -113,6 +117,9 @@ object WhoopCsvParser {
             else -> null
         }
     }
+
+    /** WHOOP's own sleep need, in both physiological_cycles.csv and sleeps.csv. */
+    private const val SLEEP_NEED = "sleep need (min)"
 
     /** Minutes → hours, rounded to 2 decimals so 83 min reads as 1.38 h, not 1.3833333333333333. */
     private fun minutesToHours(cell: String?): Double? =

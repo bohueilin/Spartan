@@ -1,5 +1,6 @@
 package com.spartan.ui.screens
 
+import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -8,16 +9,20 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.EventNote
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.BugReport
+import androidx.compose.material.icons.outlined.Contrast
 import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.Notifications
@@ -25,8 +30,11 @@ import androidx.compose.material.icons.outlined.PrivacyTip
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.outlined.Wallpaper
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -36,7 +44,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.spartan.BuildConfig
 import com.spartan.R
@@ -44,11 +54,13 @@ import com.spartan.domain.engine.GoalPreset
 import com.spartan.domain.engine.GoalType
 import com.spartan.domain.engine.PlanConstraints
 import com.spartan.domain.engine.SexAtBirth
+import com.spartan.ui.components.IconTile
 import com.spartan.ui.components.ListRow
 import com.spartan.ui.components.PageGutter
 import com.spartan.ui.components.ScreenTitle
 import com.spartan.ui.components.SectionHeader
 import com.spartan.ui.components.SpartanCard
+import com.spartan.ui.components.WellnessFooter
 import com.spartan.ui.theme.Spacing
 import java.util.Locale
 
@@ -58,6 +70,8 @@ import java.util.Locale
  * With no goal yet, the goal row opens [GoalWizardSheet] (a custom goal still opens
  * [GoalSetupSheet]); with an active or paused goal it goes to Progress. Plan settings edit only
  * the plan's constraints, through the wizard's constraints step, and never touch the goal.
+ * Display holds the calmer theme and, on Android 12+, wallpaper colours; About ends with the
+ * wellness disclaimer and its clinician prompt.
  */
 @Composable
 fun YouScreen(
@@ -74,6 +88,8 @@ fun YouScreen(
     onOpenDiagnostics: (() -> Unit)?,
     onStartGoalPlan: (GoalPreset, Double, Int, PlanConstraints) -> Unit = { _, _, _, _ -> },
     onSavePlanConstraints: (PlanConstraints) -> Unit = {},
+    onSetCalmerTheme: (Boolean) -> Unit = {},
+    onSetWallpaperColours: (Boolean) -> Unit = {},
 ) {
     // Saveable, so a sheet open mid-edit survives rotation and process recreation.
     var showProfileSheet by rememberSaveable { mutableStateOf(false) }
@@ -131,6 +147,32 @@ fun YouScreen(
                 }
             }
 
+            item { SectionHeader(stringResource(R.string.more_section_display)) }
+            item {
+                // Dynamic colour needs Android 12 (API 31); below that the row would do nothing.
+                val wallpaperAvailable = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                SpartanCard(contentPadding = rows) {
+                    SwitchRow(
+                        Icons.Outlined.Contrast,
+                        stringResource(R.string.more_calmer_theme),
+                        stringResource(calmerThemeBodyRes(wallpaperAvailable, state.wallpaperColours)),
+                        checked = state.calmerTheme,
+                        onCheckedChange = onSetCalmerTheme,
+                        showDivider = wallpaperAvailable,
+                    )
+                    if (wallpaperAvailable) {
+                        SwitchRow(
+                            Icons.Outlined.Wallpaper,
+                            stringResource(R.string.more_wallpaper_colours),
+                            stringResource(R.string.more_wallpaper_colours_body),
+                            checked = state.wallpaperColours,
+                            onCheckedChange = onSetWallpaperColours,
+                            showDivider = false,
+                        )
+                    }
+                }
+            }
+
             item { SectionHeader(stringResource(R.string.you_section_privacy)) }
             item {
                 SpartanCard(contentPadding = rows) {
@@ -147,6 +189,8 @@ fun YouScreen(
                     Text(stringResource(R.string.settings_version, BuildConfig.VERSION_NAME), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(stringResource(R.string.settings_disclaimer), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = Spacing.sm))
                     Text(stringResource(R.string.you_licenses), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = Spacing.sm))
+                    // What Spartan is and isn't, and when to talk to a qualified clinician.
+                    WellnessFooter()
                 }
             }
         }
@@ -211,3 +255,46 @@ private fun ProfileCard(state: MainUiState, onEdit: () -> Unit) {
         }
     }
 }
+
+/**
+ * A settings row that is one full-width switch: the whole row toggles (Role.Switch, so TalkBack
+ * announces "on/off" with the title), with a 48dp+ target. Laid out like [ListRow].
+ */
+@Composable
+private fun SwitchRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    showDivider: Boolean,
+) {
+    Column {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange)
+                .heightIn(min = 64.dp)
+                .padding(vertical = Spacing.md),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconTile(icon, MaterialTheme.colorScheme.onSurface, size = 40.dp)
+            Spacer(Modifier.width(Spacing.lg))
+            Column(Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Spacer(Modifier.width(Spacing.md))
+            // The row owns the toggle; a null callback keeps the switch from being a second target.
+            Switch(checked = checked, onCheckedChange = null)
+        }
+        if (showDivider) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+    }
+}
+
+/**
+ * The calmer theme's subtitle. With Wallpaper colours on (Android 12+), the wallpaper palette wins
+ * over the quieter colours, so the row promises only what still applies: no celebration motion.
+ */
+internal fun calmerThemeBodyRes(wallpaperAvailable: Boolean, wallpaperColours: Boolean): Int =
+    if (wallpaperAvailable && wallpaperColours) R.string.more_calmer_theme_body_wallpaper else R.string.more_calmer_theme_body

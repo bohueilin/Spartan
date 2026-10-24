@@ -20,6 +20,7 @@ import com.spartan.domain.model.DailyPlan
 import com.spartan.domain.model.ReadinessSnapshot
 import com.spartan.domain.model.WhoopSnapshot
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import java.io.IOException
 import javax.inject.Inject
@@ -58,6 +59,11 @@ class DailyPlanSync @Inject constructor(
          * them, or they would fire for items that are no longer in the plan.
          */
         val replacedReminderIds: List<String> = emptyList(),
+        /**
+         * True when all local data was erased while this sync was in flight: it wrote nothing, and
+         * nothing it fetched may be shown — the user just deleted it. Not a failure (no retry).
+         */
+        val superseded: Boolean = false,
     )
 
     /**
@@ -65,11 +71,22 @@ class DailyPlanSync @Inject constructor(
      * existing plan — used right after a data-source change (CSV import, disconnect) so the plan
      * reflects the data the user just switched to. Without it the saved plan is kept, except a
      * holding plan once today's completed cycle arrives ([replacesHoldingPlan]).
+     *
+     * [erasureGeneration] is the store's [HealthRepository.erasureGeneration] when the caller
+     * started (by default, when this call did). The fetch runs unlocked; everything this sync
+     * writes runs under the store lock and only if no erasure has landed since — otherwise the
+     * outcome is [Outcome.superseded] and nothing is written.
      */
-    suspend fun sync(dateEpochDay: Long, forceReseed: Boolean = false): Outcome {
+    suspend fun sync(
+        dateEpochDay: Long,
+        forceReseed: Boolean = false,
+        erasureGeneration: Long = repository.erasureGeneration,
+    ): Outcome {
+        // Harmless after an erasure (there is nothing left to wake), so it needs no lock.
         repository.reactivateExpiredSnoozes()
         val snapshots = runCatching { whoopClient.fetchRecentDays(7) }
             .getOrElse {
+                if (it is CancellationException) throw it
                 DebugLog.log("sync", "fetch failed: ${it.javaClass.simpleName}")
                 return Outcome(null, null, null, failed = true)
             }
@@ -77,6 +94,19 @@ class DailyPlanSync @Inject constructor(
             DebugLog.log("sync", "fetch returned no data")
             return Outcome(null, null, null, failed = true)
         }
+        return repository.writeUnlessErasedSince(erasureGeneration) {
+            persistAndPlan(dateEpochDay, forceReseed, snapshots)
+        } ?: Outcome(null, null, null, failed = false, superseded = true).also {
+            DebugLog.log("sync", "superseded: local data was erased mid-sync")
+        }
+    }
+
+    /** The write half of [sync], run under the store lock: persist, plan, seed. */
+    private suspend fun persistAndPlan(
+        dateEpochDay: Long,
+        forceReseed: Boolean,
+        snapshots: List<WhoopSnapshot>,
+    ): Outcome {
         repository.persistWhoopReadings(snapshots)
         val latest = snapshots.last()
         val readiness = carryForward(
@@ -155,7 +185,8 @@ class DailyPlanSync @Inject constructor(
 
         /**
          * Tonight's sleep target from the newest night and the user's own bed / wake times: the
-         * estimated need itself (WHOOP's need already counts debt), never a fixed eight hours. The one
+         * night's need itself — WHOOP's own when the data has it, else the estimate
+         * ([SleepNeed.forSnapshot]); WHOOP's need already counts debt — never a fixed eight hours. The one
          * place this is derived, so Today's bedtime card and the plan's sleep anchor always agree.
          * Pass [latest] through [lastNight] first, so an older night never sizes tonight's target.
          */
@@ -163,7 +194,7 @@ class DailyPlanSync @Inject constructor(
             SleepPlanner.tonight(
                 wakeMinuteOfDay = latest?.wakeMinuteOfDay,
                 sleepDebtHours = latest?.sleepDebtHours,
-                needHours = SleepNeed.neededHours(latest?.sleepDurationHours, latest?.sleepPerformance),
+                needHours = SleepNeed.forSnapshot(latest),
                 userBedtimeMinute = constraints.bedtimeMinute,
                 userWakeMinute = constraints.wakeMinute,
             )

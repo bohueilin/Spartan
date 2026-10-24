@@ -23,6 +23,16 @@ interface HealthDao {
     @Query("SELECT * FROM metric_entries WHERE type = :type ORDER BY recordedAtEpochDay DESC, createdAtMillis DESC")
     fun observeMetric(type: MetricType): Flow<List<MetricEntryEntity>>
 
+    /**
+     * The newest reading of [type] recorded on [day] that has a value, or null — the home-screen
+     * widget's one-row read of today's recovery (a re-sync's replacement row wins over the old one).
+     */
+    @Query(
+        "SELECT * FROM metric_entries WHERE type = :type AND recordedAtEpochDay = :day AND value IS NOT NULL " +
+            "ORDER BY createdAtMillis DESC, id DESC LIMIT 1",
+    )
+    suspend fun latestReadingOnDay(type: MetricType, day: Long): MetricEntryEntity?
+
     @Insert
     suspend fun insertMetric(entry: MetricEntryEntity)
 

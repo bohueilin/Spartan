@@ -7,6 +7,7 @@ import com.spartan.domain.model.Intensity
 import com.spartan.domain.model.MetricReading
 import com.spartan.domain.model.MetricType
 import com.spartan.domain.model.TimeOfDay
+import com.spartan.domain.model.WhoopSnapshot
 import java.time.LocalDate
 import kotlin.math.roundToInt
 
@@ -255,13 +256,22 @@ object ActionPlaybook {
 }
 
 /**
- * Last night's sleep need, estimated from WHOOP's own ratio. WHOOP's Sleep Performance is hours
- * slept / hours needed, so need ≈ slept ÷ performance. This is an estimate — not WHOOP's exact
- * Sleep Need, whose inputs (baseline, strain, debt, naps) are not in the data Spartan reads.
+ * Last night's sleep need. WHOOP's own figure when the data carries it (the export's "Sleep need
+ * (min)", the API's sleep_needed); otherwise an estimate from WHOOP's ratio — Sleep Performance is
+ * hours slept / hours needed, so need ≈ slept ÷ performance.
  */
 object SleepNeed {
     /** Anything outside this is a rounding artefact or a bad reading, not a sleep need. */
     private val PLAUSIBLE_HOURS = 4.0..14.0
+
+    /**
+     * The need for [snapshot]'s night: WHOOP's own [WhoopSnapshot.sleepNeedHours] when present and
+     * plausible, else the [neededHours] estimate from hours slept and performance; null when neither
+     * is known. A WHOOP figure outside the plausible range is a bad reading and is not used.
+     */
+    fun forSnapshot(snapshot: WhoopSnapshot?): Double? =
+        snapshot?.sleepNeedHours?.takeIf { it in PLAUSIBLE_HOURS }
+            ?: neededHours(snapshot?.sleepDurationHours, snapshot?.sleepPerformance)
 
     /**
      * Hours needed from [sleptHours] and [performancePercent]; null when either is missing or

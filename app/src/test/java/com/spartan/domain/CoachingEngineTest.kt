@@ -39,6 +39,8 @@ class CoachingEngineTest {
         recovery: Int? = 60, hrv: Double? = 60.0, rhr: Double? = 55.0,
         sleepPerf: Int? = 90, sleepDebt: Double? = 0.0, strainPrior: Double? = 8.0,
         resp: Double? = 15.0, hrvBase: Double? = null, rhrBase: Double? = null, respBase: Double? = null,
+        // Nights behind each baseline given; past the learning period unless a test says otherwise.
+        baselineDays: Int = 7,
     ): ReadinessSnapshot = ReadinessSnapshot(
         dateEpochDay = day, recoveryScore = recovery, hrvMs = hrv,
         hrvVsBaseline = if (hrv != null && hrvBase != null) hrv - hrvBase else null,
@@ -46,6 +48,8 @@ class CoachingEngineTest {
         sleepPerformance = sleepPerf, sleepDebtHours = sleepDebt, dayStrainPrior = strainPrior,
         respiratoryRate = resp, respiratoryRateBaseline = respBase,
         band = ReadinessBand.fromRecovery(recovery), isStale = recovery == null,
+        rrBaselineDays = if (respBase != null) baselineDays else 0,
+        rhrBaselineDays = if (rhrBase != null) baselineDays else 0,
     )
 
     @Test
@@ -86,7 +90,7 @@ class CoachingEngineTest {
 
     @Test
     fun concerningRespiratoryRate_addsNonDiagnosticClinicianReferral() {
-        val plan = engine.buildPlan(readiness(recovery = 55, resp = 27.0))
+        val plan = engine.buildPlan(readiness(recovery = 55, resp = 19.0, respBase = 15.0))
         val referral = plan.activities.firstOrNull { it.ruleId == RuleIds.CLINICIAN_REFERRAL }
         assertNotNull(referral)
         assertEquals(ActivityPriority.REQUIRED, referral!!.priority)
@@ -94,9 +98,113 @@ class CoachingEngineTest {
     }
 
     @Test
+    fun clinicianReferral_firesOnlyOnDeviationFromTheUsersOwnBaseline() {
+        fun referral(r: ReadinessSnapshot) = engine.buildPlan(r).byId("clinician")
+        // Respiratory rate: +3 breaths a minute over the user's usual is the line; just under it is not.
+        val respUp = referral(readiness(recovery = 60, resp = 18.0, respBase = 15.0))
+        assertEquals(MetricType.RESPIRATORY_RATE, respUp!!.relatedMetric)
+        assertEquals(ActivityPriority.REQUIRED, respUp.priority)
+        assertNull(referral(readiness(recovery = 60, resp = 17.9, respBase = 15.0)))
+        // Resting heart rate: +10 bpm over the user's usual is the line; just under it is not.
+        val rhrUp = referral(readiness(recovery = 60, rhr = 66.0, rhrBase = 56.0))
+        assertEquals(MetricType.RESTING_HEART_RATE, rhrUp!!.relatedMetric)
+        assertEquals(ActivityPriority.REQUIRED, rhrUp.priority)
+        assertNull(referral(readiness(recovery = 60, rhr = 65.9, rhrBase = 56.0)))
+        // Both up: one card, tagged with respiratory rate.
+        val both = engine.buildPlan(readiness(recovery = 60, resp = 19.0, respBase = 15.0, rhr = 70.0, rhrBase = 56.0))
+        assertEquals(1, both.activities.count { it.ruleId == RuleIds.CLINICIAN_REFERRAL })
+        assertEquals(MetricType.RESPIRATORY_RATE, both.byId("clinician")!!.relatedMetric)
+    }
+
+    @Test
+    fun clinicianReferral_neverFiresOnAnAbsoluteValueAlone() {
+        for (recovery in listOf(20, 60, 85, null)) {
+            // No baseline yet: no reading, however high, is "outside your usual range".
+            val noBaseline = engine.buildPlan(readiness(recovery = recovery, resp = 30.0, rhr = 120.0))
+            assertNull("recovery=$recovery", noBaseline.byId("clinician"))
+            // A high reading that IS the user's usual is not a deviation either.
+            val usual = engine.buildPlan(readiness(recovery = recovery, resp = 25.5, respBase = 25.0, rhr = 101.0, rhrBase = 100.0))
+            assertNull("recovery=$recovery", usual.byId("clinician"))
+            assertFalse("recovery=$recovery", usual.activities.any { it.ruleId == RuleIds.CONCERNING_VITAL_EASY })
+        }
+        // A respiratory baseline with no reading today, or a reading with no resting-HR delta: nothing to compare.
+        assertNull(engine.buildPlan(readiness(recovery = 60, resp = null, respBase = 15.0)).byId("clinician"))
+        assertNull(engine.buildPlan(readiness(recovery = 60, rhr = null, rhrBase = 56.0)).byId("clinician"))
+    }
+
+    /** [nights] prior nights at respiratory rate 14.5 and resting HR 55, then [today]: the snapshot a sync builds. */
+    private fun afterNights(nights: Int, today: WhoopSnapshot): ReadinessSnapshot = ReadinessSnapshot.from(
+        today,
+        (1..nights).map { WhoopSnapshot(dateEpochDay = day - it, recoveryScore = 70, restingHeartRate = 55.0, respiratoryRate = 14.5) },
+    )
+
+    @Test
+    fun clinicianReferral_waitsForTheLearningPeriod_beforeABaselineIsTheUsersUsual() {
+        val rrUp = WhoopSnapshot(dateEpochDay = day, recoveryScore = 80, restingHeartRate = 55.0, respiratoryRate = 17.6)
+        val rhrUp = WhoopSnapshot(dateEpochDay = day, recoveryScore = 80, restingHeartRate = 66.0, respiratoryRate = 14.5)
+        for (today in listOf(rrUp, rhrUp)) {
+            // One night, or four: Spartan is still learning this user's normal, so nothing is "outside" it yet.
+            for (nights in listOf(1, 4)) {
+                val ctx = "nights=$nights rr=${today.respiratoryRate} rhr=${today.restingHeartRate}"
+                val plan = engine.buildPlan(afterNights(nights, today))
+                assertNull(ctx, plan.byId("clinician"))
+                assertFalse(ctx, plan.activities.any { it.ruleId == RuleIds.CONCERNING_VITAL_EASY })
+                assertEquals(ctx, "You're primed. Make today count.", plan.headline)
+            }
+            // Five nights is the learning period: the same reading now is a check-in day.
+            val learned = afterNights(5, today)
+            assertEquals(5, learned.rrBaselineDays)
+            assertEquals(5, learned.rhrBaselineDays)
+            val plan = engine.buildPlan(learned)
+            val ctx = "rr=${today.respiratoryRate} rhr=${today.restingHeartRate}"
+            assertEquals(ctx, ActivityPriority.REQUIRED, plan.byId("clinician")!!.priority)
+            assertEquals(ctx, RuleIds.CONCERNING_VITAL_EASY, plan.byId("zone2-walk")!!.ruleId)
+            assertEquals(ctx, "Take it gently today and notice how you feel.", plan.headline)
+            assertEquals(ctx, StrainZone.LIGHT, plan.strainTarget)
+        }
+    }
+
+    @Test
+    fun clinicianReferral_needsTheLearningPeriodBehindEachBaselineItReads() {
+        fun referral(r: ReadinessSnapshot) = engine.buildPlan(r).byId("clinician")
+        // Exactly the learning period counts; one night short does not.
+        assertNotNull(referral(readiness(recovery = 60, resp = 18.0, respBase = 15.0, baselineDays = 5)))
+        assertNull(referral(readiness(recovery = 60, resp = 18.0, respBase = 15.0, baselineDays = 4)))
+        assertNotNull(referral(readiness(recovery = 60, rhr = 66.0, rhrBase = 56.0, baselineDays = 5)))
+        assertNull(referral(readiness(recovery = 60, rhr = 66.0, rhrBase = 56.0, baselineDays = 4)))
+        // Each baseline stands on its own nights: a learned one never vouches for a newer one.
+        val rhrNew = readiness(recovery = 60, resp = 15.0, respBase = 15.0, rhr = 70.0, rhrBase = 56.0).copy(rhrBaselineDays = 4)
+        assertNull(referral(rhrNew))
+        assertEquals(MetricType.RESPIRATORY_RATE, referral(rhrNew.copy(respiratoryRate = 19.0))!!.relatedMetric)
+        val rrNew = readiness(recovery = 60, resp = 19.0, respBase = 15.0, rhr = 70.0, rhrBase = 56.0).copy(rrBaselineDays = 1)
+        assertEquals(MetricType.RESTING_HEART_RATE, referral(rrNew)!!.relatedMetric)
+    }
+
+    @Test
+    fun readinessSnapshot_from_countsThePriorNightsBehindEachBaseline() {
+        val history = listOf(
+            WhoopSnapshot(dateEpochDay = day - 3, restingHeartRate = 54.0, respiratoryRate = 14.0),
+            WhoopSnapshot(dateEpochDay = day - 2, restingHeartRate = 55.0), // no respiratory rate that night
+            WhoopSnapshot(dateEpochDay = day - 1, restingHeartRate = 56.0, respiratoryRate = 15.0),
+            WhoopSnapshot(dateEpochDay = day, restingHeartRate = 90.0, respiratoryRate = 30.0), // today is never its own baseline
+        )
+        val snap = ReadinessSnapshot.from(
+            WhoopSnapshot(dateEpochDay = day, recoveryScore = 70, restingHeartRate = 57.0, respiratoryRate = 15.0), history,
+        )
+        assertEquals(2, snap.rrBaselineDays)
+        assertEquals(3, snap.rhrBaselineDays)
+        assertEquals(14.5, snap.respiratoryRateBaseline!!, 1e-9)
+        assertEquals(2.0, snap.rhrVsBaseline!!, 1e-9)
+        val alone = ReadinessSnapshot.from(WhoopSnapshot(dateEpochDay = day, recoveryScore = 70, respiratoryRate = 15.0))
+        assertEquals(0, alone.rrBaselineDays)
+        assertEquals(0, alone.rhrBaselineDays)
+        assertNull(alone.respiratoryRateBaseline)
+    }
+
+    @Test
     fun plan_respectsMaxActivities_butKeepsRequiredAndReferral() {
         val plan = engine.buildPlan(
-            readiness(recovery = 20, resp = 28.0, sleepPerf = 40, rhr = 70.0, rhrBase = 58.0),
+            readiness(recovery = 20, resp = 28.0, respBase = 15.0, sleepPerf = 40, rhr = 70.0, rhrBase = 58.0),
             CoachingOptions(maxActivities = 3, painFlag = true),
         )
         assertTrue(plan.activities.size <= maxOf(3, plan.activities.count { it.priority == ActivityPriority.REQUIRED }))
@@ -196,7 +304,7 @@ class CoachingEngineTest {
         assertEquals(StrainZone.LIGHT, engine.buildPlan(readiness(recovery = 40)).strainTarget)
         assertEquals(StrainZone.LIGHT, engine.buildPlan(readiness(recovery = 20)).strainTarget)
         // A concerning vital on a primed day swaps the hard session for an easy walk — and the target follows.
-        assertEquals(StrainZone.LIGHT, engine.buildPlan(readiness(recovery = 80, resp = 27.0)).strainTarget)
+        assertEquals(StrainZone.LIGHT, engine.buildPlan(readiness(recovery = 80, resp = 19.0, respBase = 15.0)).strainTarget)
     }
 
     // --- Concerning vitals ------------------------------------------------------------------
@@ -204,7 +312,7 @@ class CoachingEngineTest {
     @Test
     fun concerningVital_goodRecoveryDayGetsAnEasyWalk_andALightTarget() {
         for (recovery in listOf(80, 60)) {
-            for (r in listOf(readiness(recovery = recovery, resp = 27.0), readiness(recovery = recovery, rhr = 104.0))) {
+            for (r in listOf(readiness(recovery = recovery, resp = 19.0, respBase = 15.0), readiness(recovery = recovery, rhr = 66.0, rhrBase = 55.0))) {
                 val plan = engine.buildPlan(r)
                 val ctx = "recovery=$recovery resp=${r.respiratoryRate} rhr=${r.restingHeartRate}"
                 val walk = plan.byId("zone2-walk")
@@ -223,22 +331,22 @@ class CoachingEngineTest {
         }
         // Won't-do strength changes nothing here: the check-in day is easy either way.
         val noStrength = engine.buildPlan(
-            readiness(recovery = 80, resp = 27.0), CoachingOptions(constraints = avoiding(AvoidOption.STRENGTH_TRAINING)),
+            readiness(recovery = 80, resp = 19.0, respBase = 15.0), CoachingOptions(constraints = avoiding(AvoidOption.STRENGTH_TRAINING)),
         )
         assertEquals(RuleIds.CONCERNING_VITAL_EASY, noStrength.byId("zone2-walk")!!.ruleId)
         // A low-recovery day keeps its own easy block.
-        assertEquals(RuleIds.LOW_RECOVERY, engine.buildPlan(readiness(recovery = 40, resp = 27.0)).byId("zone2-walk")!!.ruleId)
+        assertEquals(RuleIds.LOW_RECOVERY, engine.buildPlan(readiness(recovery = 40, resp = 19.0, respBase = 15.0)).byId("zone2-walk")!!.ruleId)
     }
 
     @Test
     fun clinicianReferral_namesWhereTheReadingsComeFrom() {
-        val fresh = engine.buildPlan(readiness(recovery = 55, resp = 27.0)).byId("clinician")!!
+        val fresh = engine.buildPlan(readiness(recovery = 55, resp = 19.0, respBase = 15.0)).byId("clinician")!!
         assertEquals(
             "One or more of today's readings is outside your usual range. This is not a diagnosis, and one reading is not a conclusion.",
             fresh.whyItMatters,
         )
         // Carried forward from an earlier day: never "today's readings".
-        val stale = engine.buildPlan(readiness(recovery = 55, resp = 27.0).copy(isStale = true)).byId("clinician")!!
+        val stale = engine.buildPlan(readiness(recovery = 55, resp = 19.0, respBase = 15.0).copy(isStale = true)).byId("clinician")!!
         assertEquals(
             "One or more of your most recent readings is outside your usual range. This is not a diagnosis, and one reading is not a conclusion.",
             stale.whyItMatters,
@@ -251,8 +359,8 @@ class CoachingEngineTest {
     fun headline_followsTheBand_andStaysGentleOnPainAndCheckInDays() {
         val gentle = "Take it gently today and notice how you feel."
         assertEquals(gentle, engine.buildPlan(readiness(recovery = 80), CoachingOptions(painFlag = true)).headline)
-        assertEquals(gentle, engine.buildPlan(readiness(recovery = 80, resp = 27.0)).headline)
-        assertEquals(gentle, engine.buildPlan(readiness(recovery = 20, rhr = 104.0)).headline)
+        assertEquals(gentle, engine.buildPlan(readiness(recovery = 80, resp = 19.0, respBase = 15.0)).headline)
+        assertEquals(gentle, engine.buildPlan(readiness(recovery = 20, rhr = 66.0, rhrBase = 55.0)).headline)
         assertEquals("You're primed. Make today count.", engine.buildPlan(readiness(recovery = 80)).headline)
         assertEquals("Balanced day. Steady, quality work.", engine.buildPlan(readiness(recovery = 60)).headline)
         assertEquals("Go lighter today and protect recovery.", engine.buildPlan(readiness(recovery = 40)).headline)
@@ -472,7 +580,7 @@ class CoachingEngineTest {
 
     @Test
     fun timeBudget_neverDropsTheReferralOrTheStaleDayFallback() {
-        val referral = engine.buildPlan(readiness(recovery = 55, resp = 27.0), CoachingOptions(constraints = budget(5)))
+        val referral = engine.buildPlan(readiness(recovery = 55, resp = 19.0, respBase = 15.0), CoachingOptions(constraints = budget(5)))
         // The check-in day's session is the easy walk (MED-2), and it is the main session, so it stays.
         assertEquals(listOf("$day:clinician", "$day:zone2-walk"), referral.activities.map { it.id })
 
@@ -557,7 +665,7 @@ class CoachingEngineTest {
         assertEquals(listOf("pain-deload", "hydration", "breathing"), ids(pain))
         assertEquals(StrainZone.LIGHT, pain.strainTarget)
 
-        val checkIn = engine.buildPlan(readiness(recovery = 60, resp = 27.0), floorOf(4))
+        val checkIn = engine.buildPlan(readiness(recovery = 60, resp = 19.0, respBase = 15.0), floorOf(4))
         assertEquals(listOf("clinician", "zone2-walk", "hydration", "breathing"), ids(checkIn))
         assertEquals(StrainZone.LIGHT, checkIn.strainTarget)
 

@@ -14,7 +14,8 @@ import org.junit.runner.RunWith
  * Guards local health data across upgrades: a broken migration silently drops everything the user
  * has logged. Walks a database created at v3 through every migration to the current version,
  * validating each migrated schema structurally against the committed schema history in
- * app/schemas/ and asserting pre-migration rows survive the whole chain.
+ * app/schemas/ and asserting pre-migration rows survive the whole chain; v8 → v9 also checks
+ * imported WHOOP days keep every value and gain an empty sleep-need column.
  */
 @RunWith(AndroidJUnit4::class)
 class MigrationTest {
@@ -89,6 +90,49 @@ class MigrationTest {
             query("SELECT enabled FROM reminders WHERE id = 'exercise'").use { c ->
                 assertTrue(c.moveToFirst())
                 assertEquals(1, c.getInt(0))
+            }
+            close()
+        }
+
+        helper.runMigrationsAndValidate(dbName, 9, true, AppDatabase.MIGRATION_8_9).apply {
+            // Still there at the current version.
+            query("SELECT COUNT(*) FROM metric_entries").use { c -> c.moveToFirst(); assertEquals(1, c.getInt(0)) }
+            query("SELECT COUNT(*) FROM daily_reflections").use { c -> c.moveToFirst(); assertEquals(1, c.getInt(0)) }
+            close()
+        }
+    }
+
+    @Test
+    fun migrate8To9_keepsImportedDays_andTheirSleepNeedStartsUnknown() {
+        val dbName = "migration-test-8-9"
+
+        helper.createDatabase(dbName, 8).apply {
+            execSQL(
+                "INSERT INTO whoop_cycles (dateEpochDay, recoveryScore, hrvMs, sleepDurationHours, journalAlcohol, " +
+                    "source, importedAtMillis) VALUES (20000, 64, 71.5, 7.25, 0, 'CSV_IMPORT', 1)",
+            )
+            close()
+        }
+
+        helper.runMigrationsAndValidate(dbName, 9, true, AppDatabase.MIGRATION_8_9).apply {
+            query(
+                "SELECT recoveryScore, hrvMs, sleepDurationHours, journalAlcohol, source, sleepNeedHours " +
+                    "FROM whoop_cycles WHERE dateEpochDay = 20000",
+            ).use { c ->
+                assertTrue(c.moveToFirst())
+                assertEquals(64, c.getInt(0))
+                assertEquals(71.5, c.getDouble(1), 0.001)
+                assertEquals(7.25, c.getDouble(2), 0.001)
+                assertEquals(0, c.getInt(3))
+                assertEquals("CSV_IMPORT", c.getString(4))
+                // No need is known until the next import — never a made-up number.
+                assertTrue(c.isNull(5))
+            }
+            // The new column takes WHOOP's figure when an import brings one.
+            execSQL("UPDATE whoop_cycles SET sleepNeedHours = 8.5 WHERE dateEpochDay = 20000")
+            query("SELECT sleepNeedHours FROM whoop_cycles WHERE dateEpochDay = 20000").use { c ->
+                assertTrue(c.moveToFirst())
+                assertEquals(8.5, c.getDouble(0), 0.001)
             }
             close()
         }

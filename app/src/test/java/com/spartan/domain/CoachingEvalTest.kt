@@ -51,12 +51,16 @@ class CoachingEvalTest {
         band = ReadinessBand.fromRecovery(recovery),
         isStale = recovery == null,
         isMock = mock,
+        // A baseline here is an established one: a week of nights, past the learning period.
+        rrBaselineDays = if (respBase != null) 7 else 0,
+        rhrBaselineDays = if (rhrBase != null) 7 else 0,
     )
 
     /** The universal invariants every plan must satisfy. */
     private fun assertInvariants(r: ReadinessSnapshot, options: CoachingOptions = CoachingOptions()) {
         val plan = engine.buildPlan(r, options)
-        val ctx = "recovery=${r.recoveryScore} band=${r.band} sleep=${r.sleepPerformance} strain=${r.dayStrainPrior} resp=${r.respiratoryRate}"
+        val ctx = "recovery=${r.recoveryScore} band=${r.band} sleep=${r.sleepPerformance} strain=${r.dayStrainPrior} " +
+            "resp=${r.respiratoryRate}/${r.respiratoryRateBaseline} rhrDelta=${r.rhrVsBaseline}"
 
         assertTrue("[$ctx] plan is never empty", plan.activities.isNotEmpty())
 
@@ -70,6 +74,9 @@ class CoachingEvalTest {
         // Hard training is only ever green-lit on a primed day with no concerning vital.
         if (r.band != ReadinessBand.PRIMED) {
             assertTrue("[$ctx] no HARD intensity off a primed day", plan.activities.none { it.intensity == Intensity.HARD })
+        }
+        if (plan.activities.any { it.ruleId == RuleIds.CLINICIAN_REFERRAL }) {
+            assertTrue("[$ctx] no HARD intensity on a check-in day", plan.activities.none { it.intensity == Intensity.HARD })
         }
 
         // Every card is well-formed and passes the safety sanitizer (no medical over-claiming).
@@ -98,8 +105,11 @@ class CoachingEvalTest {
         for (recovery in 0..100 step 5) {
             for (sleepPerf in listOf(35, 60, 80, 100)) {
                 for (strain in listOf(3.0, 12.0, 18.0)) {
-                    for (resp in listOf(14.0, 21.0, 27.0)) {
-                        assertInvariants(snap(recovery = recovery, sleepPerf = sleepPerf, strainPrior = strain, resp = resp))
+                    // (reading, the user's baseline): usual, high with no baseline yet, +4 over the user's usual.
+                    for ((resp, respBase) in listOf(14.0 to null, 27.0 to null, 19.0 to 15.0)) {
+                        assertInvariants(
+                            snap(recovery = recovery, sleepPerf = sleepPerf, strainPrior = strain, resp = resp, respBase = respBase),
+                        )
                         evaluated++
                     }
                 }
@@ -119,21 +129,37 @@ class CoachingEvalTest {
         )
         for (recovery in listOf(15, 40, 55, 72, 90, null)) {
             for (o in options) {
-                assertInvariants(snap(recovery = recovery, hrv = 45.0, hrvBase = 70.0, rhr = 66.0, rhrBase = 55.0), o)
+                // +7 bpm is a resting-HR trend; +11 is also past the +10 check-in line.
+                for (rhr in listOf(62.0, 66.0)) {
+                    assertInvariants(snap(recovery = recovery, hrv = 45.0, hrvBase = 70.0, rhr = rhr, rhrBase = 55.0), o)
+                }
             }
         }
     }
 
     @Test
     fun eval_concerningVitalsNeverGreenlightHardTraining() {
+        // "Concerning" means well above the user's OWN baseline: +3 breaths a minute, or +10 bpm.
         for (recovery in listOf(20, 55, 85)) {
-            val highResp = engine.buildPlan(snap(recovery = recovery, resp = 28.0))
-            assertTrue("high respiratory rate must not green-light HARD", highResp.activities.none { it.intensity == Intensity.HARD })
+            val highResp = engine.buildPlan(snap(recovery = recovery, resp = 19.0, respBase = 15.0))
+            assertTrue("respiratory rate above usual must not green-light HARD", highResp.activities.none { it.intensity == Intensity.HARD })
             assertTrue(highResp.activities.any { it.ruleId == RuleIds.CLINICIAN_REFERRAL && it.priority == ActivityPriority.REQUIRED })
 
-            val highRhr = engine.buildPlan(snap(recovery = recovery, rhr = 105.0))
-            assertTrue("very high resting HR must not green-light HARD", highRhr.activities.none { it.intensity == Intensity.HARD })
-            assertTrue(highRhr.activities.any { it.ruleId == RuleIds.CLINICIAN_REFERRAL })
+            val highRhr = engine.buildPlan(snap(recovery = recovery, rhr = 66.0, rhrBase = 55.0))
+            assertTrue("resting HR above usual must not green-light HARD", highRhr.activities.none { it.intensity == Intensity.HARD })
+            assertTrue(highRhr.activities.any { it.ruleId == RuleIds.CLINICIAN_REFERRAL && it.priority == ActivityPriority.REQUIRED })
+        }
+    }
+
+    @Test
+    fun eval_absoluteValuesAloneNeverTriggerTheCheckIn() {
+        // No clinical thresholds as alerts: the retired "rr >= 25" and "RHR >= 100" rules must stay retired.
+        for (recovery in listOf(20, 55, 85, null)) {
+            for (r in listOf(snap(recovery = recovery, resp = 28.0), snap(recovery = recovery, rhr = 105.0))) {
+                val plan = engine.buildPlan(r)
+                assertTrue("recovery=$recovery", plan.activities.none { it.ruleId == RuleIds.CLINICIAN_REFERRAL })
+                assertInvariants(r)
+            }
         }
     }
 

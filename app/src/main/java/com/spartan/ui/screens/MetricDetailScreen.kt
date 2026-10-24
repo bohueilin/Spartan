@@ -301,9 +301,13 @@ private fun AboutBlock(title: String, content: @Composable () -> Unit) {
     content()
 }
 
+/**
+ * A lab's (or manual blood-pressure entry's) tone: NEUTRAL whatever its clinical status. The status
+ * is said in words on the pill; colouring above/below range as caution — or normal as positive —
+ * would turn a clinical reference range into an alert. Personal-baseline signals keep their tones.
+ */
 private fun clinicalTone(status: ClinicalStatus): Tone = when (status) {
-    ClinicalStatus.NORMAL -> Tone.POSITIVE
-    ClinicalStatus.ABOVE_RANGE, ClinicalStatus.BELOW_RANGE -> Tone.CAUTION
+    ClinicalStatus.NORMAL, ClinicalStatus.ABOVE_RANGE, ClinicalStatus.BELOW_RANGE,
     ClinicalStatus.PENDING, ClinicalStatus.UNKNOWN -> Tone.NEUTRAL
 }
 

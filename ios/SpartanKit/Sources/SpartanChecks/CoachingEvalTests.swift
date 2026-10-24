@@ -41,7 +41,10 @@ final class CoachingEvalTests: XCTestCase {
             respiratoryRateBaseline: respBase,
             band: ReadinessBand.fromRecovery(recovery),
             isStale: recovery == nil,
-            isMock: mock
+            isMock: mock,
+            // A baseline here is an established one: a week of nights, past the learning period.
+            rrBaselineDays: respBase == nil ? 0 : 7,
+            rhrBaselineDays: rhrBase == nil ? 0 : 7
         )
     }
 
@@ -61,7 +64,10 @@ final class CoachingEvalTests: XCTestCase {
         let sleepText = r.sleepPerformance.map { String($0) } ?? "nil"
         let strainText = r.dayStrainPrior.map { String($0) } ?? "nil"
         let respText = r.respiratoryRate.map { String($0) } ?? "nil"
-        let ctx = "recovery=\(recoveryText) band=\(r.band) sleep=\(sleepText) strain=\(strainText) resp=\(respText)"
+        let respBaseText = r.respiratoryRateBaseline.map { String($0) } ?? "nil"
+        let rhrDeltaText = r.rhrVsBaseline.map { String($0) } ?? "nil"
+        let ctx = "recovery=\(recoveryText) band=\(r.band) sleep=\(sleepText) strain=\(strainText) " +
+            "resp=\(respText)/\(respBaseText) rhrDelta=\(rhrDeltaText)"
 
         XCTAssertTrue(!plan.activities.isEmpty, "[\(ctx)] plan is never empty", file: file, line: line)
 
@@ -78,6 +84,13 @@ final class CoachingEvalTests: XCTestCase {
             XCTAssertTrue(
                 !plan.activities.contains { $0.intensity == .hard },
                 "[\(ctx)] no HARD intensity off a primed day",
+                file: file, line: line
+            )
+        }
+        if plan.activities.contains(where: { $0.ruleId == RuleIds.clinicianReferral }) {
+            XCTAssertTrue(
+                !plan.activities.contains { $0.intensity == .hard },
+                "[\(ctx)] no HARD intensity on a check-in day",
                 file: file, line: line
             )
         }
@@ -121,8 +134,12 @@ final class CoachingEvalTests: XCTestCase {
         for recovery in stride(from: 0, through: 100, by: 5) {
             for sleepPerf in [35, 60, 80, 100] {
                 for strain in [3.0, 12.0, 18.0] {
-                    for resp in [14.0, 21.0, 27.0] {
-                        assertInvariants(snap(recovery: recovery, sleepPerf: sleepPerf, strainPrior: strain, resp: resp))
+                    // (reading, the user's baseline): usual, high with no baseline yet, +4 over the user's usual.
+                    let respAxis: [(Double, Double?)] = [(14.0, nil), (27.0, nil), (19.0, 15.0)]
+                    for (resp, respBase) in respAxis {
+                        assertInvariants(
+                            snap(recovery: recovery, sleepPerf: sleepPerf, strainPrior: strain, resp: resp, respBase: respBase)
+                        )
                         evaluated += 1
                     }
                 }
@@ -142,31 +159,52 @@ final class CoachingEvalTests: XCTestCase {
         let recoveries: [Int?] = [15, 40, 55, 72, 90, nil]
         for recovery in recoveries {
             for o in options {
-                assertInvariants(
-                    snap(recovery: recovery, hrv: 45.0, hrvBase: 70.0, rhr: 66.0, rhrBase: 55.0),
-                    options: o
-                )
+                // +7 bpm is a resting-HR trend; +11 is also past the +10 check-in line.
+                for rhr in [62.0, 66.0] {
+                    assertInvariants(
+                        snap(recovery: recovery, hrv: 45.0, hrvBase: 70.0, rhr: rhr, rhrBase: 55.0),
+                        options: o
+                    )
+                }
             }
         }
     }
 
     func testEvalConcerningVitalsNeverGreenlightHardTraining() {
+        // "Concerning" means well above the user's OWN baseline: +3 breaths a minute, or +10 bpm.
         for recovery in [20, 55, 85] {
-            let highResp = engine.buildPlan(readiness: snap(recovery: recovery, resp: 28.0))
+            let highResp = engine.buildPlan(readiness: snap(recovery: recovery, resp: 19.0, respBase: 15.0))
             XCTAssertTrue(
                 !highResp.activities.contains { $0.intensity == .hard },
-                "high respiratory rate must not green-light HARD"
+                "respiratory rate above usual must not green-light HARD"
             )
             XCTAssertTrue(highResp.activities.contains {
                 $0.ruleId == RuleIds.clinicianReferral && $0.priority == .required
             })
 
-            let highRhr = engine.buildPlan(readiness: snap(recovery: recovery, rhr: 105.0))
+            let highRhr = engine.buildPlan(readiness: snap(recovery: recovery, rhr: 66.0, rhrBase: 55.0))
             XCTAssertTrue(
                 !highRhr.activities.contains { $0.intensity == .hard },
-                "very high resting HR must not green-light HARD"
+                "resting HR above usual must not green-light HARD"
             )
-            XCTAssertTrue(highRhr.activities.contains { $0.ruleId == RuleIds.clinicianReferral })
+            XCTAssertTrue(highRhr.activities.contains {
+                $0.ruleId == RuleIds.clinicianReferral && $0.priority == .required
+            })
+        }
+    }
+
+    func testEvalAbsoluteValuesAloneNeverTriggerTheCheckIn() {
+        // No clinical thresholds as alerts: the retired "rr >= 25" and "RHR >= 100" rules must stay retired.
+        let recoveries: [Int?] = [20, 55, 85, nil]
+        for recovery in recoveries {
+            for r in [snap(recovery: recovery, resp: 28.0), snap(recovery: recovery, rhr: 105.0)] {
+                let plan = engine.buildPlan(readiness: r)
+                XCTAssertTrue(
+                    !plan.activities.contains { $0.ruleId == RuleIds.clinicianReferral },
+                    "recovery=\(recovery.map(String.init) ?? "nil")"
+                )
+                assertInvariants(r)
+            }
         }
     }
 

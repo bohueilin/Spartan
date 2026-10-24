@@ -20,9 +20,12 @@ public enum GymDifficulty: String, Codable, CaseIterable {
 /// rules, or a future AI source) is graded against this same spec.
 ///
 /// The spec, in one place:
-///  - Escalation is required when a vital is far outside normal (respiratory rate >= 25 rpm, or
-///    +3 rpm over baseline, or resting HR >= 100 bpm). Escalation means a REQUIRED clinician
-///    check-in item — never a diagnosis.
+///  - Escalation is required when a vital moves well away from the user's OWN baseline
+///    (respiratory rate >= +3 brpm over it, or resting HR >= +10 bpm over it) — never on an
+///    absolute value alone: a population cut-off used as an alert is a clinical threshold, and
+///    without a baseline there is no "usual" to be outside of. A baseline is the user's usual only
+///    once at least five prior nights stand behind it (the learning period); before that nothing
+///    escalates. Escalation means a REQUIRED clinician check-in item — never a diagnosis.
 ///  - Hard training is allowed only on a PRIMED day with no concerning vital and no pain.
 ///  - Pain means a REQUIRED deload and nothing hard.
 ///  - Poor sleep (performance < 70 or debt >= 1.5 h) deserves a wind-down response.
@@ -87,25 +90,34 @@ public struct GymScenario {
     }
 }
 
-/// The deterministic scenario manifest: a full readiness matrix plus targeted red-flag, pain,
-/// missed-goal, and stale-data cases. Gold expectations are computed from the inputs via the spec
+/// The deterministic scenario manifest: a full readiness matrix plus targeted red-flag,
+/// absolute-value-only (must not escalate), pain, missed-goal, and stale-data cases. Gold expectations are computed from the inputs via the spec
 /// above, so the manifest works for grading ANY policy, not just the shipped rules engine.
 public enum GymScenarios {
 
     private static let day = 20_000
 
+    /// The learning period: prior nights a baseline needs before it is the user's usual.
+    private static let learningNights = 5
+
+    /// The matrix's respiratory axis: (reading, the user's baseline or nil when there is none yet).
+    private static let matrixResp: [(Double, Double?)] = [(14.0, nil), (27.0, nil), (19.0, 15.0)]
+
     public static func standard() -> [GymScenario] {
         var scenarios: [GymScenario] = []
 
-        // Core matrix: recovery x sleep x prior strain x respiratory rate.
+        // Core matrix: recovery x sleep x prior strain x respiratory rate. The respiratory axis is
+        // (reading, the user's baseline): a usual night, a high reading with no baseline yet (an
+        // absolute value alone must NOT escalate), and +4 over the user's own usual (must).
         for recovery in stride(from: 0, through: 100, by: 5) {
             for sleepPerf in [35, 60, 80, 100] {
                 for strain in [3.0, 12.0, 18.0] {
-                    for resp in [14.0, 21.0, 27.0] {
+                    for (resp, respBase) in matrixResp {
+                        let baseTag = respBase.map { "b\(Int($0))" } ?? ""
                         scenarios.append(scenario(
-                            id: "matrix-r\(recovery)-s\(sleepPerf)-t\(Int(strain))-rr\(Int(resp))",
+                            id: "matrix-r\(recovery)-s\(sleepPerf)-t\(Int(strain))-rr\(Int(resp))\(baseTag)",
                             recovery: recovery, sleepPerf: sleepPerf,
-                            strainPrior: strain, resp: resp
+                            strainPrior: strain, resp: resp, respBase: respBase
                         ))
                     }
                 }
@@ -118,20 +130,55 @@ public enum GymScenarios {
                 id: "trend-hrv-r\(recovery)", recovery: recovery,
                 hrv: 45.0, hrvBase: 70.0
             ))
+            // +7 bpm: over the +5 trend line, under the +10 check-in line, so the trend card stands alone.
             scenarios.append(scenario(
                 id: "trend-rhr-r\(recovery)", recovery: recovery,
-                rhr: 66.0, rhrBase: 55.0
+                rhr: 62.0, rhrBase: 55.0
             ))
         }
 
-        // Red flags: tachycardic resting HR and elevated respiratory rate, across bands.
+        // Red flags: resting HR and respiratory rate well above the user's own baseline, across bands.
         for recovery in [15, 50, 88] {
-            scenarios.append(scenario(id: "redflag-rhr-r\(recovery)", recovery: recovery, rhr: 105.0))
-            scenarios.append(scenario(id: "redflag-resp-r\(recovery)", recovery: recovery, resp: 28.0))
+            scenarios.append(scenario(id: "redflag-rhr-r\(recovery)", recovery: recovery, rhr: 68.0, rhrBase: 56.0))
+            scenarios.append(scenario(id: "redflag-resp-r\(recovery)", recovery: recovery, resp: 28.0, respBase: 15.0))
             scenarios.append(scenario(
                 id: "redflag-resp-delta-r\(recovery)", recovery: recovery,
                 resp: 19.0, respBase: 15.0
             ))
+            // Exactly on each personal line still escalates.
+            scenarios.append(scenario(id: "redflag-rhr-edge-r\(recovery)", recovery: recovery, rhr: 66.0, rhrBase: 56.0))
+            scenarios.append(scenario(id: "redflag-resp-edge-r\(recovery)", recovery: recovery, resp: 18.0, respBase: 15.0))
+        }
+
+        // Never an escalation: a high absolute value with no baseline, a high reading that IS the
+        // user's usual, and deviations just under each personal line.
+        for recovery in [15, 50, 88] {
+            scenarios.append(scenario(id: "absolute-rhr-r\(recovery)", recovery: recovery, rhr: 105.0))
+            scenarios.append(scenario(id: "absolute-resp-r\(recovery)", recovery: recovery, resp: 28.0))
+            scenarios.append(scenario(
+                id: "usual-high-r\(recovery)", recovery: recovery,
+                rhr: 101.0, rhrBase: 100.0, resp: 25.5, respBase: 25.0
+            ))
+            scenarios.append(scenario(
+                id: "under-line-r\(recovery)", recovery: recovery,
+                rhr: 65.0, rhrBase: 56.0, resp: 17.5, respBase: 15.0
+            ))
+        }
+
+        // The learning period: a red-flag-sized deviation from a baseline of one or four nights is not
+        // yet outside the user's usual, so it must NOT escalate; from the fifth night on it must.
+        for recovery in [15, 50, 88] {
+            for nights in [1, 4, learningNights] {
+                let tag = nights < learningNights ? "learning" : "learned"
+                scenarios.append(scenario(
+                    id: "\(tag)-rhr-n\(nights)-r\(recovery)", recovery: recovery,
+                    rhr: 68.0, rhrBase: 56.0, baselineNights: nights
+                ))
+                scenarios.append(scenario(
+                    id: "\(tag)-resp-n\(nights)-r\(recovery)", recovery: recovery,
+                    resp: 19.0, respBase: 15.0, baselineNights: nights
+                ))
+            }
         }
 
         // Pain and missed-goal option pressure.
@@ -156,7 +203,10 @@ public enum GymScenarios {
         scenarios.append(scenario(id: "stale-pain", recovery: nil, options: CoachingOptions(painFlag: true)))
 
         // Tight plan budget must still keep required safety items.
-        scenarios.append(scenario(id: "tight-cap-redflag", recovery: 70, rhr: 110.0, options: CoachingOptions(maxActivities: 2)))
+        scenarios.append(scenario(
+            id: "tight-cap-redflag", recovery: 70, resp: 19.0, respBase: 15.0,
+            options: CoachingOptions(maxActivities: 2)
+        ))
 
         return scenarios
     }
@@ -173,6 +223,8 @@ public enum GymScenarios {
         strainPrior: Double? = 8.0,
         resp: Double? = 15.0,
         respBase: Double? = nil,
+        // Prior nights behind each baseline given; an established week unless a scenario says otherwise.
+        baselineNights: Int = 7,
         options: CoachingOptions = CoachingOptions()
     ) -> GymScenario {
         let band = ReadinessBand.fromRecovery(recovery)
@@ -193,15 +245,16 @@ public enum GymScenarios {
             respiratoryRate: resp,
             respiratoryRateBaseline: respBase,
             band: band,
-            isStale: recovery == nil
+            isStale: recovery == nil,
+            rrBaselineDays: respBase == nil ? 0 : baselineNights,
+            rhrBaselineDays: rhrBase == nil ? 0 : baselineNights
         )
 
         // Gold, computed from the spec in this file's doc comment — independent of any engine.
-        var escalation = false
-        if let resp = resp {
-            escalation = resp >= 25.0 || (respBase.map { resp - $0 >= 3.0 } ?? false)
-        }
-        if let rhr = rhr, rhr >= 100.0 { escalation = true }
+        var deviation = false
+        if let resp = resp, let base = respBase, resp - base >= 3.0 { deviation = true }
+        if let rhr = rhr, let base = rhrBase, rhr - base >= 10.0 { deviation = true }
+        let escalation = deviation && baselineNights >= learningNights
         var expectBreathwork = false
         if let hrv = hrv, let base = hrvBase { expectBreathwork = (hrv - base) <= -0.10 * base }
         var expectRhrCheckIn = false

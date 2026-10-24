@@ -111,6 +111,22 @@ class PreferencesStore(private val context: Context) {
         context.dataStore.edit { it[LAST_GOAL_REVIEW_DAY] = epochDay }
     }
 
+    // --- Display (You → Display): MainActivity reads these via MainViewModel.uiState. Off until opted in ---
+
+    /** The quieter, lower-chroma colour scheme; it also stills rememberReducedMotion motion (LocalCalmMode). */
+    val calmerTheme: Flow<Boolean> = context.dataStore.data.map { it[CALMER_THEME] ?: false }
+
+    suspend fun setCalmerTheme(enabled: Boolean) {
+        context.dataStore.edit { it[CALMER_THEME] = enabled }
+    }
+
+    /** Colours from the wallpaper (Material You) on Android 12+; ignored on older versions. */
+    val wallpaperColours: Flow<Boolean> = context.dataStore.data.map { it[WALLPAPER_COLOURS] ?: false }
+
+    suspend fun setWallpaperColours(enabled: Boolean) {
+        context.dataStore.edit { it[WALLPAPER_COLOURS] = enabled }
+    }
+
     suspend fun clear() {
         context.dataStore.edit { it.clear() }
     }
@@ -129,6 +145,8 @@ class PreferencesStore(private val context: Context) {
         val PLAN_AVOID = stringSetPreferencesKey("plan_avoid")
         val MORNING_REVEAL_PLAYED_DAY = longPreferencesKey("morning_reveal_played_day")
         val LAST_GOAL_REVIEW_DAY = longPreferencesKey("last_goal_review_day")
+        val CALMER_THEME = booleanPreferencesKey("calmer_theme")
+        val WALLPAPER_COLOURS = booleanPreferencesKey("wallpaper_colours")
     }
 }
 

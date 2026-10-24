@@ -91,6 +91,27 @@ class PlanReviewReminderTest {
     }
 
     @Test
+    fun reviewSummary_neverListsAClinicalThresholdAsNeedingAttention() {
+        val today = LocalDate.of(2026, 5, 11)
+        // Above-range labs and a manual blood-pressure entry: reported as values, never as flags.
+        val metrics = listOf(
+            MetricReading(MetricType.FASTING_GLUCOSE, 118.0, today),
+            MetricReading(MetricType.SYSTOLIC_BP, 142.0, today),
+            MetricReading(MetricType.DIASTOLIC_BP, 92.0, today),
+        )
+
+        val labsOnly = ReviewEngine().summarize(metrics, emptyList(), referenceDate = today)
+        assertEquals(listOf("No urgent trend flags from the current local data."), labsOnly.needsAttention)
+        assertEquals(118.0, labsOnly.latestFastingGlucose!!, 0.0)
+        assertEquals("142/92", labsOnly.latestBp)
+
+        // The user's own week still shows up there.
+        val painLog = WorkoutLog(WorkoutType.STRENGTH, 30, 30, 6, painFlag = true, completedAt = today)
+        val withPain = ReviewEngine().summarize(metrics, listOf(painLog), referenceDate = today)
+        assertEquals(listOf("Pain was reported; avoid progression until resolved."), withPain.needsAttention)
+    }
+
+    @Test
     fun reviewSummaryUsesSevenCalendarDayAverages() {
         val today = LocalDate.of(2026, 5, 11)
         val metrics = listOf(

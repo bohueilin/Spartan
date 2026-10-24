@@ -34,6 +34,7 @@ import com.spartan.data.local.toEntity
 import com.spartan.data.whoop.csv.WhoopCsvImporter
 import com.spartan.data.whoop.csv.toWhoopSnapshot
 import com.spartan.domain.engine.ActionPlaybook
+import com.spartan.domain.engine.AvoidOption
 import com.spartan.domain.engine.BedtimePlan
 import com.spartan.domain.engine.Signal
 import com.spartan.domain.engine.SignalEngine
@@ -90,6 +91,7 @@ import com.spartan.domain.model.WorkoutType
 import com.spartan.domain.usecase.DailyPlanSync
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -157,6 +159,12 @@ data class MainUiState(
     val projections: List<MetricProjection> = emptyList(),
     /** Oldest→today: which of the trailing 7 days had a completed activity (consistency strip). */
     val consistencyFlags: List<Boolean> = emptyList(),
+    /**
+     * Oldest→today: the same flags over the trailing [STREAK_WINDOW_DAYS] (two weeks), for the
+     * streak summary — so a run or a gap that began last week gives this week's figures context.
+     * Its last seven entries are [consistencyFlags].
+     */
+    val streakFlags: List<Boolean> = emptyList(),
     /** True while a user-initiated refresh (pull-to-refresh) is in flight. */
     val isRefreshing: Boolean = false,
     /** State of an in-flight or finished WHOOP CSV import (null when none this session). */
@@ -206,7 +214,26 @@ data class MainUiState(
     val pausedGoal: Goal? = null,
     /** True when the active goal has run a week since it started or since the last check-in. */
     val weeklyReviewDue: Boolean = false,
+    // Display (You → Display)
+    /** The quieter colour scheme; it also stills rememberReducedMotion motion. Off until the user opts in. */
+    val calmerTheme: Boolean = false,
+    /** Colours from the wallpaper on Android 12+. Off until the user opts in. */
+    val wallpaperColours: Boolean = false,
+    /**
+     * The newest saved reflection's mood, to pre-fill the evening sheet — only while that answer is
+     * recent ([REFLECTION_PREFILL_DAYS]); null before the first one or after a longer gap.
+     */
+    val lastReflectionMood: ReflectionMood? = null,
 )
+
+/** Days of check-off history behind [MainUiState.streakFlags]: two weeks of runs; the strip shows the last 7. */
+internal const val STREAK_WINDOW_DAYS = 14
+
+/** Days of check-off history behind [MainUiState.consistencyFlags] and the weekly count. */
+internal const val CONSISTENCY_WINDOW_DAYS = 7
+
+/** How many days old the newest reflection may be and still pre-fill tonight's (yesterday's or so). */
+internal const val REFLECTION_PREFILL_DAYS = 2
 
 /**
  * Whether Today should offer to turn on reminders. Value first: the offer appears only once a plan
@@ -218,6 +245,57 @@ internal fun shouldOfferReminders(
     offerSettled: Boolean,
     permissionGranted: Boolean,
 ): Boolean = hasActivities && !offerSettled && !permissionGranted
+
+/**
+ * The newest saved reflection's mood — one tap to answer "same as last time". Null when there is
+ * none, or when it is more than [REFLECTION_PREFILL_DAYS] before [todayEpochDay]: an answer from
+ * weeks ago is not "last time", and pre-selecting it would make saving it a single tap.
+ */
+internal fun lastReflectionMood(reflections: List<DailyReflection>, todayEpochDay: Long): ReflectionMood? =
+    reflections.maxByOrNull { it.dateEpochDay }
+        ?.takeIf { todayEpochDay - it.dateEpochDay <= REFLECTION_PREFILL_DAYS }
+        ?.mood
+
+/** The shortest a weekly slot is ever trimmed to, however little time a day the user gave. */
+internal const val MIN_WEEKLY_SLOT_MINUTES = 10
+
+// Zone 2 copy for a swapped strength slot when the week has no Zone 2 slot to borrow it from —
+// the same words the weekly template uses (PlanEngine).
+private const val ZONE2_INTENSITY = "Easy conversational pace"
+private const val ZONE2_GUIDANCE = "Keep it repeatable."
+
+/**
+ * The weekly template works around a won't-do the way the daily plan does (finding SCO-17): with
+ * strength training on the user's won't-do list, its slots become Zone 2 sessions. A swapped slot
+ * takes the week's own Zone 2 minutes and copy, so a deload week stays a deload week.
+ */
+internal fun swapAvoidedSessions(plan: WeeklyPlan, constraints: PlanConstraints): WeeklyPlan {
+    if (AvoidOption.STRENGTH_TRAINING !in constraints.avoid) return plan
+    val zone2 = plan.workouts.firstOrNull { it.type == WorkoutType.ZONE_2 }
+    return plan.copy(
+        workouts = plan.workouts.map { slot ->
+            if (slot.type != WorkoutType.STRENGTH) {
+                slot
+            } else {
+                slot.copy(
+                    type = WorkoutType.ZONE_2,
+                    minutes = zone2?.minutes ?: slot.minutes,
+                    intensity = zone2?.intensity ?: ZONE2_INTENSITY,
+                    guidance = zone2?.guidance ?: ZONE2_GUIDANCE,
+                )
+            }
+        },
+    )
+}
+
+/**
+ * Caps every weekly slot at the minutes a day the user said they have — never below
+ * [MIN_WEEKLY_SLOT_MINUTES], so a slot stays worth doing. No limit given (null) changes nothing.
+ */
+internal fun capSlotMinutes(plan: WeeklyPlan, minutesPerDay: Int?): WeeklyPlan {
+    val cap = minutesPerDay?.coerceAtLeast(MIN_WEEKLY_SLOT_MINUTES) ?: return plan
+    return plan.copy(workouts = plan.workouts.map { if (it.minutes > cap) it.copy(minutes = cap) else it })
+}
 
 /** The hour after which the day is done enough to reflect on it. */
 internal const val REFLECTION_HOUR = 18
@@ -419,6 +497,7 @@ private data class CheckInBundle(
     val calendarConnected: Boolean,
     val consistencyDays7: Int,
     val consistencyFlags: List<Boolean>,
+    val streakFlags: List<Boolean>,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class) // flatMapLatest: day-scoped flows re-subscribe at midnight
@@ -486,6 +565,10 @@ class MainViewModel @Inject constructor(
         day.bedtime?.takeIf { day.plan?.dateEpochDay == planningDay }
             ?: DailyPlanSync.tonightFor(DailyPlanSync.lastNight(day.latestSnapshot, planningDay), constraints)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    /** The latest app-open / pull-to-refresh sync, and the latest CSV import, for erasure to stop. */
+    private var refreshJob: Job? = null
+    private var importJob: Job? = null
 
     private val syncFailed = MutableStateFlow(false)
     private val reviewRequested = MutableStateFlow(false)
@@ -708,9 +791,12 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    /** The week's active-day count and the two weeks of flags behind the strip and the streaks. */
     private val consistencyFlow = todayFlow.flatMapLatest { day ->
-        repository.dailyActivities(day)
-            .map { repository.consistencyDays(7, day) to repository.consistencyFlags(7, day) }
+        repository.dailyActivities(day).map {
+            repository.consistencyDays(CONSISTENCY_WINDOW_DAYS, day) to
+                repository.consistencyFlags(STREAK_WINDOW_DAYS, day)
+        }
     }
 
     private val checkInBundle = combine(
@@ -718,7 +804,7 @@ class MainViewModel @Inject constructor(
         repository.connections,
         synced,
         consistencyFlow,
-    ) { entities, connections, syncedDay, (consistencyCount, consistencyBits) ->
+    ) { entities, connections, syncedDay, (consistencyCount, streakBits) ->
         CheckInBundle(
             activities = entities.map { it.toDomain() },
             plan = syncedDay.plan,
@@ -733,7 +819,9 @@ class MainViewModel @Inject constructor(
                 it.provider == IntegrationProvider.GOOGLE_CALENDAR && it.status == ConnectionStatus.CONNECTED
             },
             consistencyDays7 = consistencyCount,
-            consistencyFlags = consistencyBits,
+            // The strip's week is the last seven of the same two weeks: one read, so they never disagree.
+            consistencyFlags = streakBits.takeLast(CONSISTENCY_WINDOW_DAYS),
+            streakFlags = streakBits,
         )
     }
 
@@ -743,6 +831,8 @@ class MainViewModel @Inject constructor(
         val notificationDenied: Boolean,
         val offerSettled: Boolean,
         val morningRevealPlayedDay: Long?,
+        /** Calmer theme to wallpaper colours, folded so this combine stays within its five. */
+        val display: Pair<Boolean, Boolean>,
     )
 
     private val prefsBundle = combine(
@@ -750,7 +840,12 @@ class MainViewModel @Inject constructor(
         preferencesStore.notificationPermissionDenied,
         preferencesStore.remindersOfferSettled,
         preferencesStore.morningRevealPlayedDay,
-    ) { onboarding, denied, offerSettled, revealDay -> PrefsBundle(onboarding, denied, offerSettled, revealDay) }
+        combine(preferencesStore.calmerTheme, preferencesStore.wallpaperColours) { calmer, wallpaper ->
+            calmer to wallpaper
+        },
+    ) { onboarding, denied, offerSettled, revealDay, display ->
+        PrefsBundle(onboarding, denied, offerSettled, revealDay, display)
+    }
 
     val uiState: StateFlow<MainUiState> = combine(
         prefsBundle,
@@ -768,12 +863,18 @@ class MainViewModel @Inject constructor(
         val assessments = latest
             .filter { metricEngine.validate(it.type, it.value) }
             .map { metricEngine.assess(it, targetMap[it.type]) }
-        // Goal emphasis bends the weekly plan (extra Zone-2 volume for a weight goal); the
-        // recovery-gated daily engine still owns the intensity floor.
+        // The weekly template, in order: won't-dos swapped out, goal emphasis (extra Zone-2 volume
+        // for a weight goal), the minutes-a-day cap, then the user's own per-slot edits — last, so a
+        // minute changed on the Training screen shows exactly as entered. The recovery-gated daily
+        // engine still owns the intensity floor.
         val modifiers = GoalEngine.planModifiers(health.coach.activeGoal, health.coach.windows)
-        val plan = applyGoalEmphasis(
-            applyPlanOverrides(planEngine.defaultPlan(health.logs), health.planOverrides),
-            modifiers,
+        val constraints = health.coach.planConstraints
+        val plan = applyPlanOverrides(
+            capSlotMinutes(
+                applyGoalEmphasis(swapAvoidedSessions(planEngine.defaultPlan(health.logs), constraints), modifiers),
+                constraints.minutesPerDay,
+            ),
+            health.planOverrides,
         )
         // No sessions logged yet means there is no week to review — hand the UI null so it shows
         // the designed empty state instead of a fabricated "Adherence 0%" the user never earned.
@@ -795,7 +896,8 @@ class MainViewModel @Inject constructor(
         // Only today's night is "last night": an older snapshot (lagging sync, old import) is not.
         val lastNight = DailyPlanSync.lastNight(checkIn.latestSnapshot, day)
         val sleptHours = lastNight?.sleepDurationHours
-        val sleepNeedHours = SleepNeed.neededHours(sleptHours, lastNight?.sleepPerformance)
+        // WHOOP's own need when the data has it, else the estimate — the same need tonight's target uses.
+        val sleepNeedHours = SleepNeed.forSnapshot(lastNight)
         val verdict = todayVerdict(checkIn.syncSettled, readinessToday, planToday?.strainTarget, syncFailed = syncDidFail)
         MainUiState(
             onboardingComplete = onboardingComplete,
@@ -839,6 +941,7 @@ class MainViewModel @Inject constructor(
             consistencyDays7 = checkIn.consistencyDays7,
             requestReview = reviewWanted,
             consistencyFlags = checkIn.consistencyFlags,
+            streakFlags = checkIn.streakFlags,
             isRefreshing = refreshBusy,
             whoopImport = whoopImport,
             whoopImportInfo = health.whoopImportInfo,
@@ -880,6 +983,9 @@ class MainViewModel @Inject constructor(
             goalBaselines = if (isMockData) GoalBaselines() else health.coach.goalBaselines,
             pausedGoal = health.coach.pausedGoal,
             weeklyReviewDue = health.coach.weeklyReviewDue,
+            calmerTheme = prefs.display.first,
+            wallpaperColours = prefs.display.second,
+            lastReflectionMood = lastReflectionMood(health.reflections, day),
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MainUiState())
 
@@ -910,10 +1016,12 @@ class MainViewModel @Inject constructor(
      * [syncFailed] so the UI can say so quietly.
      */
     fun loadToday() {
-        viewModelScope.launch {
-            refreshing.value = true
-            preferencesStore.recordFirstOpenIfNeeded(System.currentTimeMillis())
+        refreshJob = viewModelScope.launch {
+            // All of it inside the try: erasure cancels this job, and a cancel that lands in the
+            // first-open write must still take the pull-to-refresh spinner down.
             try {
+                refreshing.value = true
+                preferencesStore.recordFirstOpenIfNeeded(System.currentTimeMillis())
                 refreshPlan(forceReseed = false)
             } finally {
                 refreshing.value = false
@@ -921,11 +1029,20 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    private suspend fun refreshPlan(forceReseed: Boolean) {
-        val outcome = dailyPlanSync.sync(today, forceReseed = forceReseed)
+    /**
+     * [erasureGeneration] is the store's erasure count when this refresh's work began (an import
+     * passes the one it started under). If all data is erased meanwhile, nothing is written or shown.
+     */
+    private suspend fun refreshPlan(forceReseed: Boolean, erasureGeneration: Long = repository.erasureGeneration) {
+        val outcome = dailyPlanSync.sync(today, forceReseed = forceReseed, erasureGeneration = erasureGeneration)
+        // Erased while this ran: what it fetched is the data the user just deleted, and erasure has
+        // already reset what Today shows — publishing now would draw it back on screen.
+        if (erasedSince(erasureGeneration, outcome)) return
         // Pressure-window nudges come from windows the user declared locally — they owe nothing to
         // WHOOP, so an offline sync must not silently disarm them.
-        schedulePressureNudges()
+        schedulePressureNudges(erasureGeneration)
+        // Again after that suspension; nothing below suspends before the state is published.
+        if (erasedSince(erasureGeneration, outcome)) return
         if (outcome.failed) {
             syncFailed.value = true
             // Settled all the same, keeping the last-known day: a failed first sync with nothing
@@ -947,17 +1064,27 @@ class MainViewModel @Inject constructor(
         )
     }
 
+    private fun erasedSince(generation: Long, outcome: DailyPlanSync.Outcome): Boolean =
+        outcome.superseded || repository.erasureGeneration != generation
+
     /**
      * Arms today's pre-window breathwork nudges (5 minutes before each declared high-pressure
      * window). Past times and quiet hours are filtered by the scheduler; re-arming replaces the
      * previous one-shot for the same window, so re-syncing never duplicates.
+     *
+     * [erasureGeneration] is the store's erasure count when the caller's work began. Once an
+     * erasure has begun since, nothing is armed: a nudge carries the window's label, which the user
+     * just deleted, and WorkManager would keep it past the erasure.
      */
-    private suspend fun schedulePressureNudges() {
+    private suspend fun schedulePressureNudges(erasureGeneration: Long) {
         val windows = repository.pressureWindows.first().map { it.toDomain() }
         if (windows.isEmpty()) return
         val zone = ZoneId.systemDefault()
         val date = LocalDate.now()
-        StressPatterns.windowsForDay(windows, date).forEach { window ->
+        for (window in StressPatterns.windowsForDay(windows, date)) {
+            // Right before each enqueue, after the suspension above. Erasure marks itself on this
+            // same main thread, so it cannot begin between this check and the enqueue.
+            if (repository.erasureGeneration != erasureGeneration) return
             val trigger = date.atStartOfDay(zone)
                 .plusMinutes(StressPatterns.nudgeMinuteFor(window).toLong())
                 .toInstant().toEpochMilli()
@@ -977,13 +1104,29 @@ class MainViewModel @Inject constructor(
     fun importWhoopCsv(uris: List<Uri>) {
         if (uris.isEmpty()) return
         if (whoopImportState.value?.inProgress == true) return // one import at a time
-        viewModelScope.launch {
+        importJob = viewModelScope.launch {
+            val generation = repository.erasureGeneration
             whoopImportState.value = WhoopImportUiState(inProgress = true)
-            whoopCsvImporter.import(uris)
+            // Reading the files can take seconds on a slow or cloud-backed provider, so it holds no
+            // lock and an erasure never waits on it. Only the write runs under the store lock, so it
+            // never interleaves with an erasure; one that lands first means it never writes at all.
+            val result = whoopCsvImporter.read(uris).fold(
+                onSuccess = { staged ->
+                    repository.writeUnlessErasedSince(generation) { whoopCsvImporter.persist(staged) }
+                },
+                onFailure = { Result.failure<WhoopCsvImporter.Summary>(it) },
+            )
+            if (result == null) {
+                whoopImportState.value = null
+                return@launch
+            }
+            result
                 .onSuccess { summary ->
                     cancelPendingActivityReminders()
-                    refreshPlan(forceReseed = true)
-                    whoopImportState.value = WhoopImportUiState(summary = summary)
+                    refreshPlan(forceReseed = true, erasureGeneration = generation)
+                    // Erased meanwhile: the summary would describe data that no longer exists.
+                    whoopImportState.value =
+                        if (repository.erasureGeneration == generation) WhoopImportUiState(summary = summary) else null
                 }
                 .onFailure { failure ->
                     whoopImportState.value = WhoopImportUiState(
@@ -1126,6 +1269,7 @@ class MainViewModel @Inject constructor(
     fun addPressureWindow(daysOfWeekMask: Int, startMinuteOfDay: Int, endMinuteOfDay: Int, label: String) {
         if (daysOfWeekMask == 0 || endMinuteOfDay <= startMinuteOfDay) return
         viewModelScope.launch {
+            val generation = repository.erasureGeneration
             repository.upsertPressureWindow(
                 PressureWindow(
                     id = java.util.UUID.randomUUID().toString(),
@@ -1135,7 +1279,7 @@ class MainViewModel @Inject constructor(
                     label = label.trim(),
                 ).toEntity(),
             )
-            schedulePressureNudges()
+            schedulePressureNudges(generation)
         }
     }
 
@@ -1192,6 +1336,16 @@ class MainViewModel @Inject constructor(
             )
             preferencesStore.setOnboardingComplete(true)
         }
+    }
+
+    /** You → Display: the calmer colour scheme (it also stills rememberReducedMotion motion). */
+    fun setCalmerTheme(enabled: Boolean) {
+        viewModelScope.launch { preferencesStore.setCalmerTheme(enabled) }
+    }
+
+    /** You → Display: colours from the wallpaper on Android 12+. */
+    fun setWallpaperColours(enabled: Boolean) {
+        viewModelScope.launch { preferencesStore.setWallpaperColours(enabled) }
     }
 
     fun setNotificationDenied(denied: Boolean) {
@@ -1468,14 +1622,20 @@ class MainViewModel @Inject constructor(
 
     fun disconnectWhoop() {
         viewModelScope.launch {
+            val generation = repository.erasureGeneration
             whoopAuthManager.disconnect() // clears stored tokens, matching the privacy policy
             // Disconnect stops the source: imported cycles/workouts are removed so syncs fall
             // back to labeled sample data. Normalized readings stay as the user's history —
             // disconnect never silently destroys data; deletion lives in Privacy.
-            repository.clearImportedWhoopSource()
-            repository.setConnection(IntegrationProvider.WHOOP, ConnectionStatus.NOT_CONNECTED)
+            val cleared = repository.writeUnlessErasedSince(generation) {
+                repository.clearImportedWhoopSource()
+                repository.setConnection(IntegrationProvider.WHOOP, ConnectionStatus.NOT_CONNECTED)
+            }
+            // Erased meanwhile: erasure already removed the source and the connection, and wrote
+            // its own audit marker — writing a fresh connection row now would undo part of it.
+            if (cleared == null) return@launch
             cancelPendingActivityReminders()
-            refreshPlan(forceReseed = true)
+            refreshPlan(forceReseed = true, erasureGeneration = generation)
         }
     }
 
@@ -1526,6 +1686,15 @@ class MainViewModel @Inject constructor(
     }
 
     fun deleteAllLocalData() {
+        // Marked first, synchronously, before the slow teardown below: from here every sync,
+        // import, disconnect or worker that began earlier is refused — its writes by the store,
+        // its reminders by the check right before each one — not only once the wipe takes the lock.
+        repository.beginErasure()
+        // A sync or import already running must not refill the store once it is emptied: stop
+        // them now. The store lock and erasure generation catch whatever slips past — the
+        // background worker's sync, a refresh started meanwhile (HealthRepository.writeUnlessErasedSince).
+        refreshJob?.cancel()
+        importJob?.cancel()
         viewModelScope.launch {
             // Erasure-grade: disarm every scheduled job (or the plan-refresh worker would
             // repopulate the emptied DB), purge WorkManager's own DB, dismiss shown notifications.
@@ -1534,6 +1703,9 @@ class MainViewModel @Inject constructor(
             whoopAuthManager.disconnect()
             calendarAuthManager.disconnect()
             repository.deleteAllLocalData()
+            // Once more now the store is empty: a writer already past its last check when the
+            // erasure began (the worker runs off the main thread) may have armed a reminder above.
+            reminderScheduler.purgeRemindersAfterErasure()
             preferencesStore.clear()
             preferencesStore.setDemoSeedCompleted(true)
             // The erased numbers must leave the screen too: these caches live in the ViewModel,
@@ -1555,6 +1727,8 @@ class MainViewModel @Inject constructor(
         // "no data yet" (Pending) instead of the deleted verdict or a wait no sync will end.
         synced.value = SyncedDay(settled = true)
         syncFailed.value = false
+        // The cancelled refresh may have been stopped before it could take its spinner down.
+        refreshing.value = false
         whoopImportState.value = null
         goalNotice.value = null
         reflectionDismissedDay.value = null

@@ -53,8 +53,9 @@ interface RecommendationSource {
  * generated text can make a medical claim or unsafe recommendation.
  *
  * Guidance is framed as wellness / fitness / recovery / habit support — never diagnosis. When a
- * metric looks potentially concerning, the engine adds a [CLINICIAN_REFERRAL] activity that
- * recommends seeing a qualified clinician rather than interpreting the value.
+ * vital moves well outside the user's own usual range (never on a population cut-off alone), the
+ * engine adds a [RuleIds.CLINICIAN_REFERRAL] activity that recommends seeing a qualified clinician
+ * rather than interpreting the value.
  */
 class CoachingEngine(
     private val source: RecommendationSource = RuleBasedRecommendationSource(),
@@ -531,15 +532,22 @@ class RuleBasedRecommendationSource(
         minutes = 10, intensity = Intensity.EASY, time = TimeOfDay.ANYTIME, note = null)
 
     /**
-     * Emit a non-diagnostic clinician-referral nudge when a vital looks potentially concerning.
-     * Never states a cause or diagnosis — only recommends professional guidance.
+     * Emit a non-diagnostic "check in with how you feel" nudge when a vital moves well away from
+     * the user's OWN usual: respiratory rate [RESP_ABOVE_USUAL_BRPM] or more over their baseline,
+     * or resting heart rate [RHR_ABOVE_USUAL_BPM] or more over theirs. Never on an absolute value
+     * alone — a population cut-off ("25 breaths", "100 bpm") would be a clinical threshold used as
+     * an alert, and without a baseline there is no "usual" to be outside of. A baseline counts only
+     * once [SignalEngine.MIN_BASELINE_DAYS] prior nights stand behind it — the learning period the
+     * rest of the app uses before it calls anything "your normal". Never states a cause or
+     * diagnosis — only recommends professional guidance.
      */
     private fun clinicianReferral(r: ReadinessSnapshot, day: Long): DailyActivity? {
-        val respHigh = r.respiratoryRate != null &&
-            (r.respiratoryRate >= 25.0 ||
-                (r.respiratoryRateBaseline != null && r.respiratoryRate - r.respiratoryRateBaseline >= 3.0))
-        val rhrVeryHigh = r.restingHeartRate != null && r.restingHeartRate >= 100.0
-        if (!respHigh && !rhrVeryHigh) return null
+        val respHigh = r.respiratoryRate != null && r.respiratoryRateBaseline != null &&
+            r.rrBaselineDays >= SignalEngine.MIN_BASELINE_DAYS &&
+            r.respiratoryRate - r.respiratoryRateBaseline >= RESP_ABOVE_USUAL_BRPM
+        val rhrHigh = r.rhrVsBaseline != null && r.rhrBaselineDays >= SignalEngine.MIN_BASELINE_DAYS &&
+            r.rhrVsBaseline >= RHR_ABOVE_USUAL_BPM
+        if (!respHigh && !rhrHigh) return null
         val metric = if (respHigh) MetricType.RESPIRATORY_RATE else MetricType.RESTING_HEART_RATE
         // A carried-forward (stale) day still holds an earlier day's readings — never call them today's.
         val readings = if (r.isStale) "your most recent readings" else "today's readings"
@@ -564,4 +572,12 @@ class RuleBasedRecommendationSource(
         estimatedMinutes = minutes, intensity = intensity, bestTimeOfDay = time,
         ruleId = ruleId, safetyNote = note,
     )
+
+    private companion object {
+        /** Breaths a minute over the user's own baseline that put respiratory rate outside their usual. */
+        const val RESP_ABOVE_USUAL_BRPM = 3.0
+
+        /** Beats a minute over the user's own baseline that put resting heart rate outside their usual. */
+        const val RHR_ABOVE_USUAL_BPM = 10.0
+    }
 }

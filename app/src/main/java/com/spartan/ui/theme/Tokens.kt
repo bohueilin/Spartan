@@ -5,6 +5,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -47,16 +48,26 @@ object Motion {
 }
 
 /**
- * True when the user has disabled animations system-wide (animator duration scale 0).
- * Movement animations (sweeps, expands, placements) must snap; opacity/color fades may stay.
+ * True while the calmer theme is on. [SpartanTheme] provides it and [rememberReducedMotion] reads
+ * it, so the calmer theme stills the motion that checks rememberReducedMotion: sweeps, expands,
+ * item placements and the one-shot Lottie moments. Library motion that never asks (sheet slides,
+ * switch thumbs) follows only the system reduce-motion setting.
+ */
+val LocalCalmMode = staticCompositionLocalOf { false }
+
+/**
+ * True when the user has disabled animations system-wide (animator duration scale 0) or turned on
+ * the calmer theme ([LocalCalmMode]). Movement animations (sweeps, expands, placements) and the
+ * one-shot Lottie moments must snap; opacity/color fades may stay.
  */
 @Composable
 fun rememberReducedMotion(): Boolean {
     val context = LocalContext.current
-    return remember {
+    val systemAnimationsOff = remember {
         Settings.Global.getFloat(context.contentResolver,
             Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
     }
+    return systemAnimationsOff || LocalCalmMode.current
 }
 
 /**

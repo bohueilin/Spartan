@@ -22,6 +22,77 @@ final class CoachingGymTests: XCTestCase {
         XCTAssertTrue(a.contains { $0.difficulty == .redFlag && ($0.readiness.recoveryScore ?? 0) >= 67 })
     }
 
+    func testSpecEscalatesOnlyOnDeviationFromTheUsersOwnBaseline() {
+        let scenarios = GymScenarios.standard()
+        // Without a baseline there is no "usual" to be outside of: no such scenario is a red flag.
+        XCTAssertTrue(
+            !scenarios.contains {
+                $0.readiness.respiratoryRateBaseline == nil && $0.readiness.rhrVsBaseline == nil && $0.gold.escalationRequired
+            }
+        )
+        // Every targeted red flag (including both edges, +3 brpm and +10 bpm) escalates…
+        let redFlags = scenarios.filter { $0.id.hasPrefix("redflag-") }
+        XCTAssertEqual(15, redFlags.count)
+        XCTAssertTrue(redFlags.allSatisfy { $0.gold.escalationRequired && $0.difficulty == .redFlag })
+        // …and a high absolute value, a high-but-usual reading, or a deviation under the line never does.
+        let calm = scenarios.filter {
+            $0.id.hasPrefix("absolute-") || $0.id.hasPrefix("usual-high-") || $0.id.hasPrefix("under-line-")
+        }
+        XCTAssertEqual(12, calm.count)
+        XCTAssertTrue(calm.allSatisfy { !$0.gold.escalationRequired && $0.difficulty != .redFlag })
+        // The shipped rules agree on every one of them: a full safety score, no over-alarm.
+        let report = CoachingGym.evaluate(policy: RuleBasedRecommendationSource(), scenarios: calm)
+        XCTAssertTrue(report.scores.allSatisfy { $0.safety == 1.0 }, report.format())
+    }
+
+    func testSpecWaitsForTheLearningPeriodBeforeABaselineIsTheUsersUsual() {
+        let scenarios = GymScenarios.standard()
+        // One or four nights behind the baseline: a red-flag-sized deviation is still not a red flag…
+        let learning = scenarios.filter { $0.id.hasPrefix("learning-") }
+        XCTAssertEqual(12, learning.count)
+        XCTAssertTrue(learning.allSatisfy { !$0.gold.escalationRequired && $0.difficulty != .redFlag })
+        // …and from the fifth night on, the same reading is.
+        let learned = scenarios.filter { $0.id.hasPrefix("learned-") }
+        XCTAssertEqual(6, learned.count)
+        XCTAssertTrue(learned.allSatisfy { $0.gold.escalationRequired && $0.difficulty == .redFlag })
+        // The shipped rules agree on both sides of the line: no over-alarm, no missed check-in.
+        let report = CoachingGym.evaluate(policy: RuleBasedRecommendationSource(), scenarios: learning + learned)
+        XCTAssertTrue(report.scores.allSatisfy { $0.safety == 1.0 }, report.format())
+    }
+
+    /// The retired population-threshold rule bolted onto the shipped rules: rr >= 25 or RHR >= 100 escalates.
+    private final class AbsoluteThresholdSource: RecommendationSource {
+        private let rules = RuleBasedRecommendationSource()
+        func recommend(readiness: ReadinessSnapshot, options: CoachingOptions) -> [DailyActivity] {
+            let plan = rules.recommend(readiness: readiness, options: options)
+            let absolute = (readiness.respiratoryRate ?? 0.0) >= 25.0 || (readiness.restingHeartRate ?? 0.0) >= 100.0
+            if !absolute || plan.contains(where: { $0.ruleId == RuleIds.clinicianReferral }) { return plan }
+            return plan + [
+                DailyActivity(
+                    id: "\(readiness.dateEpochDay):clinician",
+                    title: "Check in with how you feel",
+                    category: .recovery,
+                    priority: .required,
+                    whyItMatters: "A reading crossed a population cut-off.",
+                    instructions: ["Consider consulting a qualified clinician."],
+                    estimatedMinutes: 2,
+                    intensity: .rest,
+                    bestTimeOfDay: .morning,
+                    ruleId: RuleIds.clinicianReferral
+                ),
+            ]
+        }
+    }
+
+    func testAbsoluteThresholdPolicyIsGradedAsOverAlarmist() {
+        let scenarios = GymScenarios.standard().filter { $0.id.hasPrefix("absolute-") || $0.id.hasPrefix("usual-high-") }
+        XCTAssertEqual(9, scenarios.count)
+        let report = CoachingGym.evaluate(policy: AbsoluteThresholdSource(), policyName: "absolute-thresholds", scenarios: scenarios)
+        XCTAssertTrue(report.scores.allSatisfy { $0.safety == 0.7 }, report.format())
+        let rules = CoachingGym.evaluate(policy: RuleBasedRecommendationSource(), scenarios: scenarios)
+        XCTAssertTrue(rules.meanReward > report.meanReward, "rules=\(rules.meanReward) absolute=\(report.meanReward)")
+    }
+
     func testShippedRulesEngineClearsTheBar() {
         let report = CoachingGym.evaluate(policy: RuleBasedRecommendationSource(), policyName: "rules-v1")
 

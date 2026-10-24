@@ -10,11 +10,14 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.glance.appwidget.updateAll
+import com.spartan.data.repository.HealthRepository
 import com.spartan.diagnostics.DebugLog
+import com.spartan.domain.model.DailyPlan
 import com.spartan.domain.usecase.DailyPlanSync
 import com.spartan.ui.widget.NextActivityWidget
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
+import kotlinx.coroutines.CancellationException
 import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -34,19 +37,25 @@ class DailyPlanRefreshWorker @AssistedInject constructor(
     @Assisted params: WorkerParameters,
     private val dailyPlanSync: DailyPlanSync,
     private val reminderScheduler: ReminderScheduler,
+    private val repository: HealthRepository,
 ) : CoroutineWorker(appContext, params) {
 
     override suspend fun doWork(): Result {
-        val outcome = dailyPlanSync.sync(LocalDate.now().toEpochDay())
+        // Read before the sync: once an erasure begins after this, what this run fetched and
+        // planned is data the user deleted, and nothing of it may be written or announced.
+        val erasureGeneration = repository.erasureGeneration
+        val outcome = dailyPlanSync.sync(LocalDate.now().toEpochDay(), erasureGeneration = erasureGeneration)
         DebugLog.log("worker", "daily refresh ${if (outcome.failed) "failed" else "ok"}")
         // A replaced holding plan's snoozed / rescheduled rows are gone; their alarms must not fire.
         outcome.replacedReminderIds.forEach(reminderScheduler::cancelActivityReminder)
         // Keep the home-screen widget showing the fresh plan.
-        runCatching { NextActivityWidget().updateAll(applicationContext) }
+        ignoringFailures { NextActivityWidget().updateAll(applicationContext) }
         // Proactive morning digest at 07:15 (just after default quiet hours end): the plan headline
         // plus size, so the day starts with a glance, not an app launch. Skipped automatically if
-        // the worker ran late (past trigger) or notifications are off.
-        outcome.plan?.let { plan ->
+        // the worker ran late (past trigger) or notifications are off. Checked right before the
+        // enqueue; a digest armed in the instant an erasure begins is swept by its second purge
+        // (ReminderScheduler.purgeRemindersAfterErasure).
+        digestPlan(outcome.plan, startedAt = erasureGeneration, current = repository.erasureGeneration)?.let { plan ->
             val digestAt = LocalDate.now().atTime(LocalTime.of(7, 15))
                 .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
             reminderScheduler.scheduleActivityReminder(
@@ -91,3 +100,20 @@ class DailyPlanRefreshWorker @AssistedInject constructor(
         }
     }
 }
+
+/**
+ * Runs [block] and swallows its failure — a widget that fails to redraw must never fail the
+ * refresh — but never a cancellation: erasure stops this worker, and a stopped run must stop
+ * there rather than go on to arm the morning digest.
+ */
+internal suspend fun ignoringFailures(block: suspend () -> Unit) {
+    runCatching { block() }.onFailure { if (it is CancellationException) throw it }
+}
+
+/**
+ * The plan the morning digest announces: none when the sync produced none, and none once an
+ * erasure has begun since the worker read the erasure count [startedAt] ([current] is the count
+ * now) — its headline would be a plan the user just deleted.
+ */
+internal fun digestPlan(plan: DailyPlan?, startedAt: Long, current: Long): DailyPlan? =
+    plan?.takeIf { current == startedAt }

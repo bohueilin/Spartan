@@ -18,9 +18,10 @@ data class WhoopImportData(
 
 /**
  * Joins the parsed WHOOP export files into one per-day record set. physiological_cycles.csv is
- * authoritative for recovery/strain/vitals; sleeps.csv refines bed/wake times to the MAIN sleep
- * (the cycles file sometimes lists a nap's window); journal_entries.csv contributes behavior
- * flags; workouts.csv becomes its own table. Pure Kotlin — unit-tested against export fixtures.
+ * authoritative for recovery/strain/vitals; sleeps.csv refines bed/wake times and WHOOP's sleep
+ * need to the MAIN sleep (the cycles file sometimes lists a nap's window); journal_entries.csv
+ * contributes behavior flags; workouts.csv becomes its own table. Pure Kotlin — unit-tested against
+ * export fixtures.
  */
 object WhoopCsvMerger {
 
@@ -63,6 +64,8 @@ object WhoopCsvMerger {
                 journalAlcohol = journal?.alcohol,
                 journalLateMeal = journal?.lateMeal,
                 importedAtMillis = importedAtMillis,
+                // The main sleep's own need, like its bed/wake; the cycle row's when sleeps.csv has none.
+                sleepNeedHours = sleep?.sleepNeedHours ?: c.sleepNeedHours,
             )
         }
 
@@ -89,6 +92,7 @@ object WhoopCsvMerger {
                     journalAlcohol = journalByCycle[s.cycleStartRaw]?.alcohol,
                     journalLateMeal = journalByCycle[s.cycleStartRaw]?.lateMeal,
                     importedAtMillis = importedAtMillis,
+                    sleepNeedHours = s.sleepNeedHours,
                 )
             }
 
@@ -131,6 +135,6 @@ object WhoopCsvMerger {
 
     private fun WhoopCycleEntity.nonNullFieldCount(): Int = listOf(
         recoveryScore, hrvMs, restingHeartRate, sleepPerformance, sleepDurationHours,
-        sleepDebtHours, respiratoryRate, dayStrain, energyKcal, bedMinuteOfDay, wakeMinuteOfDay,
+        sleepDebtHours, respiratoryRate, dayStrain, energyKcal, bedMinuteOfDay, wakeMinuteOfDay, sleepNeedHours,
     ).count { it != null }
 }

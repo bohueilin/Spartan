@@ -57,6 +57,12 @@ data class WhoopSnapshot(
     val bedMinuteOfDay: Int? = null,
     val wakeMinuteOfDay: Int? = null,
     val isMock: Boolean = false,
+    /**
+     * WHOOP's own sleep need for the night, in hours, when the data carries it (the export's
+     * "Sleep need (min)", the API's sleep_needed). Null otherwise; see
+     * [com.spartan.domain.engine.SleepNeed.forSnapshot], which falls back to an estimate.
+     */
+    val sleepNeedHours: Double? = null,
 )
 
 /**
@@ -96,6 +102,14 @@ data class ReadinessSnapshot(
      * copy can say "yesterday" only when it really was the day before; null without history.
      */
     val previousCycleEpochDay: Long? = null,
+    /**
+     * Prior nights behind [respiratoryRateBaseline] (0 without one). The clinician check-in reads a
+     * baseline as "your usual" only from [com.spartan.domain.engine.SignalEngine.MIN_BASELINE_DAYS]
+     * nights on, the same learning period the rest of the app uses.
+     */
+    val rrBaselineDays: Int = 0,
+    /** Prior nights behind the resting-heart-rate baseline [rhrVsBaseline] is measured from (0 without one). */
+    val rhrBaselineDays: Int = 0,
 ) {
     companion object {
         /**
@@ -105,9 +119,11 @@ data class ReadinessSnapshot(
         fun from(today: WhoopSnapshot, history: List<WhoopSnapshot> = emptyList()): ReadinessSnapshot {
             val priorSorted = history.filter { it.dateEpochDay < today.dateEpochDay }
                 .sortedBy { it.dateEpochDay }
+            val rhrPrior = priorSorted.mapNotNull { it.restingHeartRate }
+            val rrPrior = priorSorted.mapNotNull { it.respiratoryRate }
             val hrvBaseline = priorSorted.mapNotNull { it.hrvMs }.takeIf { it.isNotEmpty() }?.average()
-            val rhrBaseline = priorSorted.mapNotNull { it.restingHeartRate }.takeIf { it.isNotEmpty() }?.average()
-            val rrBaseline = priorSorted.mapNotNull { it.respiratoryRate }.takeIf { it.isNotEmpty() }?.average()
+            val rhrBaseline = rhrPrior.takeIf { it.isNotEmpty() }?.average()
+            val rrBaseline = rrPrior.takeIf { it.isNotEmpty() }?.average()
             val prior = priorSorted.lastOrNull()
             val priorStrain = prior?.dayStrain
             // Only the day before counts as "yesterday" — after a day without the strap there is none.
@@ -142,6 +158,8 @@ data class ReadinessSnapshot(
                 previousRecoveryScore = yesterday?.recoveryScore,
                 sleepDurationHours = today.sleepDurationHours,
                 previousCycleEpochDay = prior?.dateEpochDay,
+                rrBaselineDays = rrPrior.size,
+                rhrBaselineDays = rhrPrior.size,
             )
         }
     }

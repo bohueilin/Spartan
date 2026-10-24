@@ -14,6 +14,7 @@ import com.spartan.domain.model.Intensity
 import com.spartan.domain.model.MetricReading
 import com.spartan.domain.model.MetricType
 import com.spartan.domain.model.TimeOfDay
+import com.spartan.domain.model.WhoopSnapshot
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -224,6 +225,40 @@ class SignalsTest {
         assertNull(SleepNeed.neededHours(3.0, 90))   // 3h 20m
         assertEquals(4.0, SleepNeed.neededHours(2.0, 50)!!, 1e-9)   // bounds are inclusive
         assertEquals(14.0, SleepNeed.neededHours(7.0, 50)!!, 1e-9)
+    }
+
+    @Test
+    fun whoopsOwnSleepNeedWinsOverTheEstimate() {
+        // 7 h at 85% estimates ~8h 14m, but WHOOP said 8.5 h: WHOOP's own figure is used.
+        val night = WhoopSnapshot(dateEpochDay = 1, sleepDurationHours = 7.0, sleepPerformance = 85, sleepNeedHours = 8.5)
+        assertEquals(8.5, SleepNeed.forSnapshot(night)!!, 1e-9)
+        // Even where the ratio can't say (WHOOP's 100% cap).
+        assertEquals(7.9, SleepNeed.forSnapshot(night.copy(sleepPerformance = 100, sleepNeedHours = 7.9))!!, 1e-9)
+    }
+
+    @Test
+    fun withoutWhoopsNeedTheEstimateIsUsed() {
+        val night = WhoopSnapshot(dateEpochDay = 1, sleepDurationHours = 7.0, sleepPerformance = 85)
+        assertEquals(7.0 / 0.85, SleepNeed.forSnapshot(night)!!, 1e-9)
+    }
+
+    @Test
+    fun anImplausibleWhoopNeedIsABadReading_andFallsBackToTheEstimate() {
+        val night = WhoopSnapshot(dateEpochDay = 1, sleepDurationHours = 7.0, sleepPerformance = 85)
+        assertEquals(7.0 / 0.85, SleepNeed.forSnapshot(night.copy(sleepNeedHours = 20.0))!!, 1e-9)
+        assertEquals(7.0 / 0.85, SleepNeed.forSnapshot(night.copy(sleepNeedHours = 0.0))!!, 1e-9)
+        assertEquals(7.0 / 0.85, SleepNeed.forSnapshot(night.copy(sleepNeedHours = Double.NaN))!!, 1e-9)
+        // The plausible range is inclusive, as for the estimate.
+        assertEquals(4.0, SleepNeed.forSnapshot(night.copy(sleepNeedHours = 4.0))!!, 1e-9)
+        assertEquals(14.0, SleepNeed.forSnapshot(night.copy(sleepNeedHours = 14.0))!!, 1e-9)
+    }
+
+    @Test
+    fun noSnapshotOrNothingToGoOnMeansNoNeed() {
+        assertNull(SleepNeed.forSnapshot(null))
+        assertNull(SleepNeed.forSnapshot(WhoopSnapshot(dateEpochDay = 1)))
+        // A bad WHOOP figure and no estimate either: still no need, never an invented one.
+        assertNull(SleepNeed.forSnapshot(WhoopSnapshot(dateEpochDay = 1, sleepNeedHours = 30.0)))
     }
 
     // --- SleepPlanner -----------------------------------------------------------------------

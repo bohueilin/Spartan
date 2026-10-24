@@ -192,8 +192,13 @@ class TodayVerdictTest {
         }
         assertEquals(VerdictHeadline.BIG_DAY, headlineFor(primed))
         assertEquals(VerdictHeadline.GENTLE, headlineFor(primed, CoachingOptions(painFlag = true)))
-        assertEquals(VerdictHeadline.GENTLE, headlineFor(primed.copy(respiratoryRate = 27.0)))
-        assertEquals(VerdictHeadline.GENTLE, headlineFor(primed.copy(restingHeartRate = 104.0)))
+        val rrUp = primed.copy(respiratoryRate = 18.0, respiratoryRateBaseline = 14.0, rrBaselineDays = 7)
+        val rhrUp = primed.copy(restingHeartRate = 70.0, rhrVsBaseline = 12.0, rhrBaselineDays = 7)
+        assertEquals(VerdictHeadline.GENTLE, headlineFor(rrUp))
+        assertEquals(VerdictHeadline.GENTLE, headlineFor(rhrUp))
+        // Still inside the learning period (under five nights): no "usual" yet, so no check-in day either.
+        assertEquals(VerdictHeadline.BIG_DAY, headlineFor(rrUp.copy(rrBaselineDays = 4)))
+        assertEquals(VerdictHeadline.BIG_DAY, headlineFor(rhrUp.copy(rhrBaselineDays = 1)))
     }
 
     // --- Why today: ready -------------------------------------------------------------------
@@ -331,7 +336,7 @@ class TodayVerdictTest {
         // Respiratory rate 4 over the user's baseline on a primed day: the clinician check-in fires.
         val readiness = ReadinessSnapshot(
             dateEpochDay = day, recoveryScore = 80, band = ReadinessBand.PRIMED,
-            respiratoryRate = 19.0, respiratoryRateBaseline = 15.0,
+            respiratoryRate = 19.0, respiratoryRateBaseline = 15.0, rrBaselineDays = 7,
         )
         val plan = engine.buildPlan(readiness)
         assertEquals(StrainZone.LIGHT, plan.strainTarget)
@@ -435,7 +440,12 @@ class TodayVerdictTest {
             MorningVerdict.Pending(PendingReason.SYNC_FAILED),
         )
         val readiness = ReadinessSnapshot(dateEpochDay = day, recoveryScore = 50, sleepDebtHours = 2.0, dayStrainPrior = 18.4)
-        val checkInPlan = engine.buildPlan(ReadinessSnapshot(dateEpochDay = day, recoveryScore = 80, band = ReadinessBand.PRIMED, respiratoryRate = 27.0))
+        val checkInPlan = engine.buildPlan(
+            ReadinessSnapshot(
+                dateEpochDay = day, recoveryScore = 80, band = ReadinessBand.PRIMED,
+                respiratoryRate = 18.0, respiratoryRateBaseline = 14.0, rrBaselineDays = 7,
+            ),
+        )
         val plans = StrainZone.entries.map { planWith(it) } + listOf(planWith(null), null, checkInPlan)
         for (verdict in verdicts) for (plan in plans) for (position in SignalPosition.entries) {
             val signals = listOf(

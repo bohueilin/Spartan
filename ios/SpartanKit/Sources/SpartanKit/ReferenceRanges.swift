@@ -44,8 +44,10 @@ public struct ReferenceBand: Codable, Equatable {
 /// Sources (encoded conservatively as bands, not diagnoses):
 ///  - Resting HR: AHA adult span 60–100 bpm; large wearable-cohort percentiles by age/sex show
 ///    typical 58–72 with fitness-forward 50–62; women a few bpm higher on average.
-///  - HRV (RMSSD): wearable-cohort medians decline with age (~3–5%/decade); mid-30s ms is a
-///    typical 40s median. Highly individual — bands are wide by design.
+///  - HRV (RMSSD): deliberately NO population band. Wearable-cohort medians decline with age
+///    (~3–5%/decade) and vary so widely between people that no meaningful "good" range exists,
+///    so the band carries bracket-aware education only and HRV is read against the user's own
+///    usual range.
 ///  - Sleep duration: AASM/NSF consensus 7–9 h for adults 18–64.
 ///  - Sleep consistency: sleep-regularity literature associates ±30–45 min bed/wake windows
 ///    with better outcomes; WHOOP expresses this as a 0–100 consistency score (≥70 is a solid
@@ -142,26 +144,14 @@ public enum ReferenceRanges {
         )
     }
 
+    // No population numbers at any age: HRV never gets a good/bad grade, only education.
     private static func hrv(ageYears: Int?) -> ReferenceBand {
-        // Cohort medians by age bracket; deliberately wide and framed as medians, not targets.
-        let (lo, hi): (Double, Double)
-        switch ageYears {
-        case nil: (lo, hi) = (25.0, 75.0)
-        case .some(0...29): (lo, hi) = (45.0, 95.0)
-        case .some(30...39): (lo, hi) = (35.0, 80.0)
-        case .some(40...49): (lo, hi) = (28.0, 70.0)
-        case .some(50...59): (lo, hi) = (22.0, 60.0)
-        default: (lo, hi) = (18.0, 50.0)
-        }
-        let lowInt: Int = Int(lo)
-        let highInt: Int = Int(hi)
-        var education = "HRV is the most individual number on this list — cohort medians for "
-        education += "\(cohortPhrase(ageYears, .unspecified)) span roughly \(lowInt)–\(highInt) ms and "
-        education += "decline naturally with age. Judge yourself against your own baseline trend, "
-        education += "not this table."
+        var education = "HRV has no population 'good' number — it is highly individual, and "
+        education += "among \(cohortPhrase(ageYears, .unspecified)) it drifts down naturally "
+        education += "with age. Spartan reads yours only against your own usual range."
         return ReferenceBand(
             metric: .hrvRmssd,
-            typicalLow: lo, typicalHigh: hi,
+            typicalLow: nil, typicalHigh: nil,
             education: education
         )
     }

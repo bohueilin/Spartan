@@ -12,6 +12,7 @@ import com.spartan.domain.model.MetricReading
 import com.spartan.domain.model.MetricType
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import javax.inject.Inject
@@ -51,12 +52,29 @@ class WhoopCsvImporter @Inject constructor(
             ImportError("Recognized ${recognized.joinToString()} but no cycles/sleeps/workouts found")
     }
 
-    suspend fun import(uris: List<Uri>): Result<Summary> = withContext(Dispatchers.IO) {
+    /**
+     * What [read] made of the picked files, ready for [persist]: the merged records, the kinds of
+     * export file they came from, and which files were recognized or skipped.
+     */
+    data class Staged(
+        val data: WhoopImportData,
+        val kinds: Set<WhoopCsvKind>,
+        val recognized: List<String>,
+        val skipped: List<String>,
+    )
+
+    /**
+     * The slow half of an import, which writes nothing and so needs no lock: reads every picked
+     * file (a slow or cloud-backed provider can take seconds), parses and merges them. Fails when
+     * nothing usable was found. A cancelled import stops between files.
+     */
+    suspend fun read(uris: List<Uri>): Result<Staged> = withContext(Dispatchers.IO) {
         val parsed = mutableListOf<ParsedWhoopFile>()
         val recognized = mutableListOf<String>()
         val skipped = mutableListOf<String>()
 
         uris.forEach { uri ->
+            ensureActive()
             val name = displayName(uri)
             val file = runCatching {
                 context.contentResolver.openInputStream(uri)?.use { stream ->
@@ -73,6 +91,16 @@ class WhoopCsvImporter @Inject constructor(
                 else ImportError.NoUsableData(recognized),
             )
         }
+        Result.success(Staged(data, parsed.map { it.kind }.toSet(), recognized, skipped))
+    }
+
+    /**
+     * The write half: saves what [read] staged and records consent. Quick, and the only part a
+     * caller runs under the store lock ([HealthRepository.writeUnlessErasedSince]), so an erasure
+     * never waits on file reads.
+     */
+    suspend fun persist(staged: Staged): Result<Summary> = withContext(Dispatchers.IO) {
+        val data = staged.data
 
         // Persistence failures (full disk, DB corruption) surface as a Result, never a crash.
         runCatching {
@@ -105,14 +133,14 @@ class WhoopCsvImporter @Inject constructor(
             lastDayEpoch = days.max(),
             workouts = data.workouts.size,
             journalDays = data.cycles.count { it.journalCaffeine != null || it.journalAlcohol != null || it.journalLateMeal != null },
-            recognizedFiles = recognized,
-            skippedFiles = skipped,
+            recognizedFiles = staged.recognized,
+            skippedFiles = staged.skipped,
         )
 
         // Consent records only what actually arrived; a workouts-only import doesn't flip the
         // connection to CONNECTED because plans would still run on sample data.
         if (data.cycles.isNotEmpty()) {
-            val kinds = parsed.map { it.kind }.toSet()
+            val kinds = staged.kinds
             val scopes = buildList {
                 if (WhoopCsvKind.PHYSIOLOGICAL_CYCLES in kinds) add("csv:cycles")
                 if (WhoopCsvKind.SLEEPS in kinds) add("csv:sleeps")
@@ -128,7 +156,7 @@ class WhoopCsvImporter @Inject constructor(
             repository.markSynced(IntegrationProvider.WHOOP)
         }
         repository.logAudit("SYNC", "WHOOP_CSV_IMPORTED", "days=${summary.days} workouts=${summary.workouts}")
-        DebugLog.log("import", "whoop csv ok: days=${summary.days} workouts=${summary.workouts} skipped=${skipped.size}")
+        DebugLog.log("import", "whoop csv ok: days=${summary.days} workouts=${summary.workouts} skipped=${staged.skipped.size}")
         Result.success(summary)
     }
 

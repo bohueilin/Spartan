@@ -158,6 +158,11 @@ data class WhoopCycleEntity(
     val journalLateMeal: Boolean? = null,
     val source: String = "CSV_IMPORT",
     val importedAtMillis: Long = 0,
+    /**
+     * WHOOP's own sleep need for the night ("Sleep need (min)"), in hours; null when the export has
+     * no such column. Added in schema v9, so it sits last — where ALTER TABLE put it on upgrade.
+     */
+    val sleepNeedHours: Double? = null,
 )
 
 /** One recorded workout from the WHOOP export (workouts.csv). Local-only, like all health data. */

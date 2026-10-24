@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -33,7 +34,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyItemScope
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
@@ -65,6 +68,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.ripple
@@ -98,6 +102,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.window.core.layout.WindowWidthSizeClass
 import com.spartan.R
 import com.spartan.domain.engine.ActionPlaybook
 import com.spartan.domain.engine.BedtimePlan
@@ -182,11 +187,21 @@ private fun urgencyOf(activity: DailyActivity, nowMinuteOfDay: Int): PlanUrgency
 /** Sleep debt below this is noise, not worth a line of its own (the same cut-off as WhyTodayEngine). */
 private const val DEBT_WORTH_MENTIONING_HOURS = 0.25
 
+/** The single-column list's width cap — a readable measure on any screen. */
+private val LIST_MAX_WIDTH = 600.dp
+
+/** The two-pane layout's width cap on expanded windows: the plan list plus the "Why today?" pane. */
+private val TWO_PANE_MAX_WIDTH = 1080.dp
+
 /**
  * Today — the hero screen, answering one question: what should I do today? The morning verdict
  * (colour + word + number, one strain target, tonight's bedtime) or a calm "plan pending", then
  * 3–5 checkable actions with the next one dominant, an expandable "Why today?", and tonight's sleep
  * target. Every interactive element carries TalkBack semantics and a 48dp target.
+ *
+ * On an expanded window (840dp+, M3's breakpoint) with a Ready verdict, "Why today?" becomes a
+ * supporting pane beside the plan, always open with its driver tiles; everything else keeps its
+ * order in the left column. Compact and medium widths keep the single column.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -241,87 +256,115 @@ fun CheckInScreen(
     val collapsedIds = collapsedActionIds(ordered, nextId, keptActionIds)
     SideEffect { if (!showAllActions && collapsedIds != keptActionIds) keptActionIds = collapsedIds }
     val reducedMotion = rememberReducedMotion()
-    PullToRefreshBox(isRefreshing = state.isRefreshing, onRefresh = onRefresh, modifier = Modifier.fillMaxSize()) {
-        LazyColumn(
-            modifier = Modifier.align(Alignment.TopCenter).widthIn(max = 600.dp).fillMaxSize(),
-            contentPadding = PaddingValues(start = PageGutter, end = PageGutter, bottom = Spacing.section),
-            verticalArrangement = Arrangement.spacedBy(Spacing.md),
-        ) {
-            item(key = "header") { TodayHeader(state) }
-            // The verdict is never fabricated: Ready, Pending, or (before the first sync settles) the
-            // shared loading skeleton below, which stands in for the whole tab.
-            val verdict = state.verdict
-            when {
-                verdict is MorningVerdict.Ready -> item(key = "verdict") {
-                    ReadyVerdictCard(verdict, state, bedtime, onOpenRecoveryExplainer, onMorningRevealPlayed)
-                }
-                verdict is MorningVerdict.Pending || state.syncFailed -> item(key = "verdict") { PendingVerdictCard(state) }
+    val verdict = state.verdict
+    val drivers = remember(state.signals) { DRIVERS.mapNotNull { metric -> state.signals.firstOrNull { it.metric == metric } } }
+    // A pending verdict already explains itself (and the holding plan) on its own card.
+    val why = state.whyToday?.takeIf { verdict is MorningVerdict.Ready }
+    val expandedWidth = currentWindowAdaptiveInfo().windowSizeClass.windowWidthSizeClass == WindowWidthSizeClass.EXPANDED
+    val whyPane = why?.takeIf { expandedWidth }
+    // One list state for both layouts, so a window resize across the breakpoint keeps the scroll.
+    val listState = rememberLazyListState()
+    val listContent: LazyListScope.() -> Unit = {
+        item(key = "header") { TodayHeader(state) }
+        // The verdict is never fabricated: Ready, Pending, or (before the first sync settles) the
+        // shared loading skeleton below, which stands in for the whole tab.
+        when {
+            verdict is MorningVerdict.Ready -> item(key = "verdict") {
+                ReadyVerdictCard(verdict, state, bedtime, onOpenRecoveryExplainer, onMorningRevealPlayed)
             }
+            verdict is MorningVerdict.Pending || state.syncFailed -> item(key = "verdict") { PendingVerdictCard(state) }
+        }
 
-            if (loading) {
-                item(key = "loading") { TabLoadingSkeleton() }
+        if (loading) {
+            item(key = "loading") { TabLoadingSkeleton() }
+        } else {
+            // With nothing cached there is no "most recent sync" to show: the Pending card
+            // already says the refresh failed, so the banner would only contradict it.
+            val nothingCached = verdict is MorningVerdict.Pending && verdict.reason == PendingReason.SYNC_FAILED
+            if (state.syncFailed && !nothingCached) {
+                item(key = "sync-banner") { SafetyBanner(stringResource(R.string.checkin_sync_failed), animatedItem(reducedMotion)) }
+            }
+            if (planFinished(state)) {
+                item(key = "day-complete") { DayCompleteCard(animatedItem(reducedMotion)) }
+            }
+            item(key = "plan-header") { PlanHeader(state) }
+            if (state.todayActivities.isEmpty()) {
+                item(key = "empty-plan") { EmptyPlan() }
             } else {
-                // With nothing cached there is no "most recent sync" to show: the Pending card
-                // already says the refresh failed, so the banner would only contradict it.
-                val nothingCached = verdict is MorningVerdict.Pending && verdict.reason == PendingReason.SYNC_FAILED
-                if (state.syncFailed && !nothingCached) {
-                    item(key = "sync-banner") { SafetyBanner(stringResource(R.string.checkin_sync_failed), animatedItem(reducedMotion)) }
+                val visible = if (showAllActions) ordered else ordered.filter { it.id in collapsedIds }
+                items(visible, key = { it.id }) { activity ->
+                    PlanRow(
+                        activity = activity,
+                        isNext = activity.id == nextId,
+                        nowMinuteOfDay = nowMinuteOfDay,
+                        calendarIsStub = state.calendarIsStub,
+                        onToggle = { if (activity.status == ActivityStatus.DONE) onUncomplete(activity.id) else completeWithDebrief(activity.id) },
+                        onOpen = { openActivityId = activity.id },
+                        modifier = animatedItem(reducedMotion),
+                    )
                 }
-                if (planFinished(state)) {
-                    item(key = "day-complete") { DayCompleteCard(animatedItem(reducedMotion)) }
-                }
-                item(key = "plan-header") { PlanHeader(state) }
-                if (state.todayActivities.isEmpty()) {
-                    item(key = "empty-plan") { EmptyPlan() }
-                } else {
-                    val visible = if (showAllActions) ordered else ordered.filter { it.id in collapsedIds }
-                    items(visible, key = { it.id }) { activity ->
-                        PlanRow(
-                            activity = activity,
-                            isNext = activity.id == nextId,
-                            nowMinuteOfDay = nowMinuteOfDay,
-                            calendarIsStub = state.calendarIsStub,
-                            onToggle = { if (activity.status == ActivityStatus.DONE) onUncomplete(activity.id) else completeWithDebrief(activity.id) },
-                            onOpen = { openActivityId = activity.id },
-                            modifier = animatedItem(reducedMotion),
-                        )
-                    }
-                    val extra = ordered.size - collapsedIds.size
-                    if (extra > 0) {
-                        item(key = "show-more") {
-                            ShowMoreToggle(showAllActions, extra) {
-                                // "Show less" is the one explicit collapse: back to the first few + next.
-                                if (showAllActions) keptActionIds = emptySet()
-                                showAllActions = !showAllActions
-                            }
+                val extra = ordered.size - collapsedIds.size
+                if (extra > 0) {
+                    item(key = "show-more") {
+                        ShowMoreToggle(showAllActions, extra) {
+                            // "Show less" is the one explicit collapse: back to the first few + next.
+                            if (showAllActions) keptActionIds = emptySet()
+                            showAllActions = !showAllActions
                         }
                     }
                 }
-                // A pending verdict already explains itself (and the holding plan) on its own card.
-                val why = state.whyToday
-                if (why != null && verdict is MorningVerdict.Ready) {
-                    item(key = "why-today") {
-                        WhyTodayCard(
-                            why = why,
-                            drivers = DRIVERS.mapNotNull { metric -> state.signals.firstOrNull { it.metric == metric } },
-                            onOpenMetric = onOpenMetric,
-                            onOpenRecoveryExplainer = onOpenRecoveryExplainer,
-                        )
-                    }
-                }
-                state.planSafetyBanner?.let { banner -> item(key = "safety-banner") { SafetyBanner(banner, animatedItem(reducedMotion)) } }
-                item(key = "tonight") { TonightCard(bedtime, nowMinuteOfDay, state, onAddAction) }
-                if (state.consistencyFlags.any { it }) {
-                    item(key = "consistency") { ConsistencyCard(state.consistencyFlags) }
-                }
-                if (!state.whoopConnected) {
-                    item(key = "connect-prompt") { ConnectPrompt(state.whoopIsMock, onManageConnections, animatedItem(reducedMotion)) }
-                }
-                if (state.showRemindersOffer) {
-                    item(key = "reminders-offer") { RemindersOffer(onEnableReminders, onDismissRemindersOffer, animatedItem(reducedMotion)) }
+            }
+            // In the two-pane layout the same content lives, expanded, in the pane beside the plan.
+            if (why != null && whyPane == null) {
+                item(key = "why-today") {
+                    WhyTodayCard(
+                        why = why,
+                        drivers = drivers,
+                        onOpenMetric = onOpenMetric,
+                        onOpenRecoveryExplainer = onOpenRecoveryExplainer,
+                    )
                 }
             }
-            item(key = "footer") { WellnessFooter() }
+            state.planSafetyBanner?.let { banner -> item(key = "safety-banner") { SafetyBanner(banner, animatedItem(reducedMotion)) } }
+            item(key = "tonight") { TonightCard(bedtime, nowMinuteOfDay, state, onAddAction) }
+            if (state.consistencyFlags.any { it }) {
+                item(key = "consistency") { ConsistencyCard(state.consistencyFlags) }
+            }
+            if (!state.whoopConnected) {
+                item(key = "connect-prompt") { ConnectPrompt(state.whoopIsMock, onManageConnections, animatedItem(reducedMotion)) }
+            }
+            if (state.showRemindersOffer) {
+                item(key = "reminders-offer") { RemindersOffer(onEnableReminders, onDismissRemindersOffer, animatedItem(reducedMotion)) }
+            }
+        }
+        item(key = "footer") { WellnessFooter() }
+    }
+    PullToRefreshBox(isRefreshing = state.isRefreshing, onRefresh = onRefresh, modifier = Modifier.fillMaxSize()) {
+        if (whyPane != null) {
+            Row(Modifier.align(Alignment.TopCenter).widthIn(max = TWO_PANE_MAX_WIDTH).fillMaxSize()) {
+                LazyColumn(
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    state = listState,
+                    contentPadding = PaddingValues(start = PageGutter, end = Spacing.md, bottom = Spacing.section),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.md),
+                    content = listContent,
+                )
+                WhyTodayPane(
+                    why = whyPane,
+                    drivers = drivers,
+                    onOpenMetric = onOpenMetric,
+                    onOpenRecoveryExplainer = onOpenRecoveryExplainer,
+                    modifier = Modifier.weight(0.7f).fillMaxHeight(),
+                )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.align(Alignment.TopCenter).widthIn(max = LIST_MAX_WIDTH).fillMaxSize(),
+                state = listState,
+                contentPadding = PaddingValues(start = PageGutter, end = PageGutter, bottom = Spacing.section),
+                verticalArrangement = Arrangement.spacedBy(Spacing.md),
+                content = listContent,
+            )
         }
     }
 
@@ -870,46 +913,103 @@ private fun WhyTodayCard(
             enter = if (reducedMotion) EnterTransition.None else expandVertically(tween(Motion.medium)) + fadeIn(tween(Motion.medium)),
             exit = if (reducedMotion) ExitTransition.None else shrinkVertically(tween(Motion.medium)) + fadeOut(tween(Motion.medium)),
         ) {
-            Column(Modifier.padding(start = Spacing.xl, end = Spacing.xl, bottom = Spacing.lg)) {
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                why.reasons.forEach { reason ->
-                    Row(Modifier.padding(top = Spacing.md), verticalAlignment = Alignment.Top) {
-                        Box(
-                            Modifier.padding(top = Spacing.sm).size(6.dp).clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.onSurfaceVariant),
-                        )
-                        Spacer(Modifier.width(Spacing.md))
-                        Text(reason, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-                    }
-                }
-                Text(
-                    why.conclusion,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(top = Spacing.md),
+            WhyTodayDetails(
+                why = why,
+                drivers = drivers,
+                onOpenMetric = onOpenMetric,
+                onOpenRecoveryExplainer = onOpenRecoveryExplainer,
+                modifier = Modifier.padding(start = Spacing.xl, end = Spacing.xl, bottom = Spacing.lg),
+            )
+        }
+    }
+}
+
+/**
+ * "Why today?" as a supporting pane beside the plan on expanded windows: always open, so the
+ * observations, what the plan does about them and the driver tiles sit next to the actions they
+ * explain. It scrolls on its own; the copy is the same engine output as the collapsible card.
+ */
+@Composable
+private fun WhyTodayPane(
+    why: WhyToday,
+    drivers: List<Signal>,
+    onOpenMetric: (MetricType) -> Unit,
+    onOpenRecoveryExplainer: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier
+            .verticalScroll(rememberScrollState())
+            .padding(start = Spacing.md, end = PageGutter, top = Spacing.xxl, bottom = Spacing.section),
+    ) {
+        SpartanCard {
+            Text(
+                stringResource(R.string.today_why_title),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.semantics { heading() },
+            )
+            Text(
+                why.summary,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = Spacing.xs, bottom = Spacing.lg),
+            )
+            WhyTodayDetails(why, drivers, onOpenMetric, onOpenRecoveryExplainer)
+        }
+    }
+}
+
+/**
+ * The body of "Why today?" — the observations behind the plan, what the plan does about them, the
+ * four driver tiles, and a way down to the data — shared by the collapsible card and the pane.
+ */
+@Composable
+private fun WhyTodayDetails(
+    why: WhyToday,
+    drivers: List<Signal>,
+    onOpenMetric: (MetricType) -> Unit,
+    onOpenRecoveryExplainer: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier) {
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        why.reasons.forEach { reason ->
+            Row(Modifier.padding(top = Spacing.md), verticalAlignment = Alignment.Top) {
+                Box(
+                    Modifier.padding(top = Spacing.sm).size(6.dp).clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.onSurfaceVariant),
                 )
-                if (drivers.isNotEmpty()) {
-                    Text(
-                        stringResource(R.string.checkin_drivers),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = Spacing.lg),
-                    )
-                    Column(Modifier.padding(top = Spacing.xs)) {
-                        drivers.chunked(2).forEach { pair ->
-                            Row {
-                                pair.forEach { DriverTile(it, Modifier.weight(1f)) { onOpenMetric(it.metric) } }
-                                if (pair.size == 1) Spacer(Modifier.weight(1f))
-                            }
-                        }
+                Spacer(Modifier.width(Spacing.md))
+                Text(reason, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+            }
+        }
+        Text(
+            why.conclusion,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(top = Spacing.md),
+        )
+        if (drivers.isNotEmpty()) {
+            Text(
+                stringResource(R.string.checkin_drivers),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = Spacing.lg),
+            )
+            Column(Modifier.padding(top = Spacing.xs)) {
+                drivers.chunked(2).forEach { pair ->
+                    Row {
+                        pair.forEach { DriverTile(it, Modifier.weight(1f)) { onOpenMetric(it.metric) } }
+                        if (pair.size == 1) Spacer(Modifier.weight(1f))
                     }
-                }
-                TextButton(onClick = onOpenRecoveryExplainer, modifier = Modifier.padding(top = Spacing.sm)) {
-                    Icon(Icons.AutoMirrored.Outlined.TrendingUp, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(Spacing.sm))
-                    Text(stringResource(R.string.today_why_data), style = MaterialTheme.typography.labelLarge)
                 }
             }
+        }
+        TextButton(onClick = onOpenRecoveryExplainer, modifier = Modifier.padding(top = Spacing.sm)) {
+            Icon(Icons.AutoMirrored.Outlined.TrendingUp, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(Spacing.sm))
+            Text(stringResource(R.string.today_why_data), style = MaterialTheme.typography.labelLarge)
         }
     }
 }

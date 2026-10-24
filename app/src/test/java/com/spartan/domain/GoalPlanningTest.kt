@@ -700,6 +700,27 @@ class GoalPlanningTest {
     }
 
     @Test
+    fun habitProgress_carriesTheRealUncappedCount_outcomeGoalsCarryNone() {
+        // Over the target: the fraction stops at 1, the count does not.
+        val fitness = GoalEngine.progress(goal(GoalType.FITNESS, 3.0), emptyList(), today, trainingSessionsThisWeek = 5)
+        assertEquals(1.0, fitness.fraction, 0.0)
+        assertEquals(5, fitness.sessionsThisWeek)
+        assertEquals("5 of 3 training sessions this week", fitness.summary)
+        val recovery = GoalEngine.progress(goal(GoalType.RECOVERY, 4.0), emptyList(), today, recoverySessionsThisWeek = 6)
+        assertEquals(1.0, recovery.fraction, 0.0)
+        assertEquals(6, recovery.sessionsThisWeek)
+        // Each habit reads its own counter, and nothing logged yet is a real zero.
+        val calm = GoalEngine.progress(goal(GoalType.STRESS_RESILIENCE, 5.0), emptyList(), today, 3, 7, 7)
+        assertEquals(3, calm.sessionsThisWeek)
+        assertEquals(0, GoalEngine.progress(goal(GoalType.FITNESS, 3.0), emptyList(), today, breathworkThisWeek = 4).sessionsThisWeek)
+        // Outcome goals measure a reading, not a count — with or without readings to measure.
+        val sleep = goal(GoalType.SLEEP_RECOVERY, 10.0, baseline = 70.0, start = today - 7)
+        assertNull(GoalEngine.progress(sleep, week(MetricType.SLEEP_PERFORMANCE, 77.0), today, 3, 3, 3).sessionsThisWeek)
+        assertNull(GoalEngine.progress(sleep, emptyList(), today, 3, 3, 3).sessionsThisWeek)
+        assertNull(GoalEngine.progress(goal(GoalType.WEIGHT_LOSS, 6.0, baseline = 80.0), week(MetricType.WEIGHT, 79.0), today).sessionsThisWeek)
+    }
+
+    @Test
     fun habitGoals_measureContextMetrics() {
         assertEquals(MetricType.RESTING_HEART_RATE, GoalEngine.metricFor(GoalType.FITNESS))
         assertEquals(MetricType.RECOVERY_SCORE, GoalEngine.metricFor(GoalType.RECOVERY))

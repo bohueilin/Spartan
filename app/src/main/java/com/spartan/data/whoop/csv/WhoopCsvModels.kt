@@ -18,7 +18,10 @@ data class ParsedWhoopFile(
     val journal: List<WhoopJournalRow> = emptyList(),
 )
 
-/** A row of physiological_cycles.csv. Nullable fields mirror blank cells in the export. */
+/**
+ * A row of physiological_cycles.csv. Nullable fields mirror blank cells in the export — and columns
+ * an export doesn't have at all, such as "Sleep need (min)" in older or trimmed files.
+ */
 data class WhoopCycleRow(
     val cycleStartRaw: String,
     val dateEpochDay: Long,
@@ -33,6 +36,8 @@ data class WhoopCycleRow(
     val sleepDebtHours: Double?,
     val bedMinuteOfDay: Int?,
     val wakeMinuteOfDay: Int?,
+    /** WHOOP's own sleep need for the night, from "Sleep need (min)"; null when blank or absent. */
+    val sleepNeedHours: Double? = null,
 )
 
 /** A row of sleeps.csv (naps included; the merger prefers the main non-nap sleep). */
@@ -46,6 +51,8 @@ data class WhoopSleepRow(
     val sleepDebtHours: Double?,
     val bedMinuteOfDay: Int?,
     val wakeMinuteOfDay: Int?,
+    /** WHOOP's own sleep need for this sleep, from "Sleep need (min)"; null when blank or absent. */
+    val sleepNeedHours: Double? = null,
 )
 
 /** A row of workouts.csv. The date is the calendar day the workout started. */
@@ -83,4 +90,5 @@ fun WhoopCycleEntity.toWhoopSnapshot(): WhoopSnapshot = WhoopSnapshot(
     bedMinuteOfDay = bedMinuteOfDay,
     wakeMinuteOfDay = wakeMinuteOfDay,
     isMock = false,
+    sleepNeedHours = sleepNeedHours,
 )

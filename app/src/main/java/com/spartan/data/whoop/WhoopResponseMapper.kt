@@ -3,11 +3,13 @@ package com.spartan.data.whoop
 import com.spartan.domain.model.WhoopSnapshot
 import java.time.Instant
 import java.time.ZoneId
+import kotlin.math.abs
 
 /**
  * Pure normalization from WHOOP API DTOs to per-day [WhoopSnapshot]s. Recovery, sleep, and cycle
- * records are each keyed by their local date and joined. Kept free of Android/Retrofit types so it
- * is fully unit-testable — this is the single boundary where WHOOP's shape becomes Spartan's model.
+ * records are each keyed by their local date and joined; WHOOP's own sleep need rides on the main
+ * sleep. Kept free of Android/Retrofit types so it is fully unit-testable — this is the single
+ * boundary where WHOOP's shape becomes Spartan's model.
  */
 class WhoopResponseMapper(private val zone: ZoneId = ZoneId.systemDefault()) {
 
@@ -38,6 +40,7 @@ class WhoopResponseMapper(private val zone: ZoneId = ZoneId.systemDefault()) {
                 val awake = s.stageSummary?.totalAwakeMilli ?: 0L
                 if (inBed != null) sleepDurationHours = (inBed - awake).coerceAtLeast(0L) / 3_600_000.0
                 s.sleepNeeded?.needFromSleepDebtMilli?.let { sleepDebtHours = it / 3_600_000.0 }
+                s.sleepNeeded?.let { totalNeedMilli(it) }?.let { sleepNeedHours = it / 3_600_000.0 }
                 // Local bed/wake anchor the scheduling window so nudges never land in sleep.
                 bedMinuteOfDay = minuteOfDay(sl.start) ?: bedMinuteOfDay
                 wakeMinuteOfDay = minuteOfDay(sl.end) ?: wakeMinuteOfDay
@@ -52,6 +55,17 @@ class WhoopResponseMapper(private val zone: ZoneId = ZoneId.systemDefault()) {
             }
         }
         return byDay.values.map { it.build() }
+    }
+
+    /**
+     * The night's whole need: baseline + debt + recent strain, less the recent-nap credit. WHOOP
+     * reports that credit as a reduction (negative in its own docs' example), so its size is taken
+     * off whichever sign it arrives with. Null without a baseline: the add-ons alone are no need.
+     */
+    private fun totalNeedMilli(need: WhoopSleepNeeded): Long? {
+        val baseline = need.baselineMilli ?: return null
+        return baseline + (need.needFromSleepDebtMilli ?: 0L) + (need.needFromRecentStrainMilli ?: 0L) -
+            abs(need.needFromRecentNapMilli ?: 0L)
     }
 
     private fun epochDay(iso: String?): Long? = try {
@@ -80,6 +94,7 @@ class WhoopResponseMapper(private val zone: ZoneId = ZoneId.systemDefault()) {
         var energyKcal: Double? = null
         var bedMinuteOfDay: Int? = null
         var wakeMinuteOfDay: Int? = null
+        var sleepNeedHours: Double? = null
 
         fun build() = WhoopSnapshot(
             dateEpochDay = day,
@@ -95,6 +110,8 @@ class WhoopResponseMapper(private val zone: ZoneId = ZoneId.systemDefault()) {
             bedMinuteOfDay = bedMinuteOfDay,
             wakeMinuteOfDay = wakeMinuteOfDay,
             isMock = false,
+            // Two decimals, like the CSV path: minute-level precision for "8h 10m".
+            sleepNeedHours = sleepNeedHours?.let { kotlin.math.round(it * 100.0) / 100.0 },
         )
     }
 

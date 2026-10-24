@@ -116,6 +116,17 @@ class ReminderScheduler @Inject constructor(
         NotificationManagerCompat.from(context).cancelAll()
     }
 
+    /**
+     * Erasure's second sweep, run once the store is empty: a sync, import or worker that passed its
+     * last erasure check just before the erasure began can still arm a reminder while
+     * [purgeAllForErasure] runs. This cancels it and prunes it from WorkManager's database, where
+     * its title and body would otherwise outlive the erasure.
+     */
+    suspend fun purgeRemindersAfterErasure() {
+        workManager.cancelAllWorkByTag(REMINDER_TAG).await()
+        workManager.pruneWork().await()
+    }
+
     fun hasNotificationPermission(): Boolean {
         return android.os.Build.VERSION.SDK_INT < 33 ||
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED

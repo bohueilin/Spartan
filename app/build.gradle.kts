@@ -121,6 +121,10 @@ dependencies {
 
     implementation("androidx.activity:activity-compose:1.9.3")
     implementation("androidx.compose.material3:material3")
+    // Adaptive navigation (bar on compact, rail from 600dp) and window size classes for Today's
+    // supporting pane; both BOM-managed (nav-suite 1.3.1, adaptive 1.0.0 in compose-bom 2024.12.01).
+    implementation("androidx.compose.material3:material3-adaptive-navigation-suite")
+    implementation("androidx.compose.material3.adaptive:adaptive")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")

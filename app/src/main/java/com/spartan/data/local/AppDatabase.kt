@@ -24,7 +24,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         PressureWindowEntity::class,
         DailyReflectionEntity::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -216,6 +216,14 @@ abstract class AppDatabase : RoomDatabase() {
                     )
                     """.trimIndent(),
                 )
+            }
+        }
+
+        // WHOOP's own sleep need per imported day. Additive: one nullable column, existing rows read
+        // null (no need known) until the next import fills it.
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE whoop_cycles ADD COLUMN sleepNeedHours REAL")
             }
         }
     }

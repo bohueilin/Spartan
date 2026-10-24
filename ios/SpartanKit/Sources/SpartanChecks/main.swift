@@ -32,6 +32,13 @@ run("engine.primedGreenlight") { engine.testPrimedGreenlightsAQualityStrengthSes
 run("engine.poorSleepHygiene") { engine.testPoorSleepAddsSleepHygiene() }; testCount += 1
 run("engine.elevatedRhrCheckIn") { engine.testElevatedRhrTrendAddsCheckIn() }; testCount += 1
 run("engine.clinicianReferral") { try engine.testConcerningRespiratoryRateAddsNonDiagnosticClinicianReferral() }; testCount += 1
+run("engine.referralOnlyOnOwnBaselineDeviation") { try engine.testClinicianReferralFiresOnlyOnDeviationFromTheUsersOwnBaseline() }; testCount += 1
+run("engine.referralNeverOnAbsoluteValue") { engine.testClinicianReferralNeverFiresOnAnAbsoluteValueAlone() }; testCount += 1
+run("engine.referralWaitsForLearningPeriod") { try engine.testClinicianReferralWaitsForTheLearningPeriodBeforeABaselineIsTheUsersUsual() }; testCount += 1
+run("engine.referralLearningPeriodPerBaseline") { try engine.testClinicianReferralNeedsTheLearningPeriodBehindEachBaselineItReads() }; testCount += 1
+run("engine.readinessBaselineNightCounts") { try engine.testReadinessSnapshotFromCountsThePriorNightsBehindEachBaseline() }; testCount += 1
+run("engine.concerningVitalEasyWalk") { try engine.testConcerningVitalGoodRecoveryDayGetsAnEasyWalk() }; testCount += 1
+run("engine.headlineGentleOnPainAndCheckIn") { engine.testHeadlineFollowsTheBandAndStaysGentleOnPainAndCheckInDays() }; testCount += 1
 run("engine.maxActivitiesCap") { engine.testPlanRespectsMaxActivitiesButKeepsRequiredAndReferral() }; testCount += 1
 run("engine.staleFallback") { engine.testStaleDataProducesSafeFallbackPlan() }; testCount += 1
 run("engine.readinessTrends") { try engine.testReadinessSnapshotFromComputesTrendsAndBand() }; testCount += 1
@@ -41,6 +48,7 @@ let eval = CoachingEvalTests()
 run("eval.fullReadinessMatrix") { eval.testEvalInvariantsHoldAcrossFullReadinessMatrix() }; testCount += 1
 run("eval.optionAndTrendVariations") { eval.testEvalInvariantsHoldWithOptionAndTrendVariations() }; testCount += 1
 run("eval.concerningVitalsNeverHard") { eval.testEvalConcerningVitalsNeverGreenlightHardTraining() }; testCount += 1
+run("eval.absoluteValuesNeverCheckIn") { eval.testEvalAbsoluteValuesAloneNeverTriggerTheCheckIn() }; testCount += 1
 run("eval.lowRecoveryAlwaysRequired") { eval.testEvalLowRecoveryAlwaysCarriesARequiredRecoveryAction() }; testCount += 1
 run("eval.capRespected") { eval.testEvalMaxActivitiesRespectedWhenNoRequiredOverflow() }; testCount += 1
 
@@ -76,6 +84,9 @@ run("explainers.allCopySafe") { proj.testEveryUserFacingStringPassesSafetyCheck(
 // --- CoachingGymTests (domain-specific reward eval over the scenario manifest) ---
 let gym = CoachingGymTests()
 run("gym.manifestLargeDeterministicCoversDifficulties") { gym.testManifestIsLargeDeterministicAndCoversEveryDifficulty() }; testCount += 1
+run("gym.specEscalatesOnlyOnOwnBaseline") { gym.testSpecEscalatesOnlyOnDeviationFromTheUsersOwnBaseline() }; testCount += 1
+run("gym.specWaitsForLearningPeriod") { gym.testSpecWaitsForTheLearningPeriodBeforeABaselineIsTheUsersUsual() }; testCount += 1
+run("gym.absoluteThresholdPolicyOverAlarmist") { gym.testAbsoluteThresholdPolicyIsGradedAsOverAlarmist() }; testCount += 1
 run("gym.shippedEngineClearsTheBar") { gym.testShippedRulesEngineClearsTheBar() }; testCount += 1
 run("gym.deterministic") { gym.testGymIsDeterministic() }; testCount += 1
 run("gym.recklessPolicyCrushed") { gym.testRecklessPolicyIsCrushedByTheGraders() }; testCount += 1
@@ -121,6 +132,8 @@ let coach = CoachEnginesTests()
 run("coach.epochDayWeekdayMath") { coach.testEpochDayWeekdayMathMatchesJavaTime() }; testCount += 1
 run("coach.referenceRangesTopFiveAgeSex") { try coach.testReferenceRangesCoverTopFiveAndAdjustByAgeAndSex() }; testCount += 1
 run("coach.referenceRangesCopySafe") { try coach.testReferenceRangesEducationCopyPassesSafetyEngine() }; testCount += 1
+run("coach.referenceRangesCohortPhrase") { try coach.testReferenceRangesCohortPhraseReadsCorrectlyForEveryProfile() }; testCount += 1
+run("coach.referenceRangesHrvNoPopulationNumbers") { try coach.testReferenceRangesHrvHasNoPopulationNumbersAtAnyAge() }; testCount += 1
 run("coach.weightGoalSafeRateAccepted") { coach.testWeightGoalWithin2lbPerWeekIsAccepted() }; testCount += 1
 run("coach.weightGoalCounterOffered") { try coach.testWeightGoalTooFastIsCounterOfferedAtSafeRateNotRefused() }; testCount += 1
 run("coach.sleepGoalValidation") { try coach.testSleepGoal10pctIn3WeeksIsAcceptedAnd30pctIn2WeeksIsAdjusted() }; testCount += 1

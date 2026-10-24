@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Lab results on Insights: neutral, word-first presentation of clinical status. -->
+<resources>
+    <!-- Lead-in for a lab insight's clinician prompts; neutral, never an alert. -->
+    <string name="labs_worth_discussing">Worth discussing with a clinician</string>
+</resources>

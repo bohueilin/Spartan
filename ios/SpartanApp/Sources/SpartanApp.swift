@@ -84,8 +84,10 @@ extension Color {
     static let spartanOutline = spartanDynamic(light: 0x9BADAA, dark: 0x3D4F48)
 
     // Readiness band colors (Tokens.kt SpartanBands), incl. WCAG light-mode variants
-    // (easy/rest darkened so band text passes 4.5:1 on 18%-alpha tinted chips too).
-    static let spartanBandPrimed = spartanDynamic(light: 0x0E7B43, dark: 0x38D07E)
+    // (easy/rest darkened so band text passes 4.5:1 on 18%-alpha tinted chips too; primed is
+    // 0x0B6E3D, not 0x0E7B43: 6.34:1 on white and ~5.1:1 on its own 14% pill tint, where the
+    // old green fell to ~4.4:1 — WCAG relative-luminance ratio, see docs/ACCESSIBILITY.md).
+    static let spartanBandPrimed = spartanDynamic(light: 0x0B6E3D, dark: 0x38D07E)
     static let spartanBandEasy = spartanDynamic(light: 0x7C570E, dark: 0xE7B25A)
     static let spartanBandRest = spartanDynamic(light: 0xA0381D, dark: 0xE67A5A)
 }

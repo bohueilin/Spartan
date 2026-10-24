@@ -55,10 +55,16 @@ data class WhoopStageSummary(
     @SerialName("total_awake_time_milli") val totalAwakeMilli: Long? = null,
 )
 
+/**
+ * WHOOP's sleep-need breakdown. The night's need is baseline + debt + recent strain, less what a
+ * recent nap already covered (WHOOP reports that last part as a reduction).
+ */
 @Serializable
 data class WhoopSleepNeeded(
     @SerialName("baseline_milli") val baselineMilli: Long? = null,
     @SerialName("need_from_sleep_debt_milli") val needFromSleepDebtMilli: Long? = null,
+    @SerialName("need_from_recent_strain_milli") val needFromRecentStrainMilli: Long? = null,
+    @SerialName("need_from_recent_nap_milli") val needFromRecentNapMilli: Long? = null,
 )
 
 // --- /v2/cycle ---

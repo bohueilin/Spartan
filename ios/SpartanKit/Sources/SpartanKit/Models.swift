@@ -129,6 +129,12 @@ public struct WhoopSnapshot: Codable, Equatable {
     }
 }
 
+/// The personal-baseline learning period. Mirrors Android's `SignalEngine.MIN_BASELINE_DAYS`.
+public enum SignalEngine {
+    /// Prior nights a baseline needs before Spartan reads it as the user's usual.
+    public static let minBaselineDays = 5
+}
+
 /// The CoachingEngine input. Wearable-agnostic: built from a `WhoopSnapshot` today plus recent
 /// history via `from(today:history:)`. Carries derived trend deltas and the resolved `band`.
 public struct ReadinessSnapshot: Codable, Equatable {
@@ -147,6 +153,11 @@ public struct ReadinessSnapshot: Codable, Equatable {
     public let trendNotes: [String]
     public let isStale: Bool
     public let isMock: Bool
+    /// Prior nights behind `respiratoryRateBaseline` (0 without one). The clinician check-in reads a
+    /// baseline as "your usual" only from `SignalEngine.minBaselineDays` nights on.
+    public let rrBaselineDays: Int
+    /// Prior nights behind the resting-heart-rate baseline `rhrVsBaseline` is measured from (0 without one).
+    public let rhrBaselineDays: Int
 
     public init(
         dateEpochDay: Int,
@@ -163,7 +174,9 @@ public struct ReadinessSnapshot: Codable, Equatable {
         band: ReadinessBand = .balanced,
         trendNotes: [String] = [],
         isStale: Bool = false,
-        isMock: Bool = false
+        isMock: Bool = false,
+        rrBaselineDays: Int = 0,
+        rhrBaselineDays: Int = 0
     ) {
         self.dateEpochDay = dateEpochDay
         self.recoveryScore = recoveryScore
@@ -180,6 +193,8 @@ public struct ReadinessSnapshot: Codable, Equatable {
         self.trendNotes = trendNotes
         self.isStale = isStale
         self.isMock = isMock
+        self.rrBaselineDays = rrBaselineDays
+        self.rhrBaselineDays = rhrBaselineDays
     }
 
     /// Build a readiness snapshot for `today` using `history` (older snapshots, any order)
@@ -194,9 +209,11 @@ public struct ReadinessSnapshot: Codable, Equatable {
             return values.reduce(0, +) / Double(values.count)
         }
 
+        let rhrPrior = priorSorted.compactMap { $0.restingHeartRate }
+        let rrPrior = priorSorted.compactMap { $0.respiratoryRate }
         let hrvBaseline = average(priorSorted.compactMap { $0.hrvMs })
-        let rhrBaseline = average(priorSorted.compactMap { $0.restingHeartRate })
-        let rrBaseline = average(priorSorted.compactMap { $0.respiratoryRate })
+        let rhrBaseline = average(rhrPrior)
+        let rrBaseline = average(rrPrior)
         let priorStrain = priorSorted.last?.dayStrain
 
         var notes: [String] = []
@@ -232,7 +249,9 @@ public struct ReadinessSnapshot: Codable, Equatable {
             band: ReadinessBand.fromRecovery(today.recoveryScore),
             trendNotes: notes,
             isStale: today.recoveryScore == nil,
-            isMock: today.isMock
+            isMock: today.isMock,
+            rrBaselineDays: rrPrior.count,
+            rhrBaselineDays: rhrPrior.count
         )
     }
 }

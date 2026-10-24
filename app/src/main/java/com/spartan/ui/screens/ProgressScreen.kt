@@ -22,10 +22,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.EventNote
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.EventRepeat
 import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.outlined.PauseCircleOutline
 import androidx.compose.material.icons.outlined.Psychology
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -40,6 +42,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -51,9 +54,12 @@ import com.spartan.R
 import com.spartan.domain.engine.Goal
 import com.spartan.domain.engine.GoalPlanning
 import com.spartan.domain.engine.GoalPreset
+import com.spartan.domain.engine.GoalProgress
 import com.spartan.domain.engine.GoalType
 import com.spartan.domain.engine.PlanConstraints
 import com.spartan.domain.engine.ProjectionEngine
+import com.spartan.domain.engine.StreakSummary
+import com.spartan.domain.engine.Streaks
 import com.spartan.domain.engine.WeeklyDecision
 import com.spartan.domain.model.MetricType
 import com.spartan.ui.components.IconTile
@@ -83,7 +89,8 @@ private val TRENDS = listOf(MetricType.RECOVERY_SCORE, MetricType.HRV_RMSSD, Met
  * Progress: the weekly check-in when one is due, the goal you are working toward, how this week
  * went, where your signals are heading, what your own reflections revealed, and the one thing to
  * focus on next week. Goals are set and changed in [GoalWizardSheet]; a custom goal still opens
- * [GoalSetupSheet]. A trends screen, so it ends with the wellness disclaimer.
+ * [GoalSetupSheet]. A trends screen, so it ends with the wellness disclaimer. Consistency is
+ * forgiving by design (research §4.4): never a big 0, never "streak lost".
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -155,8 +162,11 @@ fun ProgressScreen(
 
             item(key = "week-header") { SectionHeader(stringResource(R.string.progress_this_week)) }
             item(key = "stats") {
+                // A quiet week reads as a start, not a big 0.
+                val activeDays = if (state.consistencyDays7 == 0) stringResource(R.string.more_active_days_starting)
+                else stringResource(R.string.progress_of_seven, state.consistencyDays7)
                 val tiles = buildList {
-                    add(stringResource(R.string.progress_active_days) to stringResource(R.string.progress_of_seven, state.consistencyDays7))
+                    add(stringResource(R.string.progress_active_days) to activeDays)
                     weekAverage(state, MetricType.RECOVERY_SCORE)?.let { add(stringResource(R.string.progress_avg_recovery) to "$it%") }
                     weekAverage(state, MetricType.SLEEP_PERFORMANCE)?.let { add(stringResource(R.string.progress_avg_sleep) to "$it%") }
                     if (review != null) add(stringResource(R.string.review_strength) to review.strengthSessions.toString())
@@ -170,6 +180,10 @@ fun ProgressScreen(
                         }
                     }
                 }
+            }
+            item(key = "consistency") {
+                val streak = remember(state.streakFlags, state.consistencyFlags) { consistencyStreak(state) }
+                ConsistencyCard(streak)
             }
 
             if (review != null) {
@@ -289,6 +303,25 @@ fun ProgressScreen(
     }
 }
 
+/**
+ * The Consistency card's runs, read over the trailing two weeks ([MainUiState.streakFlags]) so a
+ * return after a long gap still finds the earlier active days, and the grace window has the week
+ * before it. Falls back to the seven-day strip until the longer window has loaded.
+ */
+internal fun consistencyStreak(state: MainUiState): StreakSummary =
+    Streaks.summarize(state.streakFlags.ifEmpty { state.consistencyFlags })
+
+/**
+ * A habit goal's weekly ring in words: the real sessions logged this week — uncapped, so 7 of a
+ * 5-session target reads "7 of 5" rather than the ring's full "5 of 5" — and the weekly target.
+ * Null for goals that are not counted in sessions, or whose stored target is not a number.
+ */
+internal fun weeklyRingCount(goal: Goal, progress: GoalProgress): Pair<Int, Int>? {
+    val sessions = progress.sessionsThisWeek ?: return null
+    val target = goal.targetValue.takeIf { it.isFinite() } ?: return null
+    return sessions to target.coerceAtLeast(1.0).roundToInt()
+}
+
 /** Mean of the last seven days of a signal, rounded; null when there is no data this week. */
 private fun weekAverage(state: MainUiState, metric: MetricType): Int? =
     state.signals.firstOrNull { it.metric == metric }?.history?.takeLast(7)?.takeIf { it.isNotEmpty() }?.average()?.roundToInt()
@@ -309,6 +342,44 @@ private fun ReviewList(title: String, lines: List<String>, tone: Tone) {
             Box(Modifier.padding(top = 7.dp).size(6.dp).clip(CircleShape).background(toneColor(tone)))
             Spacer(Modifier.width(Spacing.md))
             Text(line, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+        }
+    }
+}
+
+/**
+ * How steady the last two weeks have been, from [Streaks]: the longest recent run, "back on track"
+ * after a gap, and a note when the built-in grace day kept a run going. Runs only ever grow or
+ * rest — no reset — and an empty window invites the next run, never a "first" one.
+ */
+@Composable
+private fun ConsistencyCard(streak: StreakSummary) {
+    SpartanCard {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconTile(Icons.Outlined.CalendarMonth, MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.width(Spacing.lg))
+            Text(
+                stringResource(R.string.more_consistency_title),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f).semantics { heading() },
+            )
+        }
+        Text(
+            if (streak.longestRun == 0) stringResource(R.string.more_consistency_empty)
+            else pluralStringResource(R.plurals.more_longest_run, streak.longestRun, streak.longestRun),
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(top = Spacing.md),
+        )
+        if (streak.currentRun in 1 until streak.longestRun) {
+            Text(pluralStringResource(R.plurals.more_current_run, streak.currentRun, streak.currentRun), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = Spacing.xs))
+        }
+        if (streak.backOnTrack) {
+            StatusPill(stringResource(R.string.more_back_on_track), Tone.POSITIVE, Modifier.padding(top = Spacing.md))
+            Text(stringResource(R.string.more_back_on_track_body), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(top = Spacing.sm))
+        }
+        if (streak.graceUsed) {
+            Text(stringResource(R.string.more_grace_used), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = Spacing.sm))
         }
     }
 }
@@ -368,12 +439,37 @@ internal fun GoalCard(
                     }
                 }
                 state.goalProgress?.let { p ->
-                    LinearProgressIndicator(
-                        progress = { p.fraction.coerceIn(0.0, 1.0).toFloat() },
-                        modifier = Modifier.fillMaxWidth().padding(top = Spacing.lg).height(8.dp).clip(CircleShape).clearAndSetSemantics {},
-                        trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                        drawStopIndicator = {},
-                    )
+                    val fraction = p.fraction.coerceIn(0.0, 1.0)
+                    val ring = weeklyRingCount(goal, p)
+                    if (ring != null) {
+                        // Habit goals score the week (research §4.4): a decorative ring and the real count in words.
+                        val (sessions, weeklyTarget) = ring
+                        Row(Modifier.padding(top = Spacing.lg), verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(
+                                progress = { fraction.toFloat() },
+                                modifier = Modifier.size(56.dp).clearAndSetSemantics {},
+                                strokeWidth = 6.dp,
+                                trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                strokeCap = StrokeCap.Round,
+                                gapSize = 0.dp,
+                            )
+                            Spacer(Modifier.width(Spacing.lg))
+                            Text(
+                                stringResource(R.string.more_ring_this_week, sessions, weeklyTarget),
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                    } else {
+                        LinearProgressIndicator(
+                            progress = { fraction.toFloat() },
+                            modifier = Modifier.fillMaxWidth().padding(top = Spacing.lg).height(8.dp).clip(CircleShape).clearAndSetSemantics {},
+                            trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                            drawStopIndicator = {},
+                        )
+                    }
+                    // Under either: for a habit goal the summary adds what is counted and the body-signal context.
                     Text(p.summary, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = Spacing.sm))
                 }
                 FlowRow(Modifier.padding(top = Spacing.xs), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {

@@ -39,7 +39,9 @@ class ReviewEngine(
             // Only score adherence when there were sessions to adhere to: 0% out of nothing is the
             // absence of data, not a shortfall, and must never be reported back as one.
             if (recentLogs.isNotEmpty() && adherence < 60) add("Adherence was below 60%; reduce friction next week.")
-            if (glucose != null && glucose > 99.0) add("Fasting glucose remains worth tracking and discussing if repeated.")
+            // Nothing here is triggered by a clinical cut-off alone (no "glucose > 99" line): this list
+            // is about the user's own week — sessions and pain. A lab value's clinical status is
+            // stated, neutrally and in words, on its Insights card with the clinician prompt.
             if (recentLogs.any { it.painFlag }) add("Pain was reported; avoid progression until resolved.")
         }
         // WHOOP dates each night's sleep by its local wake-up day, so the reading on day D is the night before D.

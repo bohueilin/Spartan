@@ -47,7 +47,7 @@ Status: authoritative as of the Spartan rebrand/pivot from the as-found **Vital 
 ## 3. Domain models (canonical fields)
 
 - **`WhoopSnapshot`** — WHOOP-layer normalized data for one day + short history: `dateEpochDay: Long`, `recoveryScore: Int?`, `hrvMs: Double?`, `restingHeartRate: Double?`, `sleepPerformance: Int?`, `sleepDurationHours: Double?`, `sleepDebtHours: Double?`, `respiratoryRate: Double?`, `dayStrain: Double?`, `energyKcal: Double?`, `isMock: Boolean`.
-- **`ReadinessSnapshot`** — engine input (wearable-agnostic): `recoveryScore: Int?`, `hrvMs: Double?`, `hrvVsBaseline: Double?`, `restingHeartRate: Double?`, `rhrVsBaseline: Double?`, `sleepPerformance: Int?`, `sleepDebtHours: Double?`, `dayStrainPrior: Double?`, `respiratoryRate: Double?`, `band: ReadinessBand`, `trendNotes: List<String>`, `isStale: Boolean`, `isMock: Boolean`. Built by `ReadinessSnapshot.from(today, history)`.
+- **`ReadinessSnapshot`** — engine input (wearable-agnostic): `recoveryScore: Int?`, `hrvMs: Double?`, `hrvVsBaseline: Double?`, `restingHeartRate: Double?`, `rhrVsBaseline: Double?`, `sleepPerformance: Int?`, `sleepDebtHours: Double?`, `dayStrainPrior: Double?`, `respiratoryRate: Double?`, `respiratoryRateBaseline: Double?`, `band: ReadinessBand`, `trendNotes: List<String>`, `isStale: Boolean`, `isMock: Boolean`, `rrBaselineDays: Int`, `rhrBaselineDays: Int` (prior nights behind each baseline; see §8). Built by `ReadinessSnapshot.from(today, history)`.
 - **`DailyActivity`** — `id: String`, `title: String`, `category: ActivityCategory`, `priority: ActivityPriority`, `whyItMatters: String`, `relatedMetric: MetricType?`, `instructions: List<String>`, `estimatedMinutes: Int`, `intensity: Intensity`, `bestTimeOfDay: TimeOfDay`, `status: ActivityStatus`, `ruleId: String`, `scheduledEpochMinute: Long?`, `completedAtMillis: Long?`, `snoozedUntilMillis: Long?`, `safetyNote: String?`.
 - **`DailyPlan`** — `dateEpochDay: Long`, `headline: String`, `band: ReadinessBand`, `activities: List<DailyActivity>`, `totalEstimatedMinutes: Int`, `safetyBanner: String?`, `isMock: Boolean`.
 - **`TimeWindow`** — `startEpochMinute: Long`, `endEpochMinute: Long`.
@@ -117,7 +117,7 @@ CSV import rows; normalized readings still land in `metric_entries`) · **6 → 
 
 ## 7. Rule IDs (provenance carried on each `DailyActivity.ruleId`)
 
-`LOW_RECOVERY`, `POOR_SLEEP`, `HIGH_STRAIN_LOW_RECOVERY`, `LOW_HRV_TREND`, `ELEVATED_RHR_TREND`, `MISSED_GOAL`, `GOOD_RECOVERY_GREENLIGHT`, `PAIN_DELOAD`, `HYDRATION_BASELINE`, `STALE_DATA_FALLBACK`, `CLINICIAN_REFERRAL`.
+`LOW_RECOVERY`, `POOR_SLEEP`, `HIGH_STRAIN_LOW_RECOVERY`, `LOW_HRV_TREND`, `ELEVATED_RHR_TREND`, `MISSED_GOAL`, `GOOD_RECOVERY_GREENLIGHT`, `PAIN_DELOAD`, `HYDRATION_BASELINE`, `STALE_DATA_FALLBACK`, `CLINICIAN_REFERRAL`, `CONCERNING_VITAL_EASY` (the easy walk on a good-recovery check-in day).
 
 ## 7a. As-built API signatures (authoritative — matches shipped `com.spartan` code)
 
@@ -156,4 +156,6 @@ Note: the Architecture doc's earlier "WhoopClient returns raw DTOs / busyBlocks(
 
 ## 8. Safety (reused `SafetyEngine`)
 
-All generated coaching copy passes `SafetyEngine.sanitize(...)`. No diagnosis / no medical claims / wellness framing. Concerning vitals (very low HRV, very high RHR, respiratory-rate spike) emit a `CLINICIAN_REFERRAL` activity that recommends seeing a qualified clinician — never a diagnosis. Existing blocked phrases remain enforced.
+All generated coaching copy passes `SafetyEngine.sanitize(...)`. No diagnosis / no medical claims / wellness framing. Existing blocked phrases remain enforced.
+
+The clinician check-in (`CLINICIAN_REFERRAL`) is a deviation from the user's **own** baseline, never an absolute threshold. It fires when resting heart rate is ≥ +10 bpm or respiratory rate is ≥ +3 breaths a minute over the user's baseline. A population cut-off ("100 bpm", "25 breaths") never triggers it, because a clinical reference used as an alert would read as a diagnosis. A baseline counts as "your usual" only after a **5-day learning period**: at least `SignalEngine.MIN_BASELINE_DAYS` (5) prior nights behind it (`ReadinessSnapshot.rrBaselineDays` / `rhrBaselineDays`). That matches when Insights stops showing a signal as "learning". The card is a REQUIRED "Check in with how you feel" activity. It says one reading is not a diagnosis and suggests a qualified clinician if readings stay unusual or symptoms appear. On a PRIMED or BALANCED day it also turns the band session into an easy 15-minute walk (`CONCERNING_VITAL_EASY`) and makes the headline the gentle line. Android and iOS (`SpartanKit`) share this rule.

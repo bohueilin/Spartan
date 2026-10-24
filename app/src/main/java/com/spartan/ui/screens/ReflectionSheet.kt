@@ -37,14 +37,17 @@ import com.spartan.ui.theme.Spacing
  * The optional end-of-day reflection: how the day felt, in one tap, with an optional line of the
  * user's own words. Deliberately not a score and not a prompt to do better — the three moods are
  * neutral peers, and dismissing costs nothing. Offered at most once a day, in-app only.
+ * [initialMood] (the last saved answer) comes pre-selected, so an unchanged day is one tap on Save
+ * (research §4.4: use your previous answer, change what's different).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReflectionSheet(
     onSave: (ReflectionMood, String) -> Unit,
     onDismiss: () -> Unit,
+    initialMood: ReflectionMood? = null,
 ) {
-    var mood by rememberSaveable { mutableStateOf<ReflectionMood?>(null) }
+    var mood by rememberSaveable { mutableStateOf(initialMood) }
     var note by rememberSaveable { mutableStateOf("") }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
@@ -83,6 +86,13 @@ fun ReflectionSheet(
                     selected = mood == ReflectionMood.STRONG,
                     onSelect = { mood = ReflectionMood.STRONG },
                     modifier = Modifier.weight(1f),
+                )
+            }
+            if (initialMood != null && mood == initialMood) {
+                Text(
+                    stringResource(R.string.more_reflection_prefilled),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             OutlinedTextField(

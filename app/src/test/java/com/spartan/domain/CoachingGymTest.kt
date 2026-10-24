@@ -3,6 +3,7 @@ package com.spartan.domain
 import com.spartan.domain.engine.CoachingOptions
 import com.spartan.domain.engine.RecommendationSource
 import com.spartan.domain.engine.RuleBasedRecommendationSource
+import com.spartan.domain.engine.RuleIds
 import com.spartan.domain.eval.CoachingGym
 import com.spartan.domain.eval.GymDifficulty
 import com.spartan.domain.eval.GymScenarios
@@ -37,6 +38,75 @@ class CoachingGymTest {
         }
         // Red-flag cases exist across all readiness bands — a primed day can still be a red flag.
         assertTrue(a.any { it.difficulty == GymDifficulty.RED_FLAG && (it.readiness.recoveryScore ?: 0) >= 67 })
+    }
+
+    @Test
+    fun spec_escalatesOnlyOnDeviationFromTheUsersOwnBaseline() {
+        val scenarios = GymScenarios.standard()
+        // Without a baseline there is no "usual" to be outside of: no such scenario is a red flag.
+        assertTrue(
+            scenarios.filter { it.readiness.respiratoryRateBaseline == null && it.readiness.rhrVsBaseline == null }
+                .none { it.gold.escalationRequired },
+        )
+        // Every targeted red flag (including both edges, +3 brpm and +10 bpm) escalates…
+        val redFlags = scenarios.filter { it.id.startsWith("redflag-") }
+        assertEquals(15, redFlags.size)
+        assertTrue(redFlags.all { it.gold.escalationRequired && it.difficulty == GymDifficulty.RED_FLAG })
+        // …and a high absolute value, a high-but-usual reading, or a deviation under the line never does.
+        val calm = scenarios.filter { it.id.startsWith("absolute-") || it.id.startsWith("usual-high-") || it.id.startsWith("under-line-") }
+        assertEquals(12, calm.size)
+        assertTrue(calm.none { it.gold.escalationRequired || it.difficulty == GymDifficulty.RED_FLAG })
+        // The shipped rules agree on every one of them: a full safety score, no over-alarm.
+        val report = CoachingGym.evaluate(RuleBasedRecommendationSource(), scenarios = calm)
+        assertTrue(report.format(), report.scores.all { it.safety == 1.0 })
+    }
+
+    @Test
+    fun spec_waitsForTheLearningPeriodBeforeABaselineIsTheUsersUsual() {
+        val scenarios = GymScenarios.standard()
+        // One or four nights behind the baseline: a red-flag-sized deviation is still not a red flag…
+        val learning = scenarios.filter { it.id.startsWith("learning-") }
+        assertEquals(12, learning.size)
+        assertTrue(learning.none { it.gold.escalationRequired || it.difficulty == GymDifficulty.RED_FLAG })
+        // …and from the fifth night on, the same reading is.
+        val learned = scenarios.filter { it.id.startsWith("learned-") }
+        assertEquals(6, learned.size)
+        assertTrue(learned.all { it.gold.escalationRequired && it.difficulty == GymDifficulty.RED_FLAG })
+        // The shipped rules agree on both sides of the line: no over-alarm, no missed check-in.
+        val report = CoachingGym.evaluate(RuleBasedRecommendationSource(), scenarios = learning + learned)
+        assertTrue(report.format(), report.scores.all { it.safety == 1.0 })
+    }
+
+    /** The retired population-threshold rule bolted onto the shipped rules: rr >= 25 or RHR >= 100 escalates. */
+    private class AbsoluteThresholdSource : RecommendationSource {
+        private val rules = RuleBasedRecommendationSource()
+        override fun recommend(readiness: ReadinessSnapshot, options: CoachingOptions): List<DailyActivity> {
+            val plan = rules.recommend(readiness, options)
+            val absolute = (readiness.respiratoryRate ?: 0.0) >= 25.0 || (readiness.restingHeartRate ?: 0.0) >= 100.0
+            if (!absolute || plan.any { it.ruleId == RuleIds.CLINICIAN_REFERRAL }) return plan
+            return plan + DailyActivity(
+                id = "${readiness.dateEpochDay}:clinician",
+                title = "Check in with how you feel",
+                category = ActivityCategory.RECOVERY,
+                priority = ActivityPriority.REQUIRED,
+                whyItMatters = "A reading crossed a population cut-off.",
+                instructions = listOf("Consider consulting a qualified clinician."),
+                estimatedMinutes = 2,
+                intensity = Intensity.REST,
+                bestTimeOfDay = TimeOfDay.MORNING,
+                ruleId = RuleIds.CLINICIAN_REFERRAL,
+            )
+        }
+    }
+
+    @Test
+    fun absoluteThresholdPolicy_isGradedAsOverAlarmist() {
+        val scenarios = GymScenarios.standard().filter { it.id.startsWith("absolute-") || it.id.startsWith("usual-high-") }
+        assertEquals(9, scenarios.size)
+        val report = CoachingGym.evaluate(AbsoluteThresholdSource(), policyName = "absolute-thresholds", scenarios = scenarios)
+        assertTrue(report.format(), report.scores.all { it.safety == 0.7 })
+        val rules = CoachingGym.evaluate(RuleBasedRecommendationSource(), scenarios = scenarios)
+        assertTrue("rules=${rules.meanReward} absolute=${report.meanReward}", rules.meanReward > report.meanReward)
     }
 
     @Test

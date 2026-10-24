@@ -39,6 +39,8 @@ public enum RuleIds {
     public static let hydrationBaseline = "HYDRATION_BASELINE"
     public static let staleDataFallback = "STALE_DATA_FALLBACK"
     public static let clinicianReferral = "CLINICIAN_REFERRAL"
+    /// The easy walk that stands in for the band session on a good-recovery day with a concerning vital.
+    public static let concerningVitalEasy = "CONCERNING_VITAL_EASY"
 }
 
 /// Transparent, rules-based daily coaching. Every rule is small, named (see `DailyActivity.ruleId`),
@@ -46,8 +48,9 @@ public enum RuleIds {
 /// generated text can make a medical claim or unsafe recommendation.
 ///
 /// Guidance is framed as wellness / fitness / recovery / habit support — never diagnosis. When a
-/// metric looks potentially concerning, the engine adds a `RuleIds.clinicianReferral` activity that
-/// recommends seeing a qualified clinician rather than interpreting the value.
+/// vital moves well outside the user's own usual range (never on a population cut-off alone), the
+/// engine adds a `RuleIds.clinicianReferral` activity that recommends seeing a qualified clinician
+/// rather than interpreting the value.
 public final class CoachingEngine {
     private let source: RecommendationSource
     private let safetyEngine: SafetyEngine
@@ -68,7 +71,7 @@ public final class CoachingEngine {
         let activities = prioritizeAndCap(raw, maxActivities: options.maxActivities)
         let plan = DailyPlan(
             dateEpochDay: readiness.dateEpochDay,
-            headline: headlineFor(readiness),
+            headline: headlineFor(readiness, activities: activities),
             band: readiness.band,
             activities: activities,
             safetyBanner: safetyBannerFor(readiness),
@@ -130,9 +133,13 @@ public final class CoachingEngine {
             .map { $0.element }
     }
 
-    private func headlineFor(_ readiness: ReadinessSnapshot) -> String {
+    private func headlineFor(_ readiness: ReadinessSnapshot, activities: [DailyActivity]) -> String {
         if readiness.isStale {
             return "Let's ease in while Spartan waits for today's data."
+        }
+        // A pain or check-in day never gets "make today count" — the plan on it stays gentle.
+        if activities.contains(where: { $0.ruleId == RuleIds.painDeload || $0.ruleId == RuleIds.clinicianReferral }) {
+            return "Take it gently today and notice how you feel."
         }
         switch readiness.band {
         case .primed: return "You're primed. Make today count."
@@ -175,11 +182,16 @@ public final class RuleBasedRecommendationSource: RecommendationSource {
             switch readiness.band {
             case .rest, .easy:
                 out.append(contentsOf: lowRecoveryBlock(readiness, day: day))
-            case .primed:
-                // A concerning vital suppresses hard training even on a primed day — safety over strain.
-                out.append(contentsOf: concerning ? balancedSession(readiness, day: day) : greenlight(readiness, day: day))
-            case .balanced:
-                out.append(contentsOf: balancedSession(readiness, day: day))
+            case .primed, .balanced:
+                // A concerning vital takes even a primed day down to an easy walk — safety over strain —
+                // so the check-in's "take it easy" matches the session planned.
+                if concerning {
+                    out.append(easyCheckInSession(day))
+                } else if readiness.band == .primed {
+                    out.append(contentsOf: greenlight(readiness, day: day))
+                } else {
+                    out.append(contentsOf: balancedSession(readiness, day: day))
+                }
             }
         }
 
@@ -255,6 +267,18 @@ public final class RuleBasedRecommendationSource: RecommendationSource {
                              "Finish feeling like you could keep going."],
                      minutes: 25, intensity: .moderate, time: .afternoon, note: nil),
         ]
+    }
+
+    /// The day's only session when a vital is outside the user's usual on a good-recovery day.
+    private func easyCheckInSession(_ day: Int) -> DailyActivity {
+        activity(day, "zone2-walk", "15-minute easy walk", .zone2,
+                 .recommended, RuleIds.concerningVitalEasy, .recoveryScore,
+                 why: "A reading is outside your usual range today, so easy movement keeps you active without adding strain.",
+                 steps: ["Walk at a conversational pace.",
+                         "Keep effort easy — you should be able to talk.",
+                         "Stop and rest if you feel unwell."],
+                 minutes: 15, intensity: .easy, time: .midday,
+                 note: "Skip hard training today and notice how you feel.")
     }
 
     private func greenlight(_ r: ReadinessSnapshot, day: Int) -> [DailyActivity] {
@@ -348,22 +372,32 @@ public final class RuleBasedRecommendationSource: RecommendationSource {
                  minutes: 10, intensity: .easy, time: .anytime, note: nil)
     }
 
-    /// Emit a non-diagnostic clinician-referral nudge when a vital looks potentially concerning.
-    /// Never states a cause or diagnosis — only recommends professional guidance.
+    /// Breaths a minute over the user's own baseline that put respiratory rate outside their usual.
+    private static let respAboveUsualBrpm = 3.0
+    /// Beats a minute over the user's own baseline that put resting heart rate outside their usual.
+    private static let rhrAboveUsualBpm = 10.0
+
+    /// Emit a non-diagnostic "check in with how you feel" nudge when a vital moves well away from
+    /// the user's OWN usual: respiratory rate `respAboveUsualBrpm` or more over their baseline, or
+    /// resting heart rate `rhrAboveUsualBpm` or more over theirs. Never on an absolute value alone
+    /// — a population cut-off ("25 breaths", "100 bpm") would be a clinical threshold used as an
+    /// alert, and without a baseline there is no "usual" to be outside of. A baseline counts only
+    /// once `SignalEngine.minBaselineDays` prior nights stand behind it — the learning period the
+    /// rest of the app uses before it calls anything "your normal". Never states a cause or
+    /// diagnosis — only recommends professional guidance. Mirrors Android's `clinicianReferral`.
     private func clinicianReferral(_ r: ReadinessSnapshot, day: Int) -> DailyActivity? {
         var respHigh = false
-        if let resp = r.respiratoryRate {
-            if resp >= 25.0 {
-                respHigh = true
-            } else if let baseline = r.respiratoryRateBaseline, resp - baseline >= 3.0 {
-                respHigh = true
-            }
+        if let resp = r.respiratoryRate, let baseline = r.respiratoryRateBaseline,
+           r.rrBaselineDays >= SignalEngine.minBaselineDays,
+           resp - baseline >= Self.respAboveUsualBrpm {
+            respHigh = true
         }
-        var rhrVeryHigh = false
-        if let rhr = r.restingHeartRate, rhr >= 100.0 {
-            rhrVeryHigh = true
+        var rhrHigh = false
+        if let delta = r.rhrVsBaseline, r.rhrBaselineDays >= SignalEngine.minBaselineDays,
+           delta >= Self.rhrAboveUsualBpm {
+            rhrHigh = true
         }
-        if !respHigh && !rhrVeryHigh { return nil }
+        if !respHigh && !rhrHigh { return nil }
         let metric: MetricType = respHigh ? .respiratoryRate : .restingHeartRate
         return activity(day, "clinician", "Check in with how you feel", .recovery,
                         .required, RuleIds.clinicianReferral, metric,

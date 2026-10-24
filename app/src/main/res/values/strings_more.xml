@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- You, Connections, Diagnostics, Progress and the reflection sheet. Calm, honest, never shaming. -->
+<resources>
+    <!-- You: display preferences -->
+    <string name="more_section_display">Display</string>
+    <string name="more_calmer_theme">Calmer theme</string>
+    <string name="more_calmer_theme_body">Quieter colours and no celebration motion</string>
+    <!-- With Wallpaper colours on, the wallpaper palette wins: only the motion half of the calmer theme applies. -->
+    <string name="more_calmer_theme_body_wallpaper">No celebration motion · colours come from your wallpaper</string>
+    <string name="more_wallpaper_colours">Wallpaper colours</string>
+    <string name="more_wallpaper_colours_body">Use colours from your wallpaper</string>
+
+    <!-- Connections + Diagnostics: the WHOOP export contract, in plain language (research §2.2, §6.2) -->
+    <string name="more_export_title">How a WHOOP export works</string>
+    <string name="more_export_step_request">In the WHOOP app, go to More → Data Export and request an export.</string>
+    <string name="more_export_step_email">WHOOP emails you a download link, usually within 24 hours. The link expires after 7 days.</string>
+    <string name="more_export_step_limit">You can request one export every 24 hours.</string>
+    <string name="more_export_step_reads">Unzip the download, then pick its CSV files here. Spartan reads cycles, sleeps, workouts and journal entries only, and keeps them on this device.</string>
+    <string name="more_export_missing_title">What a WHOOP export doesn\'t include</string>
+    <string name="more_export_missing_hr">No live heart-rate timeline, only daily and per-workout summaries</string>
+    <string name="more_export_missing_strength">No Strength Trainer workouts</string>
+    <string name="more_export_missing_steps">No steps — Spartan doesn\'t read steps from a WHOOP export</string>
+    <!-- Freshness stamp: only a CSV import stamps a time, so it always reads "Imported". -->
+    <string name="more_fresh_imported">Imported %1$s, %2$s</string>
+    <string name="more_fresh_imported_through">Imported %1$s, %2$s · data through %3$s</string>
+    <string name="more_diagnostics_import_header">WHOOP import</string>
+    <string name="more_diagnostics_no_import">No WHOOP import stamped yet.</string>
+
+    <!-- Progress: weekly rings and forgiving consistency (research §4.4). Never a big 0, never "streak lost".
+         Runs are read over the last two weeks, so their copy never says "this week" or "first". -->
+    <string name="more_active_days_starting">Starting this week</string>
+    <string name="more_ring_this_week">%1$d of %2$d this week</string>
+    <string name="more_consistency_title">Consistency</string>
+    <plurals name="more_longest_run">
+        <item quantity="one">Longest recent run: %1$d day</item>
+        <item quantity="other">Longest recent run: %1$d days</item>
+    </plurals>
+    <plurals name="more_current_run">
+        <item quantity="one">Current run: %1$d day</item>
+        <item quantity="other">Current run: %1$d days</item>
+    </plurals>
+    <string name="more_back_on_track">Back on track</string>
+    <string name="more_back_on_track_body">Today picks up where you left off. Your earlier days still count.</string>
+    <string name="more_grace_used">A missed day didn\'t break your run. One a week is built in.</string>
+    <string name="more_consistency_empty">Your next run starts with one activity on Today.</string>
+
+    <!-- Reflection: pre-filled from the last answer, so it takes one tap -->
+    <string name="more_reflection_prefilled">Pre-selected from your last answer. Change it if today felt different.</string>
+</resources>

@@ -28,7 +28,7 @@ The palette is already defined in code (`ui/theme/Theme.kt`, `Tokens.kt`) and du
 | Surface | `#121817` | `#FFFFFF` | Cards |
 | Outline | `#3D4F48` | `#9BADAA` | Borders, ring track |
 | Accent (teal) | `#3FE0C8` | `#0B685C` | The one accent. Primary actions, brand. |
-| Primed (green) | `#38D07E` | `#0E7B43` | High readiness |
+| Primed (green) | `#38D07E` | `#0B6E3D` | High readiness |
 | Easy (amber) | `#E7B25A` | `#7C570E` | Medium readiness |
 | Rest (ember) | `#E67A5A` | `#A0381D` | Low readiness |
 | Ink | `#EAF1EF` | `#11201E` | Primary text |

@@ -53,7 +53,6 @@ import com.spartan.domain.engine.StrainZone
 import com.spartan.domain.engine.SuggestedAction
 import com.spartan.domain.engine.Trend
 import com.spartan.domain.engine.formatHoursMinutes
-import com.spartan.domain.model.ClinicalStatus
 import com.spartan.domain.model.InsightCard
 import com.spartan.domain.model.MetricAssessment
 import com.spartan.domain.model.MetricType
@@ -70,6 +69,7 @@ import com.spartan.ui.components.WellnessFooter
 import com.spartan.ui.components.metricIcon
 import com.spartan.ui.components.toneColor
 import com.spartan.ui.theme.Spacing
+import com.spartan.ui.theme.rememberReducedMotion
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
@@ -415,14 +415,16 @@ internal fun ActionLine(action: SuggestedAction, planned: Boolean, onAdd: () -> 
     }
 }
 
+/**
+ * One lab or body-metric entry — a manual blood-pressure reading included. The clinical status is
+ * said in words on the pill, and every row keeps the same NEUTRAL tone whatever that status is:
+ * colouring an above-range value amber (or an in-range one green) would turn a clinical reference
+ * range into an alert.
+ */
 @Composable
 private fun LabRow(assessment: MetricAssessment, onOpenMetric: (MetricType) -> Unit) {
     val type = assessment.reading.type
-    val tone = when (assessment.clinicalStatus) {
-        ClinicalStatus.NORMAL -> Tone.POSITIVE
-        ClinicalStatus.ABOVE_RANGE, ClinicalStatus.BELOW_RANGE -> Tone.CAUTION
-        ClinicalStatus.PENDING, ClinicalStatus.UNKNOWN -> Tone.NEUTRAL
-    }
+    val tone = Tone.NEUTRAL
     SpartanCard(onClick = { onOpenMetric(type) }, onClickLabel = stringResource(R.string.checkin_open_metric, type.label)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconTile(metricIcon(type), toneColor(tone))
@@ -440,12 +442,18 @@ private fun LabRow(assessment: MetricAssessment, onOpenMetric: (MetricType) -> U
     }
 }
 
-/** A lab-derived insight: the headline shows, the reasoning and safe actions open on tap. */
+/**
+ * A lab-derived insight: the headline shows, the reasoning, safe actions and what is worth
+ * discussing with a clinician open on tap. All in neutral text colours — the explanation states
+ * the clinical status in words, never as an alert colour.
+ */
 @Composable
 private fun LabInsight(card: InsightCard) {
     var open by rememberSaveable(card.title) { mutableStateOf(false) }
+    // An expand is movement: it snaps open under reduced motion or the calmer theme.
+    val reducedMotion = rememberReducedMotion()
     SpartanCard(
-        modifier = Modifier.animateContentSize(),
+        modifier = if (reducedMotion) Modifier else Modifier.animateContentSize(),
         onClick = { open = !open },
         onClickLabel = stringResource(if (open) R.string.insights_show_less else R.string.insights_read_more),
     ) {
@@ -455,6 +463,17 @@ private fun LabInsight(card: InsightCard) {
             Text(card.whyItMatters, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(top = Spacing.md))
             card.safeActions.forEach {
                 Text("•  $it", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(top = Spacing.xs))
+            }
+            if (card.clinicianTriggers.isNotEmpty()) {
+                Text(
+                    stringResource(R.string.labs_worth_discussing),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = Spacing.md),
+                )
+                card.clinicianTriggers.forEach {
+                    Text("•  $it", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(top = Spacing.xs))
+                }
             }
         } else {
             Text(stringResource(R.string.insights_read_more), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = Spacing.sm))

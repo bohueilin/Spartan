@@ -33,8 +33,13 @@ class MainActivity : ComponentActivity() {
         // Edge-to-edge with system-managed bar contrast (fixes forced-light bars in dark theme).
         enableEdgeToEdge()
         setContent {
-            SpartanTheme {
-                val viewModel: MainViewModel = hiltViewModel()
+            // Activity-scoped, so it survives rotation and other recreations (SpartanRoot gets this
+            // same instance). The display settings come from its already-filled state, not a fresh
+            // flow starting at false, so the first frame after a recreation is already calm and in
+            // the right colours; a change made on You restyles at once.
+            val viewModel: MainViewModel = hiltViewModel()
+            val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+            SpartanTheme(calmer = uiState.calmerTheme, wallpaperColours = uiState.wallpaperColours) {
                 val notificationLauncher = rememberLauncherForActivityResult(
                     ActivityResultContracts.RequestPermission(),
                 ) { granted -> viewModel.setNotificationDenied(!granted) }
@@ -43,7 +48,6 @@ class MainActivity : ComponentActivity() {
                 }
                 // In-app review at positive moments only (rate-limited in the ViewModel); the Play
                 // API decides whether a dialog is actually shown.
-                val uiState by viewModel.uiState.collectAsStateWithLifecycle()
                 LaunchedEffect(uiState.requestReview) {
                     if (uiState.requestReview) {
                         val manager = ReviewManagerFactory.create(this@MainActivity)

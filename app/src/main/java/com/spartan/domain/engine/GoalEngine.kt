@@ -69,6 +69,12 @@ data class GoalProgress(
     val timeFraction: Double,
     val onTrack: Boolean,
     val summary: String,
+    /**
+     * Habit goals (STRESS_RESILIENCE, FITNESS, RECOVERY): the sessions done this week, uncapped —
+     * [fraction] stops at 1, this does not, so a 5-session week against a target of 3 reads "5 of 3".
+     * Null for outcome goals, which measure a reading rather than a count.
+     */
+    val sessionsThisWeek: Int? = null,
 )
 
 object GoalEngine {
@@ -206,6 +212,7 @@ object GoalEngine {
                 onTrack = fraction >= 0.5 || timeFraction < 0.2,
                 summary = "$sessionsThisWeek of ${weeklyTarget.toInt()} ${habitNoun(goal.type)} this week" +
                     contextNote(goal, readings, todayEpochDay),
+                sessionsThisWeek = sessionsThisWeek,
             )
         }
 
