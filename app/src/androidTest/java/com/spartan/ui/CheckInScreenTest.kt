@@ -3,9 +3,11 @@ package com.spartan.ui
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -14,6 +16,7 @@ import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.compose.ui.unit.dp
@@ -47,10 +50,25 @@ class CheckInScreenTest {
 
     private val activityCheckbox = SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Checkbox)
 
+    /**
+     * Today is a lazy list: on a short screen (CI's default emulator is one) the plan starts below the
+     * verdict card's fold, and rows below the fold are not composed until scrolled to. Scroll the list
+     * to what a test asserts instead of assuming it is on screen. False until the list and the node
+     * exist, so it can be polled while the first sync settles.
+     */
+    private fun scrollTodayTo(matcher: SemanticsMatcher): Boolean = runCatching {
+        composeRule.onAllNodes(hasScrollAction()).onFirst().performScrollToNode(matcher)
+    }.isSuccess
+
+    // 20s: the first sync after a cold install is slow on a software-rendered CI emulator.
     private fun awaitTodaysPlan() {
-        composeRule.waitUntil(10_000) {
-            composeRule.onAllNodesWithText("Today's plan").fetchSemanticsNodes().isNotEmpty()
-        }
+        composeRule.waitUntil(20_000) { scrollTodayTo(hasText("Today's plan")) }
+    }
+
+    /** The first activity's checkbox, scrolled into view. */
+    private fun firstActivityCheckbox(): SemanticsNodeInteraction {
+        composeRule.waitUntil(20_000) { scrollTodayTo(activityCheckbox) }
+        return composeRule.onAllNodes(activityCheckbox).onFirst()
     }
 
     private fun completeOnboardingIfShown() {
@@ -71,9 +89,7 @@ class CheckInScreenTest {
         // Honesty requirement: mock mode must be visibly labeled.
         composeRule.onAllNodesWithText("SAMPLE DATA").onFirst().assertExists()
         // The plan is non-empty: at least one activity checkbox exists.
-        composeRule.waitUntil(10_000) {
-            composeRule.onAllNodes(activityCheckbox).fetchSemanticsNodes().isNotEmpty()
-        }
+        firstActivityCheckbox().assertExists()
     }
 
     @Test
@@ -81,7 +97,7 @@ class CheckInScreenTest {
         completeOnboardingIfShown()
         awaitTodaysPlan()
         // Open the first activity's sheet (its card carries the title as text) and skip it.
-        val title = composeRule.onAllNodes(activityCheckbox).onFirst().fetchSemanticsNode()
+        val title = firstActivityCheckbox().fetchSemanticsNode()
             .config[SemanticsProperties.ContentDescription].first()
         composeRule.onAllNodesWithText(title).onFirst().performScrollTo().performClick()
         composeRule.onNodeWithText("Skip today").performScrollTo().performClick()
@@ -101,11 +117,11 @@ class CheckInScreenTest {
     @Test
     fun verdictCard_statesColourWordAndNumber_inSampleMode() {
         completeOnboardingIfShown()
-        awaitTodaysPlan()
         // The sample day's completed cycle scores 42: a Ready verdict, Yellow. Status is never colour
-        // alone, so the card must say the word and the number in text.
+        // alone, so the card must say the word and the number in text. The verdict leads the list, so
+        // it is on screen without scrolling (scrolling to the plan first could dispose it).
         val verdict = "Yellow · 42%"
-        composeRule.waitUntil(10_000) {
+        composeRule.waitUntil(20_000) {
             composeRule.onAllNodesWithText(verdict).fetchSemanticsNodes().isNotEmpty()
         }
         // TalkBack hears the same verdict as one stop, with the provenance the chip shows sighted users.
@@ -120,8 +136,7 @@ class CheckInScreenTest {
         completeOnboardingIfShown()
         awaitTodaysPlan()
         // First activity checkbox: 48dp minimum touch target (a11y contract from the design system).
-        composeRule.onAllNodes(activityCheckbox)
-            .onFirst()
+        firstActivityCheckbox()
             .assertHeightIsAtLeast(48.dp)
             .assertWidthIsAtLeast(48.dp)
     }
