@@ -292,6 +292,10 @@
     <string name="privacy_delete_dialog_text">This deletes local health data on this device. This action cannot be undone.</string>
     <string name="privacy_delete_dialog_title">Delete local data?</string>
     <string name="privacy_export_preview">Local export preview</string>
+    <plurals name="privacy_export_more">
+        <item quantity="one">…and 1 more line, included when you share.</item>
+        <item quantity="other">…and %d more lines, included when you share.</item>
+    </plurals>
     <string name="privacy_export_sample_line">Includes sample (mock) data — not real WHOOP measurements.</string>
     <string name="privacy_share_export">Share local export</string>
     <string name="privacy_share_note">Sharing is user-directed and may send health data to the app you choose.</string>

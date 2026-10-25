@@ -460,7 +460,7 @@ private data class HealthBundle(
     val targets: List<TargetValue>,
     val logs: List<WorkoutLog>,
     val reminders: List<ReminderEntity>,
-    val exportText: String,
+    val exportText: String = "",
     val planOverrides: List<PlanWorkoutOverrideEntity> = emptyList(),
     val whoopImportInfo: WhoopImportInfo? = null,
     val coach: CoachBundle = CoachBundle(),
@@ -746,7 +746,6 @@ class MainViewModel @Inject constructor(
             targets = targetValues,
             logs = logs,
             reminders = reminders,
-            exportText = LocalExportFormatter.format(profile, metrics, targets, workouts, reminders = reminders),
         )
     }.let { baseFlow ->
         combine(

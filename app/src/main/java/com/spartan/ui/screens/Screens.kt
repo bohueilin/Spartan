@@ -65,6 +65,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -477,12 +478,23 @@ fun PrivacyScreen(state: MainUiState, onShare: (String) -> Unit, onDelete: () ->
                 Spacer(Modifier.width(Spacing.md))
                 Text(stringResource(R.string.privacy_export_preview), style = MaterialTheme.typography.titleMedium)
             }
+            // A preview, not the file: a year of readings is thousands of lines in one Text. Share
+            // still sends everything, and the count says so.
+            val lines = state.exportText.trimEnd('\n').lines() // the file ends in a newline, not a 31st line
             Text(
-                state.exportText,
+                lines.take(30).joinToString("\n"),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = Spacing.md),
             )
+            if (lines.size > 30) {
+                Text(
+                    pluralStringResource(R.plurals.privacy_export_more, lines.size - 30, lines.size - 30),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(top = Spacing.sm),
+                )
+            }
         }
         PrimaryButton(stringResource(R.string.privacy_share_export), { onShare(state.exportText) }, Modifier.fillMaxWidth(), icon = Icons.Outlined.Share)
         Text(stringResource(R.string.privacy_share_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
