@@ -41,7 +41,7 @@ object MetricBenefits {
     private val phrases = mapOf(
         MetricType.RECOVERY_SCORE to "how ready your body is each morning",
         MetricType.HRV_RMSSD to "your heart-rate variability and stress balance",
-        MetricType.RESTING_HEART_RATE to "your resting heart rate and aerobic base",
+        MetricType.RESTING_HEART_RATE to "how settled your heart is at rest",
         MetricType.SLEEP_PERFORMANCE to "how well you sleep against your need",
         MetricType.SLEEP_DURATION to "the sleep you get each night",
         MetricType.SLEEP_DEBT to "how quickly you clear sleep debt",

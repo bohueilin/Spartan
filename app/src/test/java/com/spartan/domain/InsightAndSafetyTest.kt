@@ -56,6 +56,15 @@ class InsightAndSafetyTest {
     }
 
     @Test
+    fun rhrBelowTheClinicalSpan_isNotAlarmist_andKeepsTheSymptomHedge() {
+        val insight = InsightEngine().generate(listOf(metricEngine.assess(MetricReading(MetricType.RESTING_HEART_RATE, 59.0)))).single()
+
+        assertTrue(insight.explanation.contains("often seen in aerobically trained people"))
+        assertTrue(insight.explanation.contains("Context and symptoms matter."))
+        assertTrue(insight.clinicianTriggers.isNotEmpty())
+    }
+
+    @Test
     fun insightGeneration_givesBloodPressureOneCard_fromTheOutOfRangeHalf() {
         val assessments = listOf(
             metricEngine.assess(MetricReading(MetricType.SYSTOLIC_BP, 112.0)),

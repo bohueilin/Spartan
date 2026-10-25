@@ -88,7 +88,7 @@ class InsightEngine(
             assessment.clinicalStatus == ClinicalStatus.ABOVE_RANGE ->
                 "This value is above the common clinical reference range. One value is not a diagnosis."
             assessment.clinicalStatus == ClinicalStatus.BELOW_RANGE ->
-                "This value is below the common clinical reference range. Context and symptoms matter."
+                "This is below the common 60–100 bpm adult reference range, which is often seen in aerobically trained people. Context and symptoms matter."
             assessment.targetStatus == TargetStatus.ABOVE_PERSONAL_TARGET ->
                 "This is normal for many adults but above your personal fitness target."
             else -> "This is within the normal range for many adults."

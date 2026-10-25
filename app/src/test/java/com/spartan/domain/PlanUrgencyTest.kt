@@ -7,6 +7,7 @@ import com.spartan.domain.model.ActivityPriority
 import com.spartan.domain.model.ActivityStatus
 import com.spartan.domain.model.MetricType
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -81,5 +82,7 @@ class PlanUrgencyTest {
         coached.forEach { assertNotNull("missing benefit for $it", MetricBenefits.forMetric(it)) }
         // Lab metrics have no wellness benefit phrase.
         assertNull(MetricBenefits.forMetric(MetricType.APOB))
+        // One phrase serves every resting-HR activity, hydration included, so it claims no aerobic base.
+        assertFalse(MetricBenefits.forMetric(MetricType.RESTING_HEART_RATE)!!.contains("aerobic"))
     }
 }
