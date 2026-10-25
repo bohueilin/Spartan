@@ -175,14 +175,18 @@ internal fun collapsedActionIds(ordered: List<DailyActivity>, nextId: String?, k
 
 /**
  * An action's time-of-day urgency pill. The sleep anchor ("In bed by 10:40 PM") is an evening
- * target, not a chore that slips past midday, so it never reads as Due or Overdue.
+ * target, not a chore that slips past midday, so it never reads as Due or Overdue; neither does a
+ * snoozed or scheduled time still ahead, which is the user's own "later".
  */
-private fun urgencyOf(activity: DailyActivity, nowMinuteOfDay: Int): PlanUrgency =
-    if (activity.ruleId == RuleIds.SLEEP_ANCHOR) {
+private fun urgencyOf(activity: DailyActivity, nowMinuteOfDay: Int): PlanUrgency {
+    val now = System.currentTimeMillis()
+    val deferred = (activity.snoozedUntilMillis ?: 0L) > now || (activity.scheduledEpochMinute ?: 0L) * 60_000L > now
+    return if (activity.ruleId == RuleIds.SLEEP_ANCHOR || deferred) {
         PlanUrgency.NONE
     } else {
         PlanClock.urgencyFor(activity.priority, activity.status, nowMinuteOfDay)
     }
+}
 
 /** Sleep debt below this is noise, not worth a line of its own (the same cut-off as WhyTodayEngine). */
 private const val DEBT_WORTH_MENTIONING_HOURS = 0.25
@@ -234,12 +238,12 @@ fun CheckInScreen(
         TrainingProfile(ageYears = state.userAgeYears, offTargetMetrics = state.offTargetMetrics)
     }
     // Checking off a training activity opens a short debrief (minutes/effort/pain) for the adaptive rules.
-    var debriefFor by remember { mutableStateOf<DailyActivity?>(null) }
+    var debriefForId by rememberSaveable { mutableStateOf<String?>(null) }
     var openActivityId by rememberSaveable { mutableStateOf<String?>(null) }
     var showAllActions by rememberSaveable { mutableStateOf(false) }
     val completeWithDebrief: (String) -> Unit = { id ->
         onComplete(id)
-        state.todayActivities.firstOrNull { it.id == id && it.category in DEBRIEF_CATEGORIES }?.let { debriefFor = it }
+        state.todayActivities.firstOrNull { it.id == id && it.category in DEBRIEF_CATEGORIES }?.let { debriefForId = it.id }
     }
     // Skeleton only while this session's first sync is genuinely in flight: the verdict is null
     // exactly until a sync settles (success, failure, or the known-empty state after erase-all).
@@ -265,12 +269,13 @@ fun CheckInScreen(
     // One list state for both layouts, so a window resize across the breakpoint keeps the scroll.
     val listState = rememberLazyListState()
     val listContent: LazyListScope.() -> Unit = {
-        item(key = "header") { TodayHeader(state) }
+        item(key = "header") { TodayHeader(state, nowMinuteOfDay) }
         // The verdict is never fabricated: Ready, Pending, or (before the first sync settles) the
         // shared loading skeleton below, which stands in for the whole tab.
         when {
             verdict is MorningVerdict.Ready -> item(key = "verdict") {
-                ReadyVerdictCard(verdict, state, bedtime, onOpenRecoveryExplainer, onMorningRevealPlayed)
+                // Past lights-out the Tonight card says "Lights out soon"; the chip never shows a time already gone.
+                ReadyVerdictCard(verdict, state, bedtime?.takeUnless { SleepPlanner.isPastLightsOut(it, nowMinuteOfDay) }, onOpenRecoveryExplainer, onMorningRevealPlayed)
             }
             verdict is MorningVerdict.Pending || state.syncFailed -> item(key = "verdict") { PendingVerdictCard(state) }
         }
@@ -387,15 +392,15 @@ fun CheckInScreen(
         )
     }
 
-    debriefFor?.let { activity ->
+    state.todayActivities.firstOrNull { it.id == debriefForId }?.let { activity ->
         ExerciseDebriefSheet(
             activity = activity,
             alreadyLoggedToday = debriefRepeatsLog(activity, state.todayActivities, state.workoutsLoggedToday),
             onSave = { minutes, rpe, pain ->
                 onLogExercise(activity, minutes, rpe, pain)
-                debriefFor = null
+                debriefForId = null
             },
-            onSkip = { debriefFor = null },
+            onSkip = { debriefForId = null },
         )
     }
 }
@@ -412,8 +417,8 @@ private fun LazyItemScope.animatedItem(reducedMotion: Boolean): Modifier = Modif
 
 /** Date, provenance chip, and a quiet greeting — the verdict below is the screen's one headline. */
 @Composable
-private fun TodayHeader(state: MainUiState) {
-    val hour = remember { LocalTime.now().hour }
+private fun TodayHeader(state: MainUiState, nowMinuteOfDay: Int) {
+    val hour = nowMinuteOfDay / 60
     val base = stringResource(
         when {
             hour < 12 -> R.string.checkin_good_morning
@@ -422,7 +427,7 @@ private fun TodayHeader(state: MainUiState) {
         },
     )
     val name = state.profile?.displayName?.takeIf { it.isNotBlank() && it != "You" }
-    val date = remember { LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE, MMMM d", Locale.getDefault())) }
+    val date = LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE, MMMM d", Locale.getDefault()))
     Column(Modifier.fillMaxWidth().padding(top = Spacing.xxl, bottom = Spacing.xs)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(date, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
@@ -748,7 +753,7 @@ private fun PlanRow(
             Modifier.padding(start = Spacing.lg, top = verticalPadding, bottom = verticalPadding, end = Spacing.xs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            IconTile(categoryIcon(activity.category), iconTint, size = if (isNext) 52.dp else 44.dp)
+            IconTile(categoryIcon(activity.category), iconTint)
             Spacer(Modifier.width(Spacing.lg))
             Column(Modifier.weight(1f)) {
                 if (isNext) {
@@ -1208,7 +1213,11 @@ private fun statusLine(activity: DailyActivity, calendarIsStub: Boolean): String
     val clock = clockFormatter()
     fun time(millis: Long) = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalTime().format(clock)
     return when (activity.status) {
-        ActivityStatus.SNOOZED -> activity.snoozedUntilMillis?.let { stringResource(R.string.checkin_snoozed_until, time(it)) } ?: stringResource(R.string.checkin_snoozed)
+        ActivityStatus.SNOOZED -> when (val until = activity.snoozedUntilMillis) {
+            null -> stringResource(R.string.checkin_snoozed)
+            // Once the time passes the row is simply open again; the next sync marks it PLANNED.
+            else -> if (until > System.currentTimeMillis()) stringResource(R.string.checkin_snoozed_until, time(until)) else null
+        }
         ActivityStatus.SKIPPED -> stringResource(R.string.checkin_skipped_today)
         // A slot found against stub free/busy must say so — real-feeling artifacts from fake
         // availability are exactly what the provenance system exists to prevent.
