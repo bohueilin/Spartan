@@ -156,7 +156,8 @@ fun MetricDetailScreen(
                         signal?.normalHigh,
                         height = 160.dp,
                     )
-                    if (signal?.normalLow != null) {
+                    // A collapsed usual draws no band, so there is nothing for the legend to point at.
+                    if (signal?.normalLow != null && signal.normalLow != signal.normalHigh) {
                         Text(stringResource(R.string.detail_band_legend), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = Spacing.sm))
                     }
                 }

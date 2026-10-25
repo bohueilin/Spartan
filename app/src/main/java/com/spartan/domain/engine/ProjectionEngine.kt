@@ -64,7 +64,7 @@ class ProjectionEngine(private val safetyEngine: SafetyEngine = SafetyEngine()) 
         val assumption = safetyEngine.sanitize(
             when {
                 days >= FULL_EFFECT_MIN_DAYS -> ASSUMPTION_FULL
-                days >= 1 -> "At your current consistency of $days days a week"
+                days >= 1 -> "At your current consistency of $days ${if (days == 1) "day" else "days"} a week"
                 else -> ASSUMPTION_INACTIVE
             },
         )

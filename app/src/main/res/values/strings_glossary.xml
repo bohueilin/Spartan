@@ -41,9 +41,10 @@
     <string name="glossary_population_label">General adult reference</string>
 
     <!-- TalkBack: one sentence for the numbers; the chart stays decorative -->
-    <string name="glossary_a11y_above">%1$s %2$s, above your usual of %3$s to %4$s</string>
-    <string name="glossary_a11y_below">%1$s %2$s, below your usual of %3$s to %4$s</string>
-    <string name="glossary_a11y_within">%1$s %2$s, within your usual of %3$s to %4$s</string>
+    <string name="glossary_a11y_above">%1$s %2$s, above your usual of %3$s</string>
+    <string name="glossary_a11y_below">%1$s %2$s, below your usual of %3$s</string>
+    <string name="glossary_a11y_within">%1$s %2$s, within your usual of %3$s</string>
+    <string name="glossary_a11y_range">%1$s to %2$s</string>
     <!-- Quantity: %4$d, the days needed to learn a usual -->
     <plurals name="glossary_a11y_learning">
         <item quantity="one">%1$s %2$s, Spartan is still learning your usual, %3$d of %4$d day</item>

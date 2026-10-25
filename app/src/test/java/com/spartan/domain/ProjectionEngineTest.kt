@@ -259,6 +259,9 @@ class ProjectionEngineTest {
 
         val light = engine.project(60.0, null, null, 2).first()
         assertEquals("At your current consistency of 2 days a week", light.assumption)
+
+        val one = engine.project(60.0, null, null, 1).first()
+        assertEquals("At your current consistency of 1 day a week", one.assumption)
     }
 
     @Test

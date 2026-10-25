@@ -538,11 +538,15 @@ internal fun TrajectoryCard(projections: List<com.spartan.domain.engine.MetricPr
         projections.forEach { projection ->
             val week8 = projection.points.last()
             val flat = week8.low == week8.high && week8.low == projection.currentValue
+            // Same precision and units as everywhere else the metric shows ("42%", "58 bpm").
+            val metric = projection.metric
+            val high = formatMetricValue(week8.high, metric)
+            val target = if (formatMetricValue(week8.low, metric) == high) high else "${formatNumber(week8.low, metric)}–$high"
             Column(Modifier.fillMaxWidth().padding(top = Spacing.md)) {
                 Text(projection.label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
                 Text(
-                    if (flat) "${trajectoryNumber(projection.currentValue)} ${projection.unit}".trim()
-                    else "${trajectoryNumber(projection.currentValue)} → ${trajectoryNumber(week8.low)}–${trajectoryNumber(week8.high)} ${projection.unit} in 8 wks".trim(),
+                    if (flat) formatMetricValue(projection.currentValue, metric)
+                    else "${formatNumber(projection.currentValue, metric)} → $target in 8 wks",
                     style = MaterialTheme.typography.titleSmall,
                     color = if (flat) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary,
                 )
@@ -552,5 +556,3 @@ internal fun TrajectoryCard(projections: List<com.spartan.domain.engine.MetricPr
     }
 }
 
-private fun trajectoryNumber(value: Double): String =
-    if (value % 1.0 == 0.0) value.toInt().toString() else String.format(Locale.getDefault(), "%.1f", value)

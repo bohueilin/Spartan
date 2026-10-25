@@ -268,7 +268,7 @@ internal fun glossaryFacts(signal: Signal, state: MainUiState): GlossaryFacts {
     val metric = signal.metric
     val entry = MetricGlossary.entry(metric)
     val name = entry?.name ?: metric.label
-    val value = glossaryValue(signal.latest, metric)
+    val value = formatMetricValue(signal.latest, metric)
     val low = signal.normalLow
     val high = signal.normalHigh
     // The calendar days the trend's readings actually cover, so gaps in wear are never called "7 days".
@@ -284,15 +284,17 @@ internal fun glossaryFacts(signal: Signal, state: MainUiState): GlossaryFacts {
         pluralStringResource(R.plurals.glossary_usual_learning, needed, signal.baselineDays, needed) to
             pluralStringResource(R.plurals.glossary_a11y_learning, needed, name, value, signal.baselineDays, needed)
     } else {
-        val lowText = if (metric == MetricType.SLEEP_DEBT) formatHoursMinutes(low) else formatNumber(low, metric)
-        val highText = glossaryValue(high, metric)
+        val lowText = formatNumber(low, metric)
+        val highText = formatMetricValue(high, metric)
+        // A middle half that rounds to one value reads as that value, never "78–78 ms".
+        val single = formatMetricValue(low, metric) == highText
         val comparisonRes = when (signal.position) {
             SignalPosition.ABOVE -> R.string.glossary_a11y_above
             SignalPosition.BELOW -> R.string.glossary_a11y_below
             else -> R.string.glossary_a11y_within
         }
-        stringResource(R.string.glossary_usual, stringResource(R.string.glossary_range, lowText, highText)) to
-            stringResource(comparisonRes, name, value, lowText, highText)
+        stringResource(R.string.glossary_usual, if (single) highText else stringResource(R.string.glossary_range, lowText, highText)) to
+            stringResource(comparisonRes, name, value, if (single) highText else stringResource(R.string.glossary_a11y_range, lowText, highText))
     }
     val context = glossaryContext(signal, state)
     val dot = stringResource(R.string.glossary_separator)
@@ -381,10 +383,6 @@ internal fun GlossaryPopulationNote(note: String, modifier: Modifier = Modifier)
         Text(note, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
     }
 }
-
-/** A coached value as shown: sleep debt in hours and minutes ("1h 10m"), everything else as [formatMetricValue]. */
-private fun glossaryValue(value: Double, metric: MetricType): String =
-    if (metric == MetricType.SLEEP_DEBT) formatHoursMinutes(value) else formatMetricValue(value, metric)
 
 /** "TRY · 5-minute breathing protocol · 5 min" with an Add button, or a calm "In today's plan". */
 @Composable
@@ -514,7 +512,8 @@ internal fun normalRangeLabel(signal: Signal): String {
         val needed = SignalEngine.MIN_BASELINE_DAYS
         return pluralStringResource(R.plurals.signal_learning_days, needed, signal.baselineDays, needed)
     }
-    val range = "${formatNumber(low, signal.metric)}–${formatMetricValue(high, signal.metric)}"
+    val highText = formatMetricValue(high, signal.metric)
+    val range = if (formatMetricValue(low, signal.metric) == highText) highText else "${formatNumber(low, signal.metric)}–$highText"
     return pluralStringResource(R.plurals.signal_normal_range, signal.baselineDays, range, signal.baselineDays)
 }
 
@@ -526,18 +525,22 @@ private val WHOLE_NUMBERS = setOf(
     MetricType.STRENGTH_SESSIONS,
 )
 
-private fun formatNumber(value: Double, metric: MetricType): String {
+internal fun formatNumber(value: Double, metric: MetricType): String {
+    // "1h 48m" carries its own units, so a sleep-debt range reads "12m–1h 48m", never "0.2–1h 48m".
+    if (metric == MetricType.SLEEP_DEBT) return formatHoursMinutes(value)
     if (metric in WHOLE_NUMBERS) return value.roundToInt().toString()
     val oneDecimal = String.format(Locale.getDefault(), "%.1f", value)
     return if ((value * 10).roundToInt() % 10 == 0) value.roundToInt().toString() else oneDecimal
 }
 
-/** "58 ms", "1.8 h", "42%" — how every metric value is shown. */
+/** "58 ms", "1h 48m", "42%" — how every metric value is shown. */
 internal fun formatMetricValue(value: Double, metric: MetricType): String {
     val number = formatNumber(value, metric)
+    if (metric == MetricType.SLEEP_DEBT) return number
     return when (metric.unit) {
         "" -> number
         "%" -> "$number%"
+        "sessions" -> if (number == "1") "1 session" else "$number sessions"
         else -> "$number ${metric.unit}"
     }
 }
