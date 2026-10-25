@@ -210,7 +210,7 @@ object GoalEngine {
             return GoalProgress(
                 fraction = fraction, timeFraction = timeFraction,
                 onTrack = fraction >= 0.5 || timeFraction < 0.2,
-                summary = "$sessionsThisWeek of ${weeklyTarget.toInt()} ${habitNoun(goal.type)} this week" +
+                summary = "$sessionsThisWeek of ${weeklyTarget.toInt()} ${habitNoun(goal.type)}${if (weeklyTarget.toInt() == 1) "" else "s"} this week" +
                     contextNote(goal, readings, todayEpochDay),
                 sessionsThisWeek = sessionsThisWeek,
             )
@@ -259,9 +259,9 @@ object GoalEngine {
     }
 
     private fun habitNoun(type: GoalType): String = when (type) {
-        GoalType.FITNESS -> "training sessions"
-        GoalType.RECOVERY -> "recovery sessions"
-        else -> "calm sessions"
+        GoalType.FITNESS -> "training session"
+        GoalType.RECOVERY -> "recovery session"
+        else -> "calm session"
     }
 
     /** " · resting HR -1.5 bpm vs baseline" — context beside a habit goal, empty without both numbers. */
@@ -298,5 +298,5 @@ object GoalEngine {
         .takeIf { it.isNotEmpty() }
         ?.average()
 
-    private fun roundTo1(v: Double): String = ((v * 10).toInt() / 10.0).toString()
+    private fun roundTo1(v: Double): String = (Math.round(v * 10) / 10.0).toString()
 }

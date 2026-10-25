@@ -670,6 +670,8 @@ class GoalPlanningTest {
         assertFalse(none.onTrack) // a quarter of the way in with nothing logged yet
         assertEquals("0 of 3 training sessions this week", none.summary)
         assertSafe(down.summary)
+        // A one-session week is singular.
+        assertEquals("0 of 1 training session this week", GoalEngine.progress(goal(GoalType.FITNESS, 1.0), emptyList(), today).summary)
     }
 
     @Test
@@ -693,6 +695,8 @@ class GoalPlanningTest {
         val p = GoalEngine.progress(g, week(MetricType.HRV_RMSSD, 40.0), today, 3)
         assertEquals(0.6, p.fraction, 0.0001)
         assertEquals("3 of 5 calm sessions this week · HRV +5.0 ms vs baseline", p.summary)
+        // Tenths round rather than truncate: +2.9 stays +2.9, never +2.8.
+        assertEquals("3 of 5 calm sessions this week · HRV +2.9 ms vs baseline", GoalEngine.progress(g, week(MetricType.HRV_RMSSD, 37.9), today, 3).summary)
         // Outcome goals are untouched by the habit counters.
         val sleep = goal(GoalType.SLEEP_RECOVERY, 10.0, baseline = 70.0, start = today - 7)
         val s = GoalEngine.progress(sleep, week(MetricType.SLEEP_PERFORMANCE, 77.0), today, 3, 3, 3)

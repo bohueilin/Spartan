@@ -263,7 +263,7 @@ public enum GoalEngine {
             return GoalProgress(
                 fraction: fraction, timeFraction: timeFraction,
                 onTrack: fraction >= 0.5 || timeFraction < 0.2,
-                summary: "\(breathworkThisWeek) of \(weeklyTargetInt) calm sessions this week\(hrvNote)"
+                summary: "\(breathworkThisWeek) of \(weeklyTargetInt) calm session\(weeklyTargetInt == 1 ? "" : "s") this week\(hrvNote)"
             )
         }
 
@@ -339,8 +339,8 @@ public enum GoalEngine {
         return values.reduce(0, +) / Double(values.count)
     }
 
-    /// Truncate-to-one-decimal, matching Kotlin's `((v * 10).toInt() / 10.0).toString()`.
+    /// Round-to-one-decimal, matching Kotlin's `Math.round(v * 10) / 10.0` (halves round up).
     private static func roundTo1(_ v: Double) -> String {
-        String(Double(Int(v * 10)) / 10.0)
+        String(Double(Int((v * 10 + 0.5).rounded(.down))) / 10.0)
     }
 }
