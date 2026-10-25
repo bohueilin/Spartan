@@ -10,6 +10,7 @@ import androidx.work.WorkerParameters
 import com.spartan.data.repository.HealthRepository
 import com.spartan.diagnostics.DebugLog
 import com.spartan.domain.engine.ReminderEngine
+import com.spartan.domain.engine.RuleIds
 import com.spartan.domain.model.ActivityPriority
 import com.spartan.domain.model.ActivityStatus
 import dagger.assisted.Assisted
@@ -24,8 +25,8 @@ import kotlinx.coroutines.flow.first
 /**
  * Proactive evening guidance (~18:00 / 6pm local — the point at which an untouched plan turns red
  * on the check-in): if today's plan still has open *recommended or required* activities, send one
- * calm nudge with what's left and how little time it takes. Optional items (hydration) never
- * trigger it. Silent when the plan is done, when nothing was planned, or during quiet hours. At
+ * calm nudge with what's left and how little time it takes. Optional items (hydration) and the
+ * bedtime anchor never trigger it: going to bed is not where an evening's plan starts. Silent when the plan is done, when nothing was planned, or during quiet hours. At
  * most one notification per evening by construction (single periodic slot).
  */
 @HiltWorker
@@ -41,7 +42,7 @@ class EveningNudgeWorker @AssistedInject constructor(
         val today = LocalDate.now().toEpochDay()
         val open = repository.dailyActivities(today).first()
             .filter { it.status == ActivityStatus.PLANNED || it.status == ActivityStatus.SNOOZED || it.status == ActivityStatus.RESCHEDULED }
-            .filter { it.priority != ActivityPriority.OPTIONAL }
+            .filter { it.priority != ActivityPriority.OPTIONAL && it.ruleId != RuleIds.SLEEP_ANCHOR }
         if (open.isEmpty()) {
             DebugLog.log("worker", "evening nudge: plan complete or empty — silent")
             return Result.success()
@@ -53,7 +54,7 @@ class EveningNudgeWorker @AssistedInject constructor(
         }
         val minutes = open.sumOf { it.estimatedMinutes }
         val title = if (open.size == 1) "1 activity still open today" else "${open.size} activities still open today"
-        val body = "It's past 6pm — about $minutes min left. ${open.first().title} is a good place to start."
+        val body = "About $minutes min left today. ${open.first().title} is a good place to start."
         reminderScheduler.notifyNow(id = "evening-nudge", title = title, body = body)
         DebugLog.log("worker", "evening nudge: notified (${open.size} open)")
         return Result.success()

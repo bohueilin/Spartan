@@ -25,7 +25,8 @@ class ReminderWorker(
         val body = inputData.getString(KEY_BODY) ?: "Take a minute to log your health data."
         postNotification(
             applicationContext, reminderId, title, body,
-            activityId = inputData.getString(KEY_ACTIVITY_ID),
+            // Pressure-window nudges and the morning digest have no plan row behind them: no Done/Snooze.
+            activityId = inputData.getString(KEY_ACTIVITY_ID)?.takeUnless { it.startsWith("pressure-") || it == "morning-digest" },
             activityTitle = inputData.getString(KEY_ACTIVITY_TITLE),
         )
         return Result.success()

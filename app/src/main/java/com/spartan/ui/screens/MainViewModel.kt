@@ -1555,8 +1555,9 @@ class MainViewModel @Inject constructor(
                 // A very late imported wake time must not push the window start past the day's end;
                 // an inverted coerceIn range below would throw and take the process down.
                 .coerceAtMost(23 * 60 - 30)
-            val endMinuteOfDay = ((snap?.bedMinuteOfDay ?: (22 * 60)) - 60)
-                .coerceIn(startMinuteOfDay + 30, 23 * 60)
+            // An onset after midnight (00:40) ends this day; read as minute 40 it would close the window by 9 AM.
+            val bedMinute = snap?.bedMinuteOfDay?.let { if (it < 12 * 60) it + 24 * 60 else it } ?: (22 * 60)
+            val endMinuteOfDay = (bedMinute - 60).coerceIn(startMinuteOfDay + 30, 23 * 60)
             val dayStartEpochMinute = date.atStartOfDay(zone).toEpochSecond() / 60
             // "Find a time" means a time still to come: searching from the wake window would
             // happily book 8:00 AM at 7:00 PM, and the scheduler then drops the past trigger.
