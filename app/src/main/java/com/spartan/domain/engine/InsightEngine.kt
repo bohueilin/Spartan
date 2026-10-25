@@ -11,6 +11,10 @@ class InsightEngine(
     private val safetyEngine: SafetyEngine = SafetyEngine(),
 ) {
     fun generate(assessments: List<MetricAssessment>): List<InsightCard> {
+        // Systolic and diastolic are one reading: one card, told from an out-of-range half when
+        // there is one, so a "normal" card never sits beside an abnormal number.
+        val bpHalves = assessments.filter { it.reading.type == MetricType.SYSTOLIC_BP || it.reading.type == MetricType.DIASTOLIC_BP }
+        val bp = bpHalves.firstOrNull { it.clinicalStatus != ClinicalStatus.NORMAL } ?: bpHalves.firstOrNull()
         val cards = assessments.mapNotNull { assessment ->
             when (assessment.reading.type) {
                 MetricType.FASTING_GLUCOSE -> glucoseInsight(assessment)
@@ -18,7 +22,7 @@ class InsightEngine(
                 MetricType.VITAMIN_D_25OH -> vitaminDInsight(assessment)
                 MetricType.RESTING_HEART_RATE -> rhrInsight(assessment)
                 MetricType.BMI -> bmiInsight(assessment)
-                MetricType.SYSTOLIC_BP, MetricType.DIASTOLIC_BP -> bpInsight(assessment)
+                MetricType.SYSTOLIC_BP, MetricType.DIASTOLIC_BP -> if (assessment === bp) bpInsight(assessment) else null
                 else -> null
             }
         }

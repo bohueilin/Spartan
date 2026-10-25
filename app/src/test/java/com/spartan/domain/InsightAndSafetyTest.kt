@@ -54,4 +54,17 @@ class InsightAndSafetyTest {
         assertTrue(insight.explanation.contains("above the normal clinical range", ignoreCase = true))
         assertFalse(insight.explanation.contains("in the normal range", ignoreCase = true))
     }
+
+    @Test
+    fun insightGeneration_givesBloodPressureOneCard_fromTheOutOfRangeHalf() {
+        val assessments = listOf(
+            metricEngine.assess(MetricReading(MetricType.SYSTOLIC_BP, 112.0)),
+            metricEngine.assess(MetricReading(MetricType.DIASTOLIC_BP, 85.0)),
+        )
+
+        val insight = InsightEngine().generate(assessments).single { it.title == "Blood pressure" }
+
+        assertTrue(insight.explanation.contains("above the normal clinical range", ignoreCase = true))
+        assertFalse(insight.explanation.contains("in the normal range", ignoreCase = true))
+    }
 }

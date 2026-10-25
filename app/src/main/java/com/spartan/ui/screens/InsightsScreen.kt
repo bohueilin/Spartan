@@ -159,7 +159,8 @@ fun InsightsScreen(
             } else {
                 items(labs, key = { "lab-" + it.reading.type.name }) { LabRow(it, onOpenMetric) }
             }
-            items(state.insights, key = { "insight-" + it.title }) { LabInsight(it) }
+            // Index keys: titles repeat (systolic and diastolic once both said "Blood pressure").
+            items(state.insights) { LabInsight(it) }
             item(key = "footer") {
                 Text(
                     stringResource(R.string.insights_footer),
