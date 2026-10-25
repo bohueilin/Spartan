@@ -662,9 +662,6 @@ class MainViewModel @Inject constructor(
     private val _messages = Channel<UserMessage>(Channel.BUFFERED)
     val messages: Flow<UserMessage> = _messages.receiveAsFlow()
 
-    /** The day the user waved off the reflection offer; keeps "not tonight" honest until tomorrow. */
-    private val reflectionDismissedDay = MutableStateFlow<Long?>(null)
-
     /** Ticks the local hour so the evening offer can appear while the app is already open. */
     private val hourTicker = flow {
         while (true) {
@@ -680,7 +677,7 @@ class MainViewModel @Inject constructor(
     val showReflectionSheet: StateFlow<Boolean> = combine(
         dailyActivitiesFlow,
         repository.reflections,
-        reflectionDismissedDay,
+        preferencesStore.reflectionDismissedDay,
         hourTicker,
         preferencesStore.firstOpenMillis,
     ) { activities, reflections, dismissedDay, hour, firstOpen ->
@@ -688,7 +685,7 @@ class MainViewModel @Inject constructor(
             hourOfDay = hour,
             hasActivities = activities.isNotEmpty(),
             alreadyAnsweredToday = reflections.any { it.dateEpochDay == today } || dismissedDay == today,
-            // Asking "how did today feel?" minutes after install asks about a day spent without us.
+            // Asking "how did today feel?" on the day of onboarding asks about a day spent without us.
             firstDay = firstOpen == null || epochDayOf(firstOpen) == today,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
@@ -1003,7 +1000,6 @@ class MainViewModel @Inject constructor(
                 val currentDay = LocalDate.now().toEpochDay()
                 if (currentDay != todayFlow.value) {
                     todayFlow.value = currentDay
-                    reflectionDismissedDay.value = null
                     loadToday()
                 }
             }
@@ -1334,6 +1330,7 @@ class MainViewModel @Inject constructor(
             repository.upsertProfile(
                 UserProfileEntity(displayName = name.ifBlank { "You" }, heightCm = heightCm, birthYear = birthYear),
             )
+            preferencesStore.setFirstOpenMillis(System.currentTimeMillis())
             preferencesStore.setOnboardingComplete(true)
         }
     }
@@ -1367,7 +1364,7 @@ class MainViewModel @Inject constructor(
 
     /** "Not tonight" — no reflection is stored, and the offer stays away until tomorrow. */
     fun dismissReflection() {
-        reflectionDismissedDay.value = today
+        viewModelScope.launch { preferencesStore.setReflectionDismissedDay(today) }
     }
 
     fun addMetric(type: MetricType, rawValue: String, note: String): Boolean {
@@ -1731,7 +1728,6 @@ class MainViewModel @Inject constructor(
         refreshing.value = false
         whoopImportState.value = null
         goalNotice.value = null
-        reflectionDismissedDay.value = null
     }
 
     private fun latestReadings(readings: List<MetricReading>): List<MetricReading> =

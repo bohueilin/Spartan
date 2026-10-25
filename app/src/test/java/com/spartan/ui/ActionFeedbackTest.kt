@@ -114,7 +114,7 @@ class ActionFeedbackTest {
         assertEquals("3:15 PM", message.formatArg)
     }
 
-    // --- Evening reflection: never on install day ---
+    // --- Evening reflection: never on onboarding day ---
 
     @Test
     fun reflectionWaitsForTheEveningAPlanAndASecondDay() {
@@ -122,7 +122,7 @@ class ActionFeedbackTest {
         assertFalse(shouldOfferReflection(hourOfDay = 12, hasActivities = true, alreadyAnsweredToday = false, firstDay = false))
         assertFalse(shouldOfferReflection(hourOfDay = 20, hasActivities = false, alreadyAnsweredToday = false, firstDay = false))
         assertFalse(shouldOfferReflection(hourOfDay = 20, hasActivities = true, alreadyAnsweredToday = true, firstDay = false))
-        // Someone who installed this evening has not lived a Spartan day yet.
+        // Someone who onboarded this evening has not lived a Spartan day yet.
         assertFalse(shouldOfferReflection(hourOfDay = 20, hasActivities = true, alreadyAnsweredToday = false, firstDay = true))
     }
 

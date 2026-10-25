@@ -52,6 +52,7 @@ class PlanPreferencesTest {
             assertTrue(constraints.isEmpty)
             assertNull(store.morningRevealPlayedDay.first())
             assertNull(store.lastGoalReviewDay.first())
+            assertNull(store.reflectionDismissedDay.first())
         }
     }
 
@@ -79,9 +80,23 @@ class PlanPreferencesTest {
         runBlocking {
             store.setMorningRevealPlayedDay(20_000L)
             store.setLastGoalReviewDay(19_995L)
+            store.setReflectionDismissedDay(20_001L)
 
             assertEquals(20_000L, store.morningRevealPlayedDay.first())
             assertEquals(19_995L, store.lastGoalReviewDay.first())
+            // "Not tonight" outlives the process, so a cold start that evening doesn't ask again.
+            assertEquals(20_001L, store.reflectionDismissedDay.first())
+        }
+    }
+
+    @Test
+    fun firstOpen_onboardingRestartsTheClock() {
+        runBlocking {
+            store.recordFirstOpenIfNeeded(1_000L)
+            store.setFirstOpenMillis(5_000L)
+            store.recordFirstOpenIfNeeded(9_000L)
+
+            assertEquals(5_000L, store.firstOpenMillis.first())
         }
     }
 
@@ -92,6 +107,7 @@ class PlanPreferencesTest {
             store.setPlanConstraints(everything)
             store.setMorningRevealPlayedDay(20_000L)
             store.setLastGoalReviewDay(19_995L)
+            store.setReflectionDismissedDay(20_001L)
 
             store.clear()
 
@@ -99,6 +115,7 @@ class PlanPreferencesTest {
             assertEquals(PlanConstraints(), store.planConstraints.first())
             assertNull(store.morningRevealPlayedDay.first())
             assertNull(store.lastGoalReviewDay.first())
+            assertNull(store.reflectionDismissedDay.first())
         }
     }
 

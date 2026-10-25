@@ -55,7 +55,7 @@ class PreferencesStore(private val context: Context) {
         context.dataStore.edit { it[REMINDERS_OFFER_SETTLED] = settled }
     }
 
-    // --- In-app review prompt bookkeeping (timestamps only; no content) ---
+    // --- In-app review prompt and evening reflection bookkeeping (timestamps only; no content) ---
     val firstOpenMillis: Flow<Long?> = context.dataStore.data.map { it[FIRST_OPEN_MILLIS] }
     val lastReviewPromptMillis: Flow<Long?> = context.dataStore.data.map { it[LAST_REVIEW_PROMPT_MILLIS] }
 
@@ -63,6 +63,11 @@ class PreferencesStore(private val context: Context) {
         context.dataStore.edit { prefs ->
             if (prefs[FIRST_OPEN_MILLIS] == null) prefs[FIRST_OPEN_MILLIS] = nowMillis
         }
+    }
+
+    /** Onboarding is day one: a launch that stopped at the welcome screen must not start the clock. */
+    suspend fun setFirstOpenMillis(millis: Long) {
+        context.dataStore.edit { it[FIRST_OPEN_MILLIS] = millis }
     }
 
     suspend fun setLastReviewPromptMillis(millis: Long) {
@@ -111,6 +116,13 @@ class PreferencesStore(private val context: Context) {
         context.dataStore.edit { it[LAST_GOAL_REVIEW_DAY] = epochDay }
     }
 
+    /** The day the user said "not tonight" to the evening reflection, so a relaunch keeps that answer. */
+    val reflectionDismissedDay: Flow<Long?> = context.dataStore.data.map { it[REFLECTION_DISMISSED_DAY] }
+
+    suspend fun setReflectionDismissedDay(epochDay: Long) {
+        context.dataStore.edit { it[REFLECTION_DISMISSED_DAY] = epochDay }
+    }
+
     // --- Display (You → Display): MainActivity reads these via MainViewModel.uiState. Off until opted in ---
 
     /** The quieter, lower-chroma colour scheme; it also stills rememberReducedMotion motion (LocalCalmMode). */
@@ -145,6 +157,7 @@ class PreferencesStore(private val context: Context) {
         val PLAN_AVOID = stringSetPreferencesKey("plan_avoid")
         val MORNING_REVEAL_PLAYED_DAY = longPreferencesKey("morning_reveal_played_day")
         val LAST_GOAL_REVIEW_DAY = longPreferencesKey("last_goal_review_day")
+        val REFLECTION_DISMISSED_DAY = longPreferencesKey("reflection_dismissed_day")
         val CALMER_THEME = booleanPreferencesKey("calmer_theme")
         val WALLPAPER_COLOURS = booleanPreferencesKey("wallpaper_colours")
     }
