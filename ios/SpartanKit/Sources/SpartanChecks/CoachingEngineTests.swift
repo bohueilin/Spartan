@@ -60,6 +60,15 @@ final class CoachingEngineTests: XCTestCase {
         )
     }
 
+    func testSafetyBannerOnlyCautionsALowRecoveryDayNeverRepeatsTheDisclaimer() throws {
+        let rest = try XCTUnwrap(engine.buildPlan(readiness: readiness(recovery: 25)).safetyBanner)
+        XCTAssertTrue(rest.contains("low-recovery day"))
+        // Today carries the general "not medical advice" line once, as its own footer line.
+        for recovery in [40, 60, 80] {
+            XCTAssertNil(engine.buildPlan(readiness: readiness(recovery: recovery)).safetyBanner, "recovery \(recovery)")
+        }
+    }
+
     func testPrimedGreenlightsAQualityStrengthSession() {
         let plan = engine.buildPlan(readiness: readiness(recovery: 80))
         XCTAssertEqual(ReadinessBand.primed, plan.band)
@@ -78,6 +87,18 @@ final class CoachingEngineTests: XCTestCase {
         XCTAssertTrue(plan.activities.contains { $0.ruleId == RuleIds.elevatedRhrTrend })
     }
 
+    func testTrendCheckInsSpeakOfYourUsualNeverAStressSign() throws {
+        let rhr = try XCTUnwrap(engine.buildPlan(readiness: readiness(recovery: 55, rhr: 66.0, rhrBase: 58.0))
+            .activities.first { $0.ruleId == RuleIds.elevatedRhrTrend })
+        XCTAssertEqual(
+            "Resting heart rate is above your usual — a good cue to hydrate, ease intensity, and check how you slept.",
+            rhr.whyItMatters
+        )
+        let breathing = try XCTUnwrap(engine.buildPlan(readiness: readiness(recovery: 55, hrv: 48.0, hrvBase: 60.0))
+            .activities.first { $0.ruleId == RuleIds.lowHrvTrend })
+        XCTAssertEqual("Your HRV is below your usual. Slow breathing is an easy way to downshift tonight.", breathing.whyItMatters)
+    }
+
     func testConcerningRespiratoryRateAddsNonDiagnosticClinicianReferral() throws {
         let plan = engine.buildPlan(readiness: readiness(recovery: 55, resp: 19.0, respBase: 15.0))
         let referral = try XCTUnwrap(
@@ -87,6 +108,12 @@ final class CoachingEngineTests: XCTestCase {
         XCTAssertTrue(
             referral.instructions.joined(separator: " ").lowercased().contains("clinician")
         )
+        // A wellness check-in, never an illness signal: how you feel, in plain words.
+        XCTAssertEqual("Notice how you feel today — energy, sleep, anything unusual.", referral.instructions.first)
+        let said = ([referral.title, referral.whyItMatters] + referral.instructions).joined(separator: " ").lowercased()
+        for word in ["illness", "sick"] {
+            XCTAssertFalse(said.contains(word), "\"\(word)\" in: \(said)")
+        }
     }
 
     func testClinicianReferralFiresOnlyOnDeviationFromTheUsersOwnBaseline() throws {

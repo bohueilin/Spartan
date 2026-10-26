@@ -154,10 +154,15 @@ object MetricGlossary {
     }
 
     /** Dates are usable only when there is one per history value. */
-    private fun hasDates(signal: Signal): Boolean = signal.dates.size == signal.history.size
+    internal fun hasDates(signal: Signal): Boolean = signal.dates.size == signal.history.size
 
-    /** History indices inside the trend window: dated within [window] days of the latest, else the last [window]. */
-    private fun recentIndices(signal: Signal, window: Int): List<Int> {
+    /**
+     * History indices inside the trend window, oldest first: dated within [window] days of the
+     * latest, else (no usable dates) the last [window]. [trend], [trendSpanDays] and the Insights
+     * chart all read this one window, so the chart always shows exactly the readings the "rising
+     * over N days" sentence counts.
+     */
+    internal fun recentIndices(signal: Signal, window: Int): List<Int> {
         if (window <= 0) return emptyList()
         val size = signal.history.size
         if (!hasDates(signal)) return (maxOf(0, size - window) until size).toList()

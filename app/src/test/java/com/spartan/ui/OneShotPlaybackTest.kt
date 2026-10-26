@@ -1,16 +1,14 @@
 package com.spartan.ui
 
 import com.spartan.ui.components.OneShot
-import com.spartan.ui.components.morningRevealJson
 import com.spartan.ui.components.oneShotPlayback
-import kotlinx.serialization.json.Json
+import com.spartan.ui.components.ringFraction
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertSame
 import org.junit.Test
 
 /**
  * The one-shot contract: an animation plays once only on a change the user saw, reduce-motion and
- * screen visits get the final frame, and the morning ring is driven by the real score.
+ * screen visits get the final frame, and the verdict ring is driven by the real score.
  */
 class OneShotPlaybackTest {
 
@@ -37,52 +35,18 @@ class OneShotPlaybackTest {
         assertEquals(OneShot.SHOW_FINAL, oneShotPlayback(endState = true, changedWhileShown = false, reducedMotion = true))
     }
 
-    // --- morningRevealJson: the ring follows the real score ---
-
-    /**
-     * A trimmed-down morning_reveal.json whose ring trim end animates 0 -> [ringEnd]. The Sun's
-     * position, the progress stroke width and the track's own trim also hold 72 — decoys that
-     * must never change.
-     */
-    private fun reveal(ringEnd: Int, ringLayer: String = "Recovery ring") = """
-        {"fr":60,"layers":[
-          {"nm":"Sun","ks":{"p":{"a":1,"k":[{"e":[160,72,0],"s":[160,196,0],"t":0},{"s":[160,72,0],"t":90}]}}},
-          {"nm":"$ringLayer","shapes":[
-            {"nm":"Ring track","it":[{"ty":"st","w":{"a":0,"k":8}},{"ty":"tm","e":{"a":1,"k":[{"s":[72],"t":0}]}}]},
-            {"nm":"Ring progress","it":[
-              {"ty":"el","s":{"a":0,"k":[110,110]}},
-              {"ty":"st","w":{"a":0,"k":72}},
-              {"ty":"tm","s":{"a":0,"k":0},"e":{"a":1,"k":[{"e":[$ringEnd],"s":[0],"t":60},{"s":[$ringEnd],"t":135},{"s":[$ringEnd],"t":150}]}}
-            ]}
-          ]}
-        ]}
-    """.trimIndent()
-
-    private fun parse(json: String) = Json.parseToJsonElement(json)
+    // --- ringFraction: the verdict ring follows the real score ---
 
     @Test
-    fun rewritesOnlyTheRingTrimEnd_toTheScore() {
-        // Whole-tree equality: the trim end keyframes become 40, every decoy 72 stays as authored.
-        assertEquals(parse(reveal(40)), parse(morningRevealJson(reveal(72), 40)))
-        assertEquals(parse(reveal(72)), parse(morningRevealJson(reveal(72), 72)))
+    fun theRingFillsToExactlyTheScore() {
+        assertEquals(0.64f, ringFraction(64), 0f)
+        assertEquals(0f, ringFraction(0), 0f)
+        assertEquals(1f, ringFraction(100), 0f)
     }
 
     @Test
-    fun clampsTheScoreToAPercentage() {
-        assertEquals(parse(reveal(100)), parse(morningRevealJson(reveal(72), 150)))
-        assertEquals(parse(reveal(0)), parse(morningRevealJson(reveal(72), -5)))
-    }
-
-    @Test
-    fun unexpectedShapes_returnTheInputUnchanged() {
-        listOf(
-            reveal(72, ringLayer = "Some other ring"), // no ring layer
-            reveal(40), // no example value left to replace
-            """{"layers":"none"}""",
-            """{"layers":[{"nm":"Recovery ring","shapes":{"nm":"Ring progress"}}]}""",
-            """{"layers":[{"nm":"Recovery ring","shapes":[{"nm":"Ring progress","it":[{"ty":"tm","e":72}]}]}]}""",
-            """[72]""",
-            """{not json""",
-        ).forEach { raw -> assertSame(raw, morningRevealJson(raw, 50)) }
+    fun theRingClampsToAPercentage() {
+        assertEquals(1f, ringFraction(150), 0f)
+        assertEquals(0f, ringFraction(-5), 0f)
     }
 }

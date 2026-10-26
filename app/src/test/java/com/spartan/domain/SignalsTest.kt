@@ -43,7 +43,6 @@ class SignalsTest {
         val s = SignalEngine.signal(MetricType.HRV_RMSSD, series(MetricType.HRV_RMSSD, 60.0, 62.0, 64.0, 66.0, 40.0))!!
         assertEquals(SignalPosition.LEARNING, s.position)
         assertNull(s.normalLow)
-        assertNull(s.favorable)
         assertEquals(4, s.baselineDays)
     }
 
@@ -55,7 +54,6 @@ class SignalsTest {
         assertEquals(66.0, s.normalHigh!!, 1e-9)
         assertEquals(SignalPosition.WITHIN, s.position)
         assertEquals(64.0, s.latest, 1e-9)
-        assertNull(s.favorable)
     }
 
     @Test
@@ -67,33 +65,13 @@ class SignalsTest {
     }
 
     @Test
-    fun aboveAndBelowFollowEachMetricsHealthyDirection() {
+    fun aboveAndBelowAreTheDirectionOnly_whicheverWayIsHealthy() {
+        // Position is where the reading sits, never a grade: a high resting HR is ABOVE just as a high HRV is.
         val base = doubleArrayOf(60.0, 62.0, 64.0, 66.0, 68.0)
-        val hrvHigh = SignalEngine.signal(MetricType.HRV_RMSSD, series(MetricType.HRV_RMSSD, *base, 80.0))!!
-        assertEquals(SignalPosition.ABOVE, hrvHigh.position)
-        assertEquals(true, hrvHigh.favorable)
-
-        val hrvLow = SignalEngine.signal(MetricType.HRV_RMSSD, series(MetricType.HRV_RMSSD, *base, 40.0))!!
-        assertEquals(SignalPosition.BELOW, hrvLow.position)
-        assertEquals(false, hrvLow.favorable)
-
-        val rhrHigh = SignalEngine.signal(MetricType.RESTING_HEART_RATE, series(MetricType.RESTING_HEART_RATE, *base, 80.0))!!
-        assertEquals(false, rhrHigh.favorable)
-
-        val rrHigh = SignalEngine.signal(MetricType.RESPIRATORY_RATE, series(MetricType.RESPIRATORY_RATE, *base, 80.0))!!
-        assertEquals(false, rrHigh.favorable)
-
-        val strainHigh = SignalEngine.signal(MetricType.DAY_STRAIN, series(MetricType.DAY_STRAIN, *base, 80.0))!!
-        assertEquals(SignalPosition.ABOVE, strainHigh.position)
-        assertNull(strainHigh.favorable)
-    }
-
-    @Test
-    fun healthyDirections() {
-        assertEquals(true, SignalEngine.healthyDirectionUp(MetricType.HRV_RMSSD))
-        assertEquals(false, SignalEngine.healthyDirectionUp(MetricType.SLEEP_DEBT))
-        assertEquals(false, SignalEngine.healthyDirectionUp(MetricType.RESPIRATORY_RATE))
-        assertNull(SignalEngine.healthyDirectionUp(MetricType.ENERGY_KCAL))
+        listOf(MetricType.HRV_RMSSD, MetricType.RESTING_HEART_RATE, MetricType.RESPIRATORY_RATE, MetricType.DAY_STRAIN).forEach { metric ->
+            assertEquals(metric.name, SignalPosition.ABOVE, SignalEngine.signal(metric, series(metric, *base, 80.0))!!.position)
+            assertEquals(metric.name, SignalPosition.BELOW, SignalEngine.signal(metric, series(metric, *base, 40.0))!!.position)
+        }
     }
 
     @Test
@@ -138,21 +116,9 @@ class SignalsTest {
         assertEquals(listOf(MetricType.RECOVERY_SCORE, MetricType.DAY_STRAIN), SignalEngine.signals(readings).map { it.metric })
     }
 
-    @Test
-    fun everyMeaningIsSafeCopy() {
-        val positions = listOf(SignalPosition.ABOVE, SignalPosition.BELOW, SignalPosition.WITHIN, SignalPosition.LEARNING)
-        val metrics = SignalEngine.DAILY + MetricType.ENERGY_KCAL
-        val seen = mutableSetOf<String>()
-        metrics.forEach { metric ->
-            positions.forEach { pos ->
-                val text = SignalEngine.meaning(Signal(metric, 1.0, listOf(1.0), 0.0, 2.0, pos))
-                assertTrue("unsafe: $text", safety.validateCopy(text))
-                seen += text
-            }
-        }
-        // 7 metrics x 3 outcomes + learning + the generic fallback for metrics without a script.
-        assertEquals(23, seen.size)
-    }
+    // What a reading means is copy, not engine logic: Insights and metric detail share string
+    // resources, checked line by line through SafetyEngine in InsightsCopyTest
+    // (everyMeaningLine_onInsightsAndInDetail_isSafeWellnessCopy).
 
     // --- ActionPlaybook ---------------------------------------------------------------------
 
@@ -167,6 +133,57 @@ class SignalsTest {
                 assertTrue(a.minutes > 0)
             }
         }
+    }
+
+    @Test
+    fun everyActionsWhy_isObservationalWellnessCopy_notAClaimAboutTheBody() {
+        // The old lines' physiological outcome claims: "the state that lifts HRV", "the most reliable
+        // way to lower resting heart rate", "boosts circulation", "anchors your body clock"...
+        val claims = Regex(
+            """\b(lifts?|raises?|boosts?|lowers?|improves?|protects?|anchors?|supports?)\b|rest-and-recover|nervous system|""" +
+                """circulation|body clock|deep sleep|dehydration|fuel|long-term health|most reliable|sleep deeper""",
+            RegexOption.IGNORE_CASE,
+        )
+        val actions = MetricType.entries.flatMap { ActionPlaybook.forMetric(it) }.distinctBy { it.key }
+        assertEquals(11, actions.size)
+        actions.forEach { assertFalse("${it.key}: ${it.why}", claims.containsMatchIn(it.why)) }
+    }
+
+    @Test
+    fun uniqueFirstActions_neverRepeatAnActionAcrossTheCards() {
+        val picks = ActionPlaybook.uniqueFirstActions(SignalEngine.DAILY)
+        // Every pick is distinct, and each is one of its own metric's actions.
+        assertEquals(picks.size, picks.values.map { it.key }.toSet().size)
+        picks.forEach { (metric, action) -> assertTrue(metric.name, action in ActionPlaybook.forMetric(metric)) }
+        // Sleep performance keeps its wind-down; sleep debt gets the next lever instead of repeating it.
+        assertEquals("wind-down", picks.getValue(MetricType.SLEEP_PERFORMANCE).key)
+        assertEquals("caffeine-cutoff", picks.getValue(MetricType.SLEEP_DEBT).key)
+        // HRV keeps breathing; respiratory rate's breathing and water are both taken, so it gets none.
+        assertEquals("breathing", picks.getValue(MetricType.HRV_RMSSD).key)
+        assertEquals("hydrate", picks.getValue(MetricType.RESTING_HEART_RATE).key)
+        assertFalse(MetricType.RESPIRATORY_RATE in picks)
+        // A metric with nothing taken before it keeps its best action.
+        assertEquals(ActionPlaybook.forMetric(MetricType.RECOVERY_SCORE).first(), picks.getValue(MetricType.RECOVERY_SCORE))
+    }
+
+    @Test
+    fun uniqueFirstActions_followTheCardOrder() {
+        // Order decides who keeps a shared action: debt first takes the wind-down, so sleep moves on.
+        val picks = ActionPlaybook.uniqueFirstActions(listOf(MetricType.SLEEP_DEBT, MetricType.SLEEP_PERFORMANCE))
+        assertEquals("wind-down", picks.getValue(MetricType.SLEEP_DEBT).key)
+        assertEquals("caffeine-cutoff", picks.getValue(MetricType.SLEEP_PERFORMANCE).key)
+        // Respiratory rate alone keeps its breathing.
+        assertEquals("breathing", ActionPlaybook.uniqueFirstActions(listOf(MetricType.RESPIRATORY_RATE)).getValue(MetricType.RESPIRATORY_RATE).key)
+    }
+
+    @Test
+    fun uniqueFirstActions_skipClinicianFirstLabsAndRepeatedMetrics() {
+        assertTrue(ActionPlaybook.uniqueFirstActions(emptyList()).isEmpty())
+        assertTrue(ActionPlaybook.uniqueFirstActions(listOf(MetricType.APOB, MetricType.CAC)).isEmpty())
+        // The same metric twice keeps its first pick rather than taking a second action.
+        val twice = ActionPlaybook.uniqueFirstActions(listOf(MetricType.HRV_RMSSD, MetricType.HRV_RMSSD, MetricType.RESPIRATORY_RATE))
+        assertEquals("breathing", twice.getValue(MetricType.HRV_RMSSD).key)
+        assertEquals("hydrate", twice.getValue(MetricType.RESPIRATORY_RATE).key)
     }
 
     @Test

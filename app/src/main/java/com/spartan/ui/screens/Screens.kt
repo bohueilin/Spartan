@@ -293,7 +293,8 @@ fun AddMetricScreen(
         Box {
             FilledTonalButton(onClick = { expanded = true }) { Text(type.label) }
             DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                MetricType.entries.forEach {
+                // Blood pressure is not offered (HIDDEN_METRICS); readings already stored keep their type.
+                MetricType.entries.filterNot { it in HIDDEN_METRICS }.forEach {
                     DropdownMenuItem(text = { Text(it.label) }, onClick = { type = it; expanded = false })
                 }
             }

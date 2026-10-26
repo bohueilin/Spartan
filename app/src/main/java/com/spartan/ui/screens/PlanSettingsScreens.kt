@@ -80,7 +80,6 @@ import com.spartan.ui.components.PageGutter
 import com.spartan.ui.components.PrimaryButton
 import com.spartan.ui.components.SecondaryButton
 import com.spartan.ui.components.SpartanCard
-import com.spartan.ui.components.WellnessFooter
 import com.spartan.ui.theme.Radius
 import com.spartan.ui.theme.Spacing
 import java.time.DayOfWeek
@@ -103,7 +102,10 @@ fun PressureWindowsScreen(
     onBack: () -> Unit,
 ) {
     DetailScaffold(stringResource(R.string.you_windows), onBack) {
-        item { PageIntro(stringResource(R.string.coach_windows_intro)) }
+        item {
+            val lead = StressPatterns.PRE_WINDOW_LEAD_MINUTES
+            PageIntro(stringResource(R.string.coach_windows_intro, pluralStringResource(R.plurals.you_windows_lead, lead, lead)))
+        }
         item { PressureWindowsCard(state.pressureWindows, onAddWindow, onRemoveWindow) }
     }
 }
@@ -137,7 +139,6 @@ fun TrainingWeekScreen(
     DetailScaffold(stringResource(R.string.plan_title), onBack) {
         item { PageIntro(state.weeklyPlan?.focus.orEmpty()) }
         item { Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) { WeeklyPlanSection(state, onEditMinutes, onComplete) } }
-        item { WellnessFooter() }
     }
 }
 

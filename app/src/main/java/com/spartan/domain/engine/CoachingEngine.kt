@@ -223,11 +223,15 @@ class CoachingEngine(
         else -> "Recovery first. Today is for rebuilding."
     }
 
+    /**
+     * A banner only when the day itself calls for a caution — a low-recovery day. The general
+     * "wellness guidance, not medical advice" line is not repeated here: Today already carries it
+     * once as its in-context line, and the full disclaimer lives in You → About.
+     */
     private fun safetyBannerFor(readiness: ReadinessSnapshot): String? = when {
         readiness.band == ReadinessBand.REST ->
             "Pushing hard on a low-recovery day rarely pays off. Keep intensity low and stop if anything hurts."
-        else ->
-            "This is wellness and fitness guidance, not medical advice. Stop and seek care for pain, illness, or unusual symptoms."
+        else -> null
     }
 
     private companion object {
@@ -425,7 +429,7 @@ class RuleBasedRecommendationSource(
     private fun breathwork(r: ReadinessSnapshot, day: Long): DailyActivity = activity(day, "breathing",
         "5-minute breathing protocol", ActivityCategory.BREATHWORK, ActivityPriority.RECOMMENDED,
         RuleIds.LOW_HRV_TREND, MetricType.HRV_RMSSD,
-        why = "Your HRV is trending below baseline, a sign of accumulated stress. Slow breathing helps you downshift.",
+        why = "Your HRV is below your usual. Slow breathing is an easy way to downshift tonight.",
         steps = listOf("Sit comfortably.", "Inhale 4 seconds, exhale 6 seconds.",
             "Repeat for 5 minutes, relaxing the shoulders."),
         minutes = 5, intensity = Intensity.REST, time = TimeOfDay.EVENING, note = null)
@@ -433,7 +437,7 @@ class RuleBasedRecommendationSource(
     private fun rhrCheckIn(r: ReadinessSnapshot, day: Long): DailyActivity = activity(day, "hydrate-rest",
         "Hydration and easy-day check-in", ActivityCategory.HYDRATION, ActivityPriority.RECOMMENDED,
         RuleIds.ELEVATED_RHR_TREND, MetricType.RESTING_HEART_RATE,
-        why = "Resting heart rate is up versus your baseline — often a cue to hydrate, ease intensity, and check sleep.",
+        why = "Resting heart rate is above your usual — a good cue to hydrate, ease intensity, and check how you slept.",
         steps = listOf("Front-load water this morning.", "Keep training easy today.",
             "If you feel unwell, rest and monitor how you feel."),
         minutes = 5, intensity = Intensity.REST, time = TimeOfDay.MORNING, note = null)
@@ -554,7 +558,7 @@ class RuleBasedRecommendationSource(
         return activity(day, "clinician", "Check in with how you feel", ActivityCategory.RECOVERY,
             ActivityPriority.REQUIRED, RuleIds.CLINICIAN_REFERRAL, metric,
             why = "One or more of $readings is outside your usual range. This is not a diagnosis, and one reading is not a conclusion.",
-            steps = listOf("Notice any symptoms like illness, unusual fatigue, or feeling unwell.",
+            steps = listOf("Notice how you feel today — energy, sleep, anything unusual.",
                 "Rest and take it easy today.",
                 "If readings stay unusual or you have symptoms, consider consulting a qualified clinician."),
             minutes = 2, intensity = Intensity.REST, time = TimeOfDay.MORNING,

@@ -11,9 +11,9 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.core.app.ApplicationProvider
-import com.spartan.ui.components.MorningReveal
 import com.spartan.ui.components.OneShot
 import com.spartan.ui.components.OneShotKey
+import com.spartan.ui.components.RecoveryRing
 import com.spartan.ui.theme.LocalCalmMode
 import com.spartan.ui.theme.SpartanTheme
 import com.spartan.ui.theme.rememberReducedMotion
@@ -32,7 +32,7 @@ import org.robolectric.annotation.Config
 /**
  * The calmer theme on the JVM: it swaps in the quieter colour scheme while keeping the neutrals,
  * and it stills motion app-wide — rememberReducedMotion() turns true with system animations on, so
- * the one-shot Lottie moments show their final frame. A plain Application keeps app start-up
+ * the one-shot moments (the verdict ring, the Lottie check) show their final state. A plain Application keeps app start-up
  * (Hilt, WorkManager) out of UI tests.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -112,25 +112,25 @@ class CalmThemeTest {
     }
 
     @Test
-    fun calmerTheme_morningRevealShowsTheFinalFrame_withoutReportingAPlay() {
+    fun calmerTheme_verdictRingShowsTheFinalArc_andUsesTheMomentUp() {
         var played = 0
         composeRule.setContent {
             SpartanTheme(calmer = true) {
-                MorningReveal(64, MaterialTheme.colorScheme.primary, playOnce = true, onPlayed = { played++ })
+                RecoveryRing(64, MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.surfaceVariant, playOnce = true, onPlayed = { played++ })
             }
         }
 
         composeRule.onNode(SemanticsMatcher.keyIsDefined(OneShotKey), useUnmergedTree = true)
             .assert(SemanticsMatcher.expectValue(OneShotKey, OneShot.SHOW_FINAL))
-        assertEquals(0, played)
+        assertEquals(1, played)
     }
 
     @Test
-    fun standardTheme_morningRevealStillPlaysOnce() {
+    fun standardTheme_verdictRingStillSweepsOnce() {
         var played = 0
         composeRule.setContent {
             SpartanTheme {
-                MorningReveal(64, MaterialTheme.colorScheme.primary, playOnce = true, onPlayed = { played++ })
+                RecoveryRing(64, MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.surfaceVariant, playOnce = true, onPlayed = { played++ })
             }
         }
 

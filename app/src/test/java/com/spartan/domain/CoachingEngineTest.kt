@@ -70,6 +70,17 @@ class CoachingEngineTest {
     }
 
     @Test
+    fun safetyBanner_onlyCautionsALowRecoveryDay_neverRepeatsTheDisclaimer() {
+        val rest = engine.buildPlan(readiness(recovery = 25)).safetyBanner
+        assertNotNull(rest)
+        assertTrue(rest!!.contains("low-recovery day"))
+        // Today carries the general "not medical advice" line once, as its own in-context line.
+        for (recovery in listOf(40, 60, 80)) {
+            assertNull("recovery $recovery", engine.buildPlan(readiness(recovery = recovery)).safetyBanner)
+        }
+    }
+
+    @Test
     fun primed_greenlightsAQualityStrengthSession() {
         val plan = engine.buildPlan(readiness(recovery = 80))
         assertEquals(ReadinessBand.PRIMED, plan.band)
@@ -95,6 +106,10 @@ class CoachingEngineTest {
         assertNotNull(referral)
         assertEquals(ActivityPriority.REQUIRED, referral!!.priority)
         assertTrue(referral.instructions.joinToString(" ").contains("clinician", ignoreCase = true))
+        // A wellness check-in, never an illness signal: how you feel, in plain words.
+        assertEquals("Notice how you feel today — energy, sleep, anything unusual.", referral.instructions.first())
+        val said = (listOf(referral.title, referral.whyItMatters) + referral.instructions).joinToString(" ")
+        listOf("illness", "sick").forEach { assertFalse("\"$it\" in: $said", said.contains(it, ignoreCase = true)) }
     }
 
     @Test

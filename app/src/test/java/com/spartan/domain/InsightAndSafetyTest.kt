@@ -6,6 +6,7 @@ import com.spartan.domain.engine.SafetyEngine
 import com.spartan.domain.model.MetricReading
 import com.spartan.domain.model.MetricType
 import com.spartan.domain.model.TargetValue
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -75,5 +76,36 @@ class InsightAndSafetyTest {
 
         assertTrue(insight.explanation.contains("above the normal clinical range", ignoreCase = true))
         assertFalse(insight.explanation.contains("in the normal range", ignoreCase = true))
+    }
+
+    @Test
+    fun insightCards_carryTheMetricTheyAreAbout_soTheUiCanHideBloodPressureByType() {
+        // The BP card carries the half it was told from: here the out-of-range diastolic.
+        val bp = InsightEngine().generate(
+            listOf(
+                metricEngine.assess(MetricReading(MetricType.SYSTOLIC_BP, 112.0)),
+                metricEngine.assess(MetricReading(MetricType.DIASTOLIC_BP, 85.0)),
+            ),
+        ).single()
+        assertEquals(MetricType.DIASTOLIC_BP, bp.metric)
+        // Both halves in range: the card is told from the first, systolic.
+        val normal = InsightEngine().generate(
+            listOf(
+                metricEngine.assess(MetricReading(MetricType.SYSTOLIC_BP, 102.0)),
+                metricEngine.assess(MetricReading(MetricType.DIASTOLIC_BP, 67.0)),
+            ),
+        ).single()
+        assertEquals(MetricType.SYSTOLIC_BP, normal.metric)
+
+        // Every other single-metric card carries its own metric.
+        val singles = listOf(
+            MetricReading(MetricType.FASTING_GLUCOSE, 92.0),
+            MetricReading(MetricType.TG_HDL_RATIO, 2.5),
+            MetricReading(MetricType.VITAMIN_D_25OH, 32.0),
+            MetricReading(MetricType.RESTING_HEART_RATE, 64.0),
+            MetricReading(MetricType.BMI, 24.0),
+        )
+        val cards = InsightEngine().generate(singles.map { metricEngine.assess(it) })
+        assertEquals(singles.map { it.type }, cards.map { it.metric })
     }
 }

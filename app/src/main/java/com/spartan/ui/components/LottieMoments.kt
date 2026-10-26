@@ -4,34 +4,30 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.ScaleFactor
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.SemanticsPropertyKey
 import androidx.compose.ui.semantics.SemanticsPropertyReceiver
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
@@ -48,29 +44,21 @@ import com.airbnb.lottie.compose.rememberLottieComposition
 import com.airbnb.lottie.compose.rememberLottieDynamicProperties
 import com.airbnb.lottie.compose.rememberLottieDynamicProperty
 import com.spartan.R
-import com.spartan.domain.model.ReadinessBand
 import com.spartan.ui.theme.Radius
 import com.spartan.ui.theme.Spacing
 import com.spartan.ui.theme.SpartanTheme
-import com.spartan.ui.theme.bandColor
+import com.spartan.ui.theme.completionGreen
+import com.spartan.ui.theme.onCompletionGreen
 import com.spartan.ui.theme.rememberReducedMotion
-import kotlinx.serialization.SerializationException
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.doubleOrNull
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.roundToInt
 
 /**
  * What a one-shot state-change animation shows: its first frame, one play-through, or its last
- * frame. The moments here (res/raw, see SPARTAN_LOTTIE_USAGE.md) — the completion morph when an
- * action is checked, the morning reveal when the verdict is ready — play once on the change itself,
- * never on a loop or on every screen visit. They are feedback that something changed, never a
- * medical result.
+ * frame. The moments — the completion morph when an action is checked (res/raw/completion_morph,
+ * see SPARTAN_LOTTIE_USAGE.md) and the verdict ring sweep ([RecoveryRing], drawn in Compose) — play
+ * once on the change itself, never on a loop or on every screen visit. They are feedback that
+ * something changed, never a medical result.
  */
 enum class OneShot { SHOW_START, PLAY_ONCE, SHOW_FINAL }
 
@@ -90,15 +78,9 @@ val OneShotKey = SemanticsPropertyKey<OneShot>("OneShot")
 var SemanticsPropertyReceiver.oneShot: OneShot by OneShotKey
 
 // Layer and group names in res/raw, as Lottie KeyPaths; "**" reaches the unnamed fill or stroke.
-private const val RingLayer = "Recovery ring"
-private const val RingProgressGroup = "Ring progress"
 internal val MorphCardLayer = arrayOf("Action card")
 internal val MorphCircleFill = arrayOf("Check circle", "Circle", "**")
 internal val MorphCheckStroke = arrayOf("Check mark", "Check", "**")
-internal val RevealHorizonFill = arrayOf("Horizon", "Horizon line", "**")
-internal val RevealSunFill = arrayOf("Sun", "Sun disc", "**")
-internal val RevealRingTrack = arrayOf(RingLayer, "Ring track", "**")
-internal val RevealRingProgress = arrayOf(RingLayer, RingProgressGroup, "**")
 
 // completion_morph.json geometry, in composition units (240 x 160): the check circle is 44 across,
 // centred at (52, 80), and overshoots to 110% while it pops in.
@@ -114,22 +96,20 @@ private val CheckCircle = 28.dp
 // Frames 0-11 of the morph only move the card, which the row draws itself — skip the empty lead-in.
 private val CirclePopsIn = LottieClipSpec.Frame(min = 12)
 
-// The card half of the morph, matching the Lottie's own 16 -> 28 corner over frames 0-36 at 60 fps.
-// The same tokens back MaterialTheme.shapes.medium / extraLarge, so the two cannot drift.
-private val RestCardRadius = Radius.medium
+// The card half of the morph: the action card's own radius (20dp) to the Lottie's 28dp end corner,
+// over the Lottie's frames 0-36 at 60 fps. The same tokens back MaterialTheme.shapes.large /
+// extraLarge, so the two cannot drift.
+private val RestCardRadius = Radius.card
 private val DoneCardRadius = Radius.extraLarge
 private const val MorphMillis = 600
-
-// morning_reveal.json is 320 x 240; its ring is authored at this example score.
-private const val RevealAspectRatio = 320f / 240f
-private const val ExampleRingEnd = 72.0
 
 /**
  * The visual inside an action row's 48dp check target. The caller keeps the toggleable 48dp box
  * (Role.Checkbox) and its state description; this adds no semantics beyond [OneShotKey]. Unchecked
  * is an outline circle in onSurfaceVariant — the role M3's Checkbox uses for its unchecked border,
- * 7.64:1 light / 7.90:1 dark on the row's surface (outline was 2.35 / 2.06:1, under WCAG 1.4.11's
- * 3:1 for the only cue of the control). Checking it while shown pops in the filled check once.
+ * 7.77:1 light / 7.90:1 dark on the row's surface (WCAG 1.4.11 asks 3:1 for the only cue of the
+ * control). Done is a filled zone-green circle ([completionGreen], 5.33:1 light / 8.98:1 dark) with
+ * its check mark ([onCompletionGreen]); checking it while shown pops the filled check in once.
  */
 @Composable
 fun CompletionCheck(done: Boolean, modifier: Modifier = Modifier) {
@@ -145,8 +125,8 @@ fun CompletionCheck(done: Boolean, modifier: Modifier = Modifier) {
     val recolour = rememberLottieDynamicProperties(
         // The row's own card does the corner and tint half of the morph (rememberCompletionMorph).
         rememberLottieDynamicProperty(LottieProperty.TRANSFORM_OPACITY, 0, *MorphCardLayer),
-        rememberLottieDynamicProperty(LottieProperty.COLOR, colors.primary.toArgb(), *MorphCircleFill),
-        rememberLottieDynamicProperty(LottieProperty.STROKE_COLOR, colors.onPrimary.toArgb(), *MorphCheckStroke),
+        rememberLottieDynamicProperty(LottieProperty.COLOR, completionGreen().toArgb(), *MorphCircleFill),
+        rememberLottieDynamicProperty(LottieProperty.STROKE_COLOR, onCompletionGreen().toArgb(), *MorphCheckStroke),
     )
     Box(
         modifier.size(CheckRegion).clipToBounds().semantics { oneShot = playback },
@@ -171,13 +151,16 @@ fun CompletionCheck(done: Boolean, modifier: Modifier = Modifier) {
 data class CompletionMorph(val cornerRadius: Dp, val containerColor: Color)
 
 /**
- * Corner [MaterialTheme.shapes] medium -> extraLarge and container surface -> primaryContainer
- * when [done]. Only a check while shown animates (in step with [CompletionCheck]); the first
- * composition, reduce-motion and un-checking snap straight to the target.
+ * Corner [MaterialTheme.shapes] large -> extraLarge (20 -> 28dp) and container surface -> a faint
+ * zone-green tint ([completionContainer]) when [done]. Only a check while shown animates (in step
+ * with [CompletionCheck]); the first composition, reduce-motion and un-checking snap straight to
+ * the target. The tint is deliberately faint: a done row keeps its full-contrast title and no
+ * strikethrough — it reads as done, never as disabled.
  */
 @Composable
 fun rememberCompletionMorph(done: Boolean): CompletionMorph {
     val colors = MaterialTheme.colorScheme
+    val doneContainer = completionContainer()
     val animate = rememberOneShot(done) == OneShot.PLAY_ONCE
     val radius by animateDpAsState(
         if (done) DoneCardRadius else RestCardRadius,
@@ -185,7 +168,7 @@ fun rememberCompletionMorph(done: Boolean): CompletionMorph {
         label = "completionRadius",
     )
     val container by animateColorAsState(
-        if (done) colors.primaryContainer else colors.surface,
+        if (done) doneContainer else colors.surface,
         if (animate) tween(MorphMillis) else snap(),
         label = "completionContainer",
     )
@@ -193,92 +176,14 @@ fun rememberCompletionMorph(done: Boolean): CompletionMorph {
 }
 
 /**
- * The morning verdict visual: the sun rises, then the ring draws to the real [recoveryScore].
- * Plays once when [playOnce] and motion is allowed, calling [onPlayed] as it starts so leaving
- * mid-way never replays it; otherwise shows the final frame. Decorative to TalkBack — the caller
- * states colour, word and number in text.
+ * A done action's card: zone green at 8% (light) / 12% (dark) over the surface, opaque. onSurface
+ * and onSurfaceVariant keep ≥6.3:1 on it in both themes (TokenContrastTest).
  */
 @Composable
-fun MorningReveal(
-    recoveryScore: Int,
-    ringColor: Color,
-    playOnce: Boolean,
-    onPlayed: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val reducedMotion = rememberReducedMotion()
-    // Decided once per visit: the caller turning playOnce off after onPlayed must not cut it short.
-    val playback = remember { oneShotPlayback(endState = true, changedWhileShown = playOnce, reducedMotion = reducedMotion) }
-    val latestOnPlayed by rememberUpdatedState(onPlayed)
-    LaunchedEffect(Unit) { if (playback == OneShot.PLAY_ONCE) latestOnPlayed() }
-
-    val resources = LocalContext.current.resources
-    val raw = remember { resources.openRawResource(R.raw.morning_reveal).bufferedReader().use { it.readText() } }
-    val score = recoveryScore.coerceIn(0, 100)
-    val json = remember(raw, score) { morningRevealJson(raw, score) }
-    val composition by rememberLottieComposition(LottieCompositionSpec.JsonString(json), cacheKey = "morning_reveal_$score")
-    val progress by animateLottieCompositionAsState(composition, isPlaying = playback == OneShot.PLAY_ONCE, iterations = 1)
-    val colors = MaterialTheme.colorScheme
-    val recolour = rememberLottieDynamicProperties(
-        rememberLottieDynamicProperty(LottieProperty.COLOR, colors.outline.toArgb(), *RevealHorizonFill),
-        rememberLottieDynamicProperty(LottieProperty.COLOR, colors.tertiary.toArgb(), *RevealSunFill),
-        rememberLottieDynamicProperty(LottieProperty.STROKE_COLOR, colors.surfaceContainerHighest.toArgb(), *RevealRingTrack),
-        rememberLottieDynamicProperty(LottieProperty.STROKE_COLOR, ringColor.toArgb(), *RevealRingProgress),
-    )
-    LottieAnimation(
-        composition = composition,
-        progress = { if (playback == OneShot.PLAY_ONCE) progress else 1f },
-        modifier = modifier.aspectRatio(RevealAspectRatio).clearAndSetSemantics { oneShot = playback },
-        dynamicProperties = recolour,
-    )
+fun completionContainer(): Color {
+    val surface = MaterialTheme.colorScheme.surface
+    return completionGreen().copy(alpha = if (isSystemInDarkTheme()) 0.12f else 0.08f).compositeOver(surface)
 }
-
-/**
- * The morning-reveal JSON with its example 72% ring replaced by the real score: every 72 among the
- * keyframe values of the "Recovery ring" -> "Ring progress" trim path end becomes
- * [recoveryScore] (clamped to 0-100); everything else is left as authored. Returns [raw] itself
- * when that path or those values are missing, or the text is not a JSON object.
- */
-internal fun morningRevealJson(raw: String, recoveryScore: Int): String {
-    val root = try {
-        Json.parseToJsonElement(raw) as? JsonObject
-    } catch (e: SerializationException) {
-        null
-    } ?: return raw
-    val score = JsonPrimitive(recoveryScore.coerceIn(0, 100))
-    var rewrote = false
-    fun scored(value: JsonElement): JsonElement =
-        if ((value as? JsonPrimitive)?.doubleOrNull == ExampleRingEnd) score.also { rewrote = true } else value
-
-    // layers[nm = Recovery ring] -> shapes[nm = Ring progress] -> it[ty = tm] -> e.k[] keyframes' s / e.
-    val updated = root.mapItems("layers", where = { it.text("nm") == RingLayer }) { layer ->
-        layer.mapItems("shapes", where = { it.text("nm") == RingProgressGroup }) { group ->
-            group.mapItems("it", where = { it.text("ty") == "tm" && it["e"] is JsonObject }) { trim ->
-                val end = (trim.getValue("e") as JsonObject).mapItems("k") { keyframe ->
-                    JsonObject(
-                        keyframe.mapValues { (key, values) ->
-                            if ((key == "s" || key == "e") && values is JsonArray) JsonArray(values.map(::scored)) else values
-                        },
-                    )
-                }
-                JsonObject(trim + ("e" to end))
-            }
-        }
-    }
-    return if (rewrote) updated.toString() else raw
-}
-
-/** This object with the array at [key] rebuilt: object items matching [where] go through [transform]. */
-private fun JsonObject.mapItems(
-    key: String,
-    where: (JsonObject) -> Boolean = { true },
-    transform: (JsonObject) -> JsonObject,
-): JsonObject {
-    val items = this[key] as? JsonArray ?: return this
-    return JsonObject(this + (key to JsonArray(items.map { if (it is JsonObject && where(it)) transform(it) else it })))
-}
-
-private fun JsonObject.text(key: String): String? = (this[key] as? JsonPrimitive)?.contentOrNull
 
 /**
  * The [OneShot] for an end state that can change while shown (an action's check). The first
@@ -318,20 +223,6 @@ private fun CompletionCheckPreview() {
         Row(Modifier.padding(Spacing.lg), horizontalArrangement = Arrangement.spacedBy(Spacing.lg)) {
             CompletionCheck(done = false)
             CompletionCheck(done = true)
-        }
-    }
-}
-
-@Preview(name = "Morning reveal", showBackground = true, widthDp = 360)
-@Composable
-private fun MorningRevealPreview() {
-    SpartanTheme {
-        Row(
-            Modifier.background(MaterialTheme.colorScheme.background).padding(Spacing.lg),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.lg),
-        ) {
-            MorningReveal(28, bandColor(ReadinessBand.REST), playOnce = false, onPlayed = {}, modifier = Modifier.weight(1f))
-            MorningReveal(86, bandColor(ReadinessBand.PRIMED), playOnce = false, onPlayed = {}, modifier = Modifier.weight(1f))
         }
     }
 }

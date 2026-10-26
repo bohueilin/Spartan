@@ -31,17 +31,6 @@ data class Signal(
 ) {
     /** Days of history behind the normal range (the latest reading is not part of it). */
     val baselineDays: Int get() = history.size - 1
-
-    /** True if the reading moved the healthy way, false the other way; null inside the range or when neither way is better. */
-    val favorable: Boolean?
-        get() {
-            val up = SignalEngine.healthyDirectionUp(metric) ?: return null
-            return when (position) {
-                SignalPosition.ABOVE -> up
-                SignalPosition.BELOW -> !up
-                else -> null
-            }
-        }
 }
 
 object SignalEngine {
@@ -85,63 +74,6 @@ object SignalEngine {
         return Signal(metric, latest, series, low, high, position, dates)
     }
 
-    /**
-     * Which way is healthy, judged against the user's own baseline. Respiratory rate counts as
-     * lower-is-healthier because a rise over baseline is the signal worth noticing; strain and
-     * energy have no healthy direction at all.
-     */
-    fun healthyDirectionUp(metric: MetricType): Boolean? = when (metric) {
-        MetricType.DAY_STRAIN, MetricType.ENERGY_KCAL -> null
-        MetricType.RESPIRATORY_RATE -> false
-        else -> !metric.lowerIsBetter
-    }
-
-    /** One plain sentence on what this reading means for today. Observational, never diagnostic. */
-    fun meaning(signal: Signal): String {
-        if (signal.position == SignalPosition.LEARNING) {
-            return "Spartan learns your normal from about a week of readings. Keep wearing WHOOP."
-        }
-        val fav = signal.favorable
-        return when (signal.metric) {
-            MetricType.RECOVERY_SCORE -> when (fav) {
-                false -> "Your body is still recovering. Gentle movement beats intensity today."
-                true -> "You're better recovered than usual — a good window for a quality session."
-                null -> "Typical recovery for you. A balanced day of steady work fits."
-            }
-            MetricType.HRV_RMSSD -> when (fav) {
-                false -> "Lower HRV often follows short sleep, alcohol, or hard training. Keep today easier and protect tonight's sleep."
-                true -> "Higher than usual — your nervous system is well rested."
-                null -> "Steady. Consistent sleep and easy aerobic work keep it here."
-            }
-            MetricType.RESTING_HEART_RATE -> when (fav) {
-                false -> "Up versus your usual. Hydrate, keep training easy, and check how you slept."
-                true -> "Lower than usual — a sign of good recovery and aerobic fitness."
-                null -> "Steady. Regular Zone 2 work lowers it slowly over months."
-            }
-            MetricType.SLEEP_PERFORMANCE -> when (fav) {
-                false -> "You got less of the sleep you needed. A wind-down tonight helps you catch up."
-                true -> "Better sleep than usual — recovery should follow."
-                null -> "Steady sleep. Consistent bed and wake times keep it that way."
-            }
-            MetricType.SLEEP_DEBT -> when (fav) {
-                false -> "More sleep debt than usual. An earlier lights-out tonight pays some of it down."
-                true -> "Less sleep debt than usual. Keep the rhythm."
-                null -> "Typical sleep debt for you."
-            }
-            MetricType.RESPIRATORY_RATE -> when (fav) {
-                false -> "Higher than your usual. It often rises after hard effort or when you are run down — take it easy and notice how you feel."
-                true -> "Calm and steady."
-                null -> "Steady — one of your most stable signals, so changes are worth noticing."
-            }
-            MetricType.DAY_STRAIN -> when (signal.position) {
-                SignalPosition.ABOVE -> "A bigger day than usual. Pair it with extra recovery tonight."
-                SignalPosition.BELOW -> "A lighter day than usual."
-                else -> "A typical load for you."
-            }
-            else -> "Compare this with your recent trend rather than any single reading."
-        }
-    }
-
     /** Linear-interpolated percentile of an already-sorted, non-empty list. */
     private fun percentile(sorted: List<Double>, p: Double): Double {
         val rank = p * (sorted.size - 1)
@@ -173,35 +105,35 @@ object ActionPlaybook {
     const val USER_ADDED_RULE = "USER_ADDED"
 
     private val breathing = SuggestedAction("breathing", "5-minute breathing protocol", 5,
-        "Slow, exhale-led breathing shifts you toward rest-and-recover — the state that lifts HRV.",
+        "Slow, exhale-led breathing is an easy way to downshift before bed.",
         ActivityCategory.BREATHWORK, Intensity.REST, TimeOfDay.EVENING,
         listOf("Sit comfortably.", "Inhale for 4 seconds, exhale for 6.", "Repeat for 5 minutes, shoulders relaxed."))
     private val easyWalk = SuggestedAction("easy-walk", "15-minute easy walk", 15,
-        "Easy movement boosts circulation and recovery without adding strain.",
+        "An easy walk keeps you moving without adding strain.",
         ActivityCategory.ZONE2, Intensity.EASY, TimeOfDay.MIDDAY,
         listOf("Walk at a conversational pace.", "Keep effort easy — you should be able to talk."))
     private val zone2 = SuggestedAction("zone2", "25-minute Zone 2 session", 25,
-        "Steady aerobic work is the most reliable way to lower resting heart rate and raise HRV over weeks.",
+        "Regular easy aerobic work tends to bring resting heart rate down slowly, over months.",
         ActivityCategory.ZONE2, Intensity.MODERATE, TimeOfDay.AFTERNOON,
         listOf("Walk briskly, cycle, or row.", "Hold a pace where you can still talk.", "Finish feeling like you could keep going."))
     private val mobility = SuggestedAction("mobility", "10-minute mobility flow", 10,
-        "Gentle range-of-motion work supports recovery without adding load.",
+        "Gentle range-of-motion work loosens you up without adding load.",
         ActivityCategory.MOBILITY, Intensity.EASY, TimeOfDay.MORNING,
         listOf("Move through hips, ankles, upper back, and shoulders.", "Slow, controlled reps — never force the end range."))
     private val windDown = SuggestedAction("wind-down", "Sleep wind-down routine", 20,
-        "A consistent wind-down helps you fall asleep faster and sleep deeper.",
+        "A consistent wind-down makes it easier to be in bed on time.",
         ActivityCategory.SLEEP, Intensity.REST, TimeOfDay.EVENING,
         listOf("Dim screens 45 minutes before lights-out.", "Keep the room cool and dark.", "Same bedtime as last night, give or take 30 minutes."))
     private val caffeineCutoff = SuggestedAction("caffeine-cutoff", "Caffeine cutoff at 2 PM", 1,
-        "Caffeine lingers for hours, so an early cutoff protects tonight's deep sleep.",
+        "Many people find falling asleep easier with no caffeine after early afternoon.",
         ActivityCategory.NUTRITION, Intensity.REST, TimeOfDay.MIDDAY,
         listOf("Switch to water or decaf after 2 PM."))
     private val morningLight = SuggestedAction("morning-light", "10 minutes of morning daylight", 10,
-        "Morning light anchors your body clock, so falling asleep on time gets easier.",
+        "Daylight soon after waking is a simple habit, and many people find bedtime comes easier with it.",
         ActivityCategory.MOVEMENT, Intensity.EASY, TimeOfDay.MORNING,
         listOf("Step outside within an hour of waking.", "A short walk counts — no sunglasses if comfortable."))
     private val hydrate = SuggestedAction("hydrate", "Front-load your water", 2,
-        "Mild dehydration nudges resting heart rate up; an early glass helps.",
+        "An early glass of water is an easy way to start the day.",
         ActivityCategory.HYDRATION, Intensity.REST, TimeOfDay.MORNING,
         listOf("Drink a full glass of water now.", "Keep a bottle within reach this morning."))
     private val stretchReset = SuggestedAction("stretch-reset", "10-minute stretch and reset", 10,
@@ -209,11 +141,11 @@ object ActionPlaybook {
         ActivityCategory.MOBILITY, Intensity.EASY, TimeOfDay.EVENING,
         listOf("Light full-body stretching.", "Breathe slowly and stay comfortable."))
     private val mealWalk = SuggestedAction("meal-walk", "10-minute walk after a meal", 10,
-        "A short walk after eating helps your body handle the meal.",
+        "A short, easy walk after a meal is a simple way to add movement to your day.",
         ActivityCategory.ZONE2, Intensity.EASY, TimeOfDay.ANYTIME,
         listOf("Walk easily for 10 minutes after your biggest meal."))
     private val strength = SuggestedAction("strength", "30-minute strength session", 30,
-        "Building muscle improves how your body uses fuel and supports long-term health.",
+        "Regular strength work tends to make everyday lifting and carrying feel easier, over months.",
         ActivityCategory.STRENGTH, Intensity.MODERATE, TimeOfDay.AFTERNOON,
         listOf("Warm up for 5 minutes.", "3–4 compound movements with clean form.", "Leave 2–3 reps in reserve."))
 
@@ -233,6 +165,25 @@ object ActionPlaybook {
         MetricType.SYSTOLIC_BP, MetricType.DIASTOLIC_BP -> listOf(zone2, breathing, easyWalk)
         MetricType.VITAMIN_D_25OH -> listOf(morningLight)
         MetricType.APOB, MetricType.LPA, MetricType.CAC, MetricType.CUSTOM -> emptyList()
+    }
+
+    /**
+     * One action per metric for a list of cards shown together, so no suggestion repeats on screen:
+     * each metric, in [metrics] order, gets its first [forMetric] action that no earlier metric
+     * already took (Sleep debt no longer echoes Sleep performance's wind-down, nor respiratory rate
+     * HRV's breathing). A metric whose actions are all taken gets none — it is left out of the map —
+     * and a metric listed twice keeps its first pick.
+     */
+    fun uniqueFirstActions(metrics: List<MetricType>): Map<MetricType, SuggestedAction> {
+        val picked = LinkedHashMap<MetricType, SuggestedAction>()
+        val taken = mutableSetOf<String>()
+        metrics.forEach { metric ->
+            if (metric in picked) return@forEach
+            val action = forMetric(metric).firstOrNull { it.key !in taken } ?: return@forEach
+            taken += action.key
+            picked[metric] = action
+        }
+        return picked
     }
 
     /** The action as a plan item for [dayEpoch]. Same action, same day → same id, so re-adding is a no-op. */

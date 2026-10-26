@@ -4,23 +4,26 @@ The canonical reference for how Spartan's Android UI is built. Code is the sourc
 `ui/theme/` (tokens, colors, type) and `ui/components/Components.kt` (the shared building blocks).
 Brand palette and marketing assets live in [VISUAL_AND_VIDEO_GUIDE.md](VISUAL_AND_VIDEO_GUIDE.md).
 
-The direction follows the patterns of best-in-class consumer apps (Airbnb is the explicit
-reference): a white canvas, soft-shadow cards, a bold type scale with large page titles, one
-primary action per page, and nothing on screen that the user can't act on or doesn't need.
+The direction is Material 3 Expressive, restrained (`SPARTAN_WORLD_CLASS_SPEC.md`, 2026-10-25):
+one hero per screen, one primary action per screen, one emphasised headline per screen, and
+everything else quieter. A barely-tinted canvas, flat outlined cards (no stacked shadows), a
+filled deep-teal hero, colour that means something (the recovery zone, always with its word and
+number), and nothing on screen that the user can't act on or doesn't need.
 
 ## 1. Product principle: every number leads to an action
 
 A number on its own is trivia. Every signal Spartan shows answers three questions, in order:
 
 1. **Where am I?** The latest value, read against *your own normal*: the middle half (25th–75th
-   percentile) of your prior days, not a population average. Shown as a shaded band on the chart
-   and as a plain status: *Higher than usual*, *Lower than usual*, *In your normal range*, or
-   *Still learning your normal* (until there are 5 prior days).
-2. **What does it mean?** One safe, plain-language sentence (`SignalEngine.meaning`). It never
+   percentile) of your prior days, not a population average. Shown as a shaded, labelled band on
+   the chart ("Your usual 49–78%") and as a plain status: *In your usual range* (only when it is),
+   *Above your usual*, *Below your usual*, or still learning (until there are 5 prior days).
+2. **What does it mean?** One safe, plain-language sentence (`insightMeaningRes` in
+   `InsightsScreen.kt`, shared by metric detail; Recovery's line also follows its zone). It never
    diagnoses and follows the AGENTS.md health-safety rules.
-3. **What do I do?** A concrete action from `ActionPlaybook` with an **Add to today** button. The
-   added activity lands in today's plan, the row flips to *In today's plan*, and a snackbar
-   offers **Undo**.
+3. **What do I do?** At most one concrete action from `ActionPlaybook`, unique across the cards
+   on screen (`ActionPlaybook.uniqueFirstActions`), with an **Add** button. The added activity
+   lands in today's plan, the row flips to *In today's plan*, and a snackbar offers **Undo**.
 
 Domain code: `domain/engine/Signals.kt` (`SignalEngine`, `ActionPlaybook`, `SleepPlanner`).
 User-added activities carry `ruleId = "USER_ADDED"` so they never stop the daily plan from being
@@ -32,22 +35,24 @@ Four tabs. The bottom bar shows only on tab roots; pushed pages are immersive.
 
 | Tab | Job | Key surfaces |
 |---|---|---|
-| **Today** | What to do now | Readiness ring + "What's driving it" (HRV, resting HR, sleep, strain vs. your normal) · Today's plan · Tonight (bedtime target from sleep debt) · Consistency |
-| **Insights** | Make sense of the data | One card per daily signal: value, status, sparkline with your normal band, meaning, and a "Try" action · Lab results |
-| **Progress** | Is it working? | Goal · this week's stats · next week's focus · trends · reflections · training week |
-| **You** | Settings and trust | Profile · plan settings (goal, weekly plan, high-pressure windows, healthy ranges) · Connections · Reminders · Privacy |
+| **Today** | What to do now | Hero verdict (ring to the real score + zone word + number) · one primary action (start / next / set bedtime / add wind-down) · 3–5 checkable actions · Why today? · Tonight (always an action) · Last 7 days · the one in-context safety line |
+| **Insights** | Make sense of the data | One card per daily signal, each in its own colour: value, status, chart with labelled usual band, day labels and latest point, one plain line, at most one unique "Try" · weekday patterns · lab results (no blood pressure) |
+| **Progress** | Is it working? | Goal hero (ring vs. weekly target, or goal setup as the primary action) · week stats with definitions · forgiving consistency · projection range bands with the illustrative-estimate disclaimer · weekly review · trends · training week |
+| **You** | Settings and trust | Profile header · Your plan (goal, weekly plan, plan settings, reminders, high-pressure windows) · Data and devices (connections, healthy ranges) · Display · Privacy · one About row (version, full disclaimer, licences) |
 
 Pushed pages: metric detail, add/edit metric, workout log, connections, reminders, privacy,
-training week, pressure windows, healthy ranges, diagnostics (debug only).
+training week, pressure windows, healthy ranges, about, diagnostics (debug only).
 
 ## 3. Tokens
 
 | Token | Value | Notes |
 |---|---|---|
 | Spacing | 4 / 8 / 12 / 16 / 20 / 24, section 32 | `Spacing.xs…xxl`, `Spacing.section`; page gutter is 24 (`PageGutter`) |
-| Radius | chip 8 · tile 12 · card 20 | Buttons and pills are fully round (`CircleShape`) |
-| Motion | 140 / 220 / 420 ms | Fast (check-off), medium (state change), slow (reveal). All respect reduced motion. |
-| Canvas | light `#FFFFFF` · dark `#0A0F0E` | Mirrored in iOS `spartanBackground` |
+| Radius | chip 8 · tile 12 · card 20 · hero 28 | Buttons and pills are fully round (`CircleShape`) |
+| Touch target | 48dp (`MinTouchTarget`) | Every action row and icon button, even when the visible icon is smaller |
+| Motion | springs: `Motion.measure()` (no overshoot — rings, charts, progress), `settle()` (state changes); the check pop is the Lottie completion morph | Only on a state change; `rememberReducedMotion()` (system setting or Calmer theme) shows the final state. Opacity fades keep 140 / 220 / 420 ms tweens. A reduced-motion sight still uses a one-shot up. |
+| Canvas | light `#F6F8F7` · dark `#0A0F0E` | iOS `spartanBackground` still has the pre-redesign value |
+| Colour | primary `#0B5B4F`, onSurfaceVariant `#46564F`, hero `#0B5B4F`, zones (text / mark / on-hero) | `SpartanBands`, `SpartanZones`, `heroColors()`, `metricAccent()`; every pair checked by `TokenContrastTest` |
 
 Every Material 3 color role is defined for light and dark in `Theme.kt`, so no baseline purple
 can leak through a default component.
@@ -73,15 +78,18 @@ exception; it can't use Compose typography.)
 
 | Component | Use it for |
 |---|---|
-| `SpartanCard` | The one card. Light: soft wide shadow, no heavy border. Dark: lifted surface + hairline. Optional `onClick` with an `onClickLabel`. |
-| `ScreenTitle` | Tab root title + optional subtitle and trailing slot (e.g. `SampleDataChip`). |
+| `SpartanCard` | The one card: flat, 20dp, a hairline outline, no shadow, both themes. Optional `onClick` with an `onClickLabel`. |
+| `HeroCard` | The one filled deep-teal surface per screen (28dp). Text uses `heroColors()`; the zone uses `zoneOnHeroColor`. |
+| `ScreenTitle` | Tab root title (the screen's one headline) + optional subtitle and trailing slot (e.g. `SampleDataChip`). |
 | `SectionHeader` | Section title with an optional text action. |
 | `StatusPill` + `Tone` | Calm status: POSITIVE, NEUTRAL, CAUTION, ALERT, INFO. Replaces red borders and shouty caps. |
 | `IconTile` | Rounded 44dp icon tile tinted by category or status. |
 | `ListRow` | Settings-style row: icon tile, title, subtitle, chevron. |
-| `PrimaryButton` / `SecondaryButton` | 52dp minimum, fully round, grows with font scale. One primary per page. |
+| `PrimaryButton` / `SecondaryButton` / `HeroTextButton` | 52dp minimum, fully round, centred labels that grow with font scale. One primary per page; `onHero = true` inverts it on a hero. |
 | `DetailScaffold` / `DetailPage` | Every pushed page: quiet back arrow, large title in the content, optional sticky bottom action bar (the "Reserve" pattern). |
-| `Sparkline` | Trend with gradient fill, end dot, and an optional shaded "your normal" band. |
+| `TrendChart` (`Charts.kt`) | A metric's days: labelled "your usual" band, line, day labels that thin evenly at large text, the latest point labelled, one TalkBack summary, draws in once per session. |
+| `RecoveryRing` / `MeasureRing` (`Charts.kt`) | A ring that fills to exactly the value (butt caps), sweeping once with no overshoot; final state under reduced motion. |
+| `CompletionCheck` / `rememberCompletionMorph` (`LottieMoments.kt`) | The green check pop and the done row's faint green, rounder card. No strikethrough. |
 
 Also shared: `SampleDataChip` (provenance; required on every surface showing sample data) and
 `SafetyBanner` (calm info banner with a polite live region).
@@ -103,8 +111,12 @@ Also shared: `SampleDataChip` (provenance; required on every surface showing sam
 - 48dp minimum touch targets (the plan check is a 28dp visual in a 48dp target).
 - Cards and tiles that open something carry an `onClickLabel` naming the destination ("Open HRV details").
 - Status text wraps instead of truncating at large font scales. It's the part that matters.
-- Headings carry `heading()` semantics. Charts are hidden from TalkBack (`clearAndSetSemantics {}`)
-  because the value, status, and normal range beside them say the same thing as text.
-- Verified at font scale 1.3 and in dark mode on the emulator.
+- Headings carry `heading()` semantics. Every chart is one TalkBack node whose description is the
+  takeaway in a sentence ("Recovery 64%, Yellow zone, within your usual of 49 to 78%, rising over
+  7 days"); its marks are not read one by one.
+- Colour is never alone: the zone is always its word and number; done is a filled check plus the
+  "Completed" state.
+- Verified on the emulator (2026-10-25) in light, dark and Calmer, at 200% font, with no clickable
+  smaller than 48dp on any tab.
 
 See also [ACCESSIBILITY.md](ACCESSIBILITY.md).

@@ -15,7 +15,7 @@ data class MetricExplainer(
     val metric: MetricType,
     val title: String,
     val whatItIs: String,          // 1-2 sentences, plain language
-    val whatMovesIt: List<String>, // 3-5 bullets (sleep, alcohol, stress, training load, hydration, illness...)
+    val whatMovesIt: List<String>, // 3-5 bullets (sleep, alcohol, stress, training load, hydration, feeling unwell...)
     val whatGoodLooksLike: String, // trends/consistency framing, NEVER clinical thresholds as judgments
     val howSpartanUsesIt: String,  // ties to the coaching rules in CoachingEngine
 )
@@ -39,7 +39,7 @@ object MetricExplainers {
                 "Training load from the previous day or two.",
                 "Alcohol, late meals, and dehydration.",
                 "Stress, travel, and irregular schedules.",
-                "Illness or feeling run down.",
+                "Feeling unwell — rest comes first on those days.",
             ),
             whatGoodLooksLike = "There is no prize for a perfect score every day. A good pattern " +
                 "is recovery that swings with your training and bounces back within a day or " +
@@ -53,23 +53,22 @@ object MetricExplainers {
             metric = MetricType.HRV_RMSSD,
             title = "Heart rate variability (HRV)",
             whatItIs = "HRV measures the small timing differences between your heartbeats, in " +
-                "milliseconds. It reflects how your nervous system is balancing effort and " +
-                "recovery from one day to the next.",
+                "milliseconds. It shifts with sleep, training load and stress, so it is most " +
+                "useful read against your own recent days.",
             whatMovesIt = listOf(
                 "Sleep, especially consistency and how late you go to bed.",
                 "Alcohol, which often lowers HRV the following night.",
                 "Hard training, which can suppress HRV for a day or two.",
                 "Mental stress and overall life load.",
-                "Hydration and coming down with something.",
+                "Hydration, and feeling unwell.",
             ),
             whatGoodLooksLike = "HRV is highly individual, so the raw number matters less than " +
                 "your own baseline. A good pattern is HRV that dips after hard days and returns " +
                 "to its usual range within a day or two, with a steady or gently rising trend " +
                 "over weeks.",
             howSpartanUsesIt = "Spartan watches your HRV against your own baseline, not a " +
-                "universal target. When it trends below that baseline, your plan adds a short " +
-                "slow-breathing protocol and leans easier, since suppressed HRV often signals " +
-                "accumulated stress.",
+                "universal target. When it runs below that baseline, your plan adds a short " +
+                "slow-breathing protocol and leans easier for the day.",
         ),
         MetricExplainer(
             metric = MetricType.RESTING_HEART_RATE,
@@ -80,7 +79,7 @@ object MetricExplainers {
                 "Aerobic fitness, which tends to lower it gradually over months.",
                 "Alcohol, late eating, and dehydration, which often raise it overnight.",
                 "Hard training or an unusually stressful day.",
-                "Heat, poor sleep, or getting sick.",
+                "Heat, poor sleep, or feeling unwell.",
             ),
             whatGoodLooksLike = "Focus on your own baseline rather than a universal number. A " +
                 "good pattern is a resting heart rate that stays near its usual range most " +
@@ -154,7 +153,7 @@ object MetricExplainers {
             whatItIs = "Respiratory rate is how many breaths you take per minute during sleep. " +
                 "For most people it is one of the steadiest signals WHOOP tracks.",
             whatMovesIt = listOf(
-                "Getting sick, which can nudge it upward for a stretch of nights.",
+                "Feeling unwell, or a run of short or disrupted nights.",
                 "Alcohol and heavy late meals.",
                 "Sleeping at altitude or in a very warm room.",
                 "Unusually high stress or training load.",

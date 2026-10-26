@@ -20,9 +20,12 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -33,6 +36,7 @@ import com.spartan.R
 import com.spartan.domain.engine.ActionPlaybook
 import com.spartan.domain.engine.MetricExplainers
 import com.spartan.domain.engine.MetricGlossary
+import com.spartan.domain.engine.Signal
 import com.spartan.domain.engine.SignalEngine
 import com.spartan.domain.engine.SuggestedAction
 import com.spartan.domain.engine.TrainingProfile
@@ -47,25 +51,38 @@ import com.spartan.ui.components.IconTile
 import com.spartan.ui.components.PrimaryButton
 import com.spartan.ui.components.SectionHeader
 import com.spartan.ui.components.SpartanCard
-import com.spartan.ui.components.Sparkline
 import com.spartan.ui.components.StatusPill
 import com.spartan.ui.components.Tone
-import com.spartan.ui.components.WellnessFooter
+import com.spartan.ui.components.TrendChart
 import com.spartan.ui.components.metricIcon
-import com.spartan.ui.components.toneColor
 import com.spartan.ui.theme.Spacing
+import com.spartan.ui.theme.metricAccent
+import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 
-/** Wearable metrics are read against the user's own normal; everything else against clinical ranges. */
+/** Wearable metrics are read against the user's own usual; everything else against clinical ranges. */
 private val WEARABLE_DETAIL = SignalEngine.DAILY.toSet() + MetricType.ENERGY_KCAL + MetricType.SLEEP_DURATION
+
+/** Entries a lab or body metric's chart shows, newest last. */
+private const val DETAIL_CHART_READINGS = 30
+
+/** Readings spanning fewer days than this are labelled by weekday; longer spans by date. */
+private const val WEEKDAY_LABEL_SPAN_DAYS = 7L
+
+/** Test tag on the "What this means for you" line. */
+internal const val DETAIL_MEANING_TAG = "detail-meaning"
 
 /**
  * One metric, laid out like a listing (level 2 → level 3): for a coached WHOOP metric, its one
- * human sentence, then the number against the user's usual and trend; its chart, what it means,
- * how to move it, and the raw entries last. A sticky bar puts the best action into today's plan.
- * Lab metrics keep their clinical-range presentation.
+ * human sentence, then the number against the user's usual and trend; its chart (the usual band
+ * labelled, day labels, the latest point labelled, one TalkBack summary), what it means — the same
+ * wellness line Insights shows ([insightMeaningRes]) — how to move it, and the raw entries last. A
+ * sticky bar puts the best action into today's plan, and "How to improve it" lists only the rest
+ * ([improveActions]), so no action shows twice. Lab metrics keep their clinical-range
+ * presentation. The tile and chart take the metric's colour, Recovery its zone's ([signalAccent]).
  */
 @Composable
 fun MetricDetailScreen(
@@ -87,6 +104,8 @@ fun MetricDetailScreen(
     // Coached WHOOP metrics carry a plain-language glossary entry; labs and body metrics do not.
     val glossary = MetricGlossary.entry(type)
     val title = glossary?.name ?: type.label
+    val facts = signal?.let { glossaryFacts(it, state) }
+    val accent = signal?.let { signalAccent(it) } ?: metricAccent(type)
 
     DetailScaffold(
         title = title,
@@ -96,11 +115,9 @@ fun MetricDetailScreen(
         },
     ) {
         item(key = "hero") {
-            val tone = signal?.let { signalStatus(it).second } ?: assessment?.let { clinicalTone(it.clinicalStatus) } ?: Tone.NEUTRAL
-            val facts = if (signal != null && glossary != null) glossaryFacts(signal, state) else null
             Column(Modifier.padding(top = Spacing.sm)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconTile(metricIcon(type), toneColor(tone), size = 52.dp)
+                    IconTile(metricIcon(type), accent, size = 52.dp)
                     Spacer(Modifier.weight(1f))
                     if (state.whoopIsMock && type in WEARABLE_DETAIL) SampleDataChip()
                 }
@@ -108,7 +125,7 @@ fun MetricDetailScreen(
                 glossary?.let {
                     Text(it.sentence, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(top = Spacing.lg))
                 }
-                if (signal != null && facts != null) {
+                if (signal != null && glossary != null && facts != null) {
                     val (status, statusTone) = signalStatus(signal)
                     // TalkBack hears the value, usual, trend and context as one sentence.
                     Column(Modifier.padding(top = Spacing.lg).clearAndSetSemantics { contentDescription = facts.summary }) {
@@ -143,18 +160,29 @@ fun MetricDetailScreen(
             }
         }
 
-        val trend = history.reversed().mapNotNull { it.value }.takeLast(30)
-        if (trend.size >= 2) {
+        val series = detailChartSeries(signal, history.reversed())
+        if (series.charted) {
             item(key = "chart") {
                 SpartanCard(Modifier.padding(top = Spacing.lg)) {
-                    Text(stringResource(R.string.detail_trend_title, trend.size), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
-                    Sparkline(
-                        trend,
-                        toneColor(signal?.let { signalStatus(it).second } ?: Tone.INFO),
-                        Modifier.padding(top = Spacing.md),
-                        signal?.normalLow,
-                        signal?.normalHigh,
-                        height = 160.dp,
+                    // Silent to TalkBack: the chart's summary below already says "last N readings".
+                    Text(
+                        stringResource(R.string.detail_trend_title, series.values.size),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.clearAndSetSemantics {},
+                    )
+                    TrendChart(
+                        values = series.values,
+                        dayLabels = rememberDetailDayLabels(series.dates),
+                        color = accent,
+                        summary = detailChartSummary(title, series.values, type, signal),
+                        latestLabel = formatMetricValue(series.values.last(), type),
+                        modifier = Modifier.padding(top = Spacing.md),
+                        usualLow = signal?.normalLow,
+                        usualHigh = signal?.normalHigh,
+                        usualLabel = facts?.usualLabel,
+                        drawKey = "detail-${type.name}",
+                        chartHeight = 160.dp,
                     )
                     // A collapsed usual draws no band, so there is nothing for the legend to point at.
                     if (signal?.normalLow != null && signal.normalLow != signal.normalHigh) {
@@ -167,18 +195,20 @@ fun MetricDetailScreen(
         item(key = "meaning") {
             SectionHeader(stringResource(R.string.detail_meaning))
             Text(
-                signal?.let { SignalEngine.meaning(it) } ?: assessment?.clinicalMessage ?: stringResource(R.string.detail_no_reading),
+                signal?.let { stringResource(insightMeaningRes(it)) } ?: assessment?.clinicalMessage ?: stringResource(R.string.detail_no_reading),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.testTag(DETAIL_MEANING_TAG),
             )
             assessment?.targetMessage?.takeIf { signal == null && it.isNotBlank() }?.let {
                 Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = Spacing.sm))
             }
         }
 
-        if (actions.isNotEmpty()) {
+        val listed = improveActions(actions)
+        if (listed.isNotEmpty()) {
             item(key = "improve-header") { SectionHeader(stringResource(R.string.detail_improve)) }
-            items(actions, key = { "action-" + it.key }) { action ->
+            items(listed, key = { "action-" + it.key }) { action ->
                 SpartanCard {
                     ActionLine(action, ActionPlaybook.isPlanned(action, state.todayActivities)) { onAddAction(action, type) }
                     Text(action.why, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = Spacing.sm))
@@ -267,8 +297,70 @@ fun MetricDetailScreen(
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             }
         }
-        item(key = "wellness") { WellnessFooter() }
     }
+}
+
+/**
+ * The actions "How to improve it" lists: all but the first, which the sticky bar already offers
+ * whenever there is one — so the top action and its Add button show once. Empty when the bar holds
+ * the only action, and the section is then left out.
+ */
+internal fun improveActions(actions: List<SuggestedAction>): List<SuggestedAction> = actions.drop(1)
+
+/**
+ * What metric detail charts, oldest first: a daily signal's own history — one reading per day, up
+ * to a month, with its days when they line up — or, for a lab or body metric, its last
+ * [DETAIL_CHART_READINGS] entries ([oldestFirst]) with the day each was recorded.
+ */
+internal fun detailChartSeries(signal: Signal?, oldestFirst: List<MetricReading>): ChartSeries {
+    if (signal != null) return ChartSeries(signal.history, if (MetricGlossary.hasDates(signal)) signal.dates else emptyList())
+    val entries = oldestFirst.mapNotNull { reading -> reading.value?.let { it to reading.recordedAt } }.takeLast(DETAIL_CHART_READINGS)
+    return ChartSeries(entries.map { it.first }, entries.map { it.second })
+}
+
+/**
+ * One day label per charted reading: the short weekday ("Mon") while the readings span under a
+ * week, else the date ("Oct 3") — over a month a weekday name would repeat — and [todayLabel] for
+ * [today]'s reading.
+ */
+internal fun detailDayLabels(dates: List<LocalDate>, today: LocalDate, todayLabel: String, locale: Locale): List<String> {
+    if (dates.isEmpty()) return emptyList()
+    val pattern = if (ChronoUnit.DAYS.between(dates.first(), dates.last()) < WEEKDAY_LABEL_SPAN_DAYS) "EEE" else "MMM d"
+    val format = DateTimeFormatter.ofPattern(pattern, locale)
+    return dates.map { if (it == today) todayLabel else it.format(format) }
+}
+
+@Composable
+private fun rememberDetailDayLabels(dates: List<LocalDate>): List<String> {
+    val todayLabel = stringResource(R.string.chart_today)
+    val locale = Locale.getDefault()
+    val today = LocalDate.now()
+    return remember(dates, today, todayLabel, locale) { detailDayLabels(dates, today, todayLabel, locale) }
+}
+
+/**
+ * The detail chart as one TalkBack sentence: its readings' lowest, highest and latest — Recovery's
+ * latest with its zone in words, as the chart's colour shows it ([signalZone]) — then the user's
+ * usual when there is one: "HRV, last 31 readings: lowest 28 ms, highest 41 ms, latest 33 ms, your
+ * usual 28 to 38 ms"; "…, latest 64%, Yellow zone, your usual 49 to 78%".
+ */
+@Composable
+private fun detailChartSummary(name: String, values: List<Double>, type: MetricType, signal: Signal?): String {
+    val value = formatMetricValue(values.last(), type)
+    val latest = signal?.let { signalZone(it) }?.let { zone ->
+        listOf(value, stringResource(R.string.glossary_zone, zone.label)).joinToString(stringResource(R.string.glossary_a11y_separator))
+    } ?: value
+    val range = pluralStringResource(
+        R.plurals.detail_chart_a11y,
+        values.size,
+        name,
+        values.size,
+        formatMetricValue(values.min(), type),
+        formatMetricValue(values.max(), type),
+        latest,
+    )
+    val usual = signal?.let { spokenUsual(it) } ?: return range
+    return stringResource(R.string.detail_chart_a11y_usual, range, usual)
 }
 
 /** The listing-style sticky footer: the best action for this metric, one tap from today's plan. */

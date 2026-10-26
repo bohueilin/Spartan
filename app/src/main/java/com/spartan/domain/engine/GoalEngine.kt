@@ -75,6 +75,12 @@ data class GoalProgress(
      * Null for outcome goals, which measure a reading rather than a count.
      */
     val sessionsThisWeek: Int? = null,
+    /**
+     * Habit goals: the body-signal context that [summary] ends with, without the session count
+     * ("resting HR -1.5 bpm since your goal started"), for a surface that already states the count. Null for
+     * outcome goals, and when the baseline or this week's readings are missing.
+     */
+    val contextNote: String? = null,
 )
 
 object GoalEngine {
@@ -207,12 +213,14 @@ object GoalEngine {
         if (sessionsThisWeek != null) {
             val weeklyTarget = goal.targetValue.coerceAtLeast(1.0)
             val fraction = (sessionsThisWeek / weeklyTarget).coerceIn(0.0, 1.0)
+            val context = contextNote(goal, readings, todayEpochDay)
             return GoalProgress(
                 fraction = fraction, timeFraction = timeFraction,
                 onTrack = fraction >= 0.5 || timeFraction < 0.2,
                 summary = "$sessionsThisWeek of ${weeklyTarget.toInt()} ${habitNoun(goal.type)}${if (weeklyTarget.toInt() == 1) "" else "s"} this week" +
-                    contextNote(goal, readings, todayEpochDay),
+                    (context?.let { " · $it" } ?: ""),
                 sessionsThisWeek = sessionsThisWeek,
+                contextNote = context,
             )
         }
 
@@ -236,12 +244,12 @@ object GoalEngine {
             // Report the direction the data actually moved: abs() here told a user who had gained
             // weight that they had lost it. A wrong-signed number is worse than a blunt one.
             GoalType.WEIGHT_LOSS -> if (achieved < 0) {
-                "${roundTo1(-achieved)} lb up vs baseline, $remainingWeeks wk left"
+                "${roundTo1(-achieved)} lb up since your goal started, $remainingWeeks wk left"
             } else {
                 "${roundTo1(achieved)} of ${goal.targetValue.toInt()} lb down, $remainingWeeks wk left"
             }
             else -> if (achieved < 0) {
-                "${roundTo1(-achieved)}% below baseline, $remainingWeeks wk left"
+                "${roundTo1(-achieved)}% lower since your goal started, $remainingWeeks wk left"
             } else {
                 "${roundTo1(achieved)}% of ${goal.targetValue.toInt()}% gained, $remainingWeeks wk left"
             }
@@ -264,17 +272,21 @@ object GoalEngine {
         else -> "calm session"
     }
 
-    /** " · resting HR -1.5 bpm vs baseline" — context beside a habit goal, empty without both numbers. */
-    private fun contextNote(goal: Goal, readings: List<MetricReading>, todayEpochDay: Long): String {
-        val baseline = goal.baselineValue ?: return ""
-        val now = trailingAverage(readings, metricFor(goal.type), todayEpochDay) ?: return ""
+    /**
+     * "resting HR -1.5 bpm since your goal started" — context beside a habit goal, against the value
+     * captured when the goal started (never called "baseline" on screen, where "your usual" is the
+     * personal range). Null without both numbers.
+     */
+    private fun contextNote(goal: Goal, readings: List<MetricReading>, todayEpochDay: Long): String? {
+        val baseline = goal.baselineValue ?: return null
+        val now = trailingAverage(readings, metricFor(goal.type), todayEpochDay) ?: return null
         val d = now - baseline
         val (label, unit) = when (goal.type) {
             GoalType.FITNESS -> "resting HR" to " bpm"
             GoalType.RECOVERY -> "recovery" to "%"
             else -> "HRV" to " ms"
         }
-        return " · $label ${if (d >= 0) "+" else ""}${roundTo1(d)}$unit vs baseline"
+        return "$label ${if (d >= 0) "+" else ""}${roundTo1(d)}$unit since your goal started"
     }
 
     /**

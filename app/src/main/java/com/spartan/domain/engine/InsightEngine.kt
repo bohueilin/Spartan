@@ -49,6 +49,7 @@ class InsightEngine(
                 "Ask whether additional lab context would be useful.",
             ),
             confidence = Confidence.MODERATE,
+            metric = assessment.reading.type,
         )
     }
 
@@ -62,6 +63,7 @@ class InsightEngine(
         ),
         clinicianTriggers = listOf("Discuss persistent elevation or family history with a clinician."),
         confidence = if (assessment.clinicalStatus == ClinicalStatus.ABOVE_RANGE) Confidence.MODERATE else Confidence.LOW,
+        metric = assessment.reading.type,
     )
 
     private fun vitaminDInsight(assessment: MetricAssessment): InsightCard = InsightCard(
@@ -80,6 +82,7 @@ class InsightEngine(
         ),
         clinicianTriggers = listOf("Ask a clinician what target range is appropriate for you."),
         confidence = Confidence.MODERATE,
+        metric = assessment.reading.type,
     )
 
     private fun rhrInsight(assessment: MetricAssessment): InsightCard = InsightCard(
@@ -100,6 +103,7 @@ class InsightEngine(
         ),
         clinicianTriggers = listOf("Seek care for new symptoms, unusual palpitations, chest pain, or fainting."),
         confidence = Confidence.MODERATE,
+        metric = assessment.reading.type,
     )
 
     private fun bmiInsight(assessment: MetricAssessment): InsightCard = InsightCard(
@@ -113,6 +117,7 @@ class InsightEngine(
         ),
         clinicianTriggers = listOf("Discuss weight strategy if changes are rapid, unexplained, or stressful."),
         confidence = Confidence.HIGH,
+        metric = assessment.reading.type,
     )
 
     private fun bpInsight(assessment: MetricAssessment): InsightCard = InsightCard(
@@ -128,6 +133,8 @@ class InsightEngine(
         safeActions = listOf("Keep logging occasional readings and note stress, caffeine, and timing."),
         clinicianTriggers = listOf("Discuss repeated high or unusually low symptomatic readings with a clinician."),
         confidence = Confidence.MODERATE,
+        // The half the card was told from: SYSTOLIC_BP or DIASTOLIC_BP.
+        metric = assessment.reading.type,
     )
 
     private fun validate(card: InsightCard): InsightCard {

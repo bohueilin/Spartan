@@ -41,7 +41,7 @@ public enum MetricExplainers {
                 "Sleep amount and quality the night before",
                 "Training load from the past few days",
                 "Alcohol, late meals, and late screens",
-                "Stress, travel, and getting sick",
+                "Stress, travel, and feeling unwell",
             ],
             whatGoodLooksLike: "Nobody is green every day. A healthy pattern cycles through green, yellow, and red across a week, with a weekly average that holds steady or drifts up.",
             howSpartanUsesIt: "Recovery sets the intensity band for your daily plan: primed days green-light quality training, and low days shift the plan toward rest and recovery actions."
@@ -49,12 +49,12 @@ public enum MetricExplainers {
         MetricExplainer(
             metric: .hrvRmssd,
             title: "HRV",
-            whatItIs: "Heart rate variability: the tiny beat-to-beat differences in timing between heartbeats, measured in milliseconds during deep sleep. More variability generally reflects a well-recovered nervous system.",
+            whatItIs: "Heart rate variability: the tiny beat-to-beat differences in timing between heartbeats, measured in milliseconds during deep sleep. It shifts with sleep, training load and stress, so it is most useful read against your own recent days.",
             whatMovesIt: [
                 "Hard training and accumulated fatigue",
                 "Sleep quality and consistency",
                 "Alcohol and late eating",
-                "Stress, illness, and dehydration",
+                "Stress, dehydration, and feeling unwell",
             ],
             whatGoodLooksLike: "HRV is personal, so comparing yours with anyone else's is not useful. What matters is your own baseline and a trend that holds steady or climbs over weeks.",
             howSpartanUsesIt: "Spartan watches HRV against your recent baseline. A sustained dip nudges the plan toward easier days and more recovery work."
@@ -89,7 +89,7 @@ public enum MetricExplainers {
             title: "Respiratory rate",
             whatItIs: "How many breaths you take per minute while you sleep. For most people it sits in a narrow band and barely moves night to night.",
             whatMovesIt: [
-                "Getting sick is the most common cause of a rise",
+                "Feeling unwell, or a run of short or disrupted nights",
                 "Altitude and heat",
                 "Alcohol close to bedtime",
             ],
@@ -115,7 +115,7 @@ public enum MetricExplainers {
             whatMovesIt: [
                 "Consistent aerobic training gradually lowers it",
                 "Alcohol, late meals, and dehydration push it up for a night",
-                "Illness, heat, and stress raise it temporarily",
+                "Heat, stress, or feeling unwell can raise it temporarily",
             ],
             whatGoodLooksLike: "Small day-to-day wobble around your baseline, with a slow drift downward over months of consistent training.",
             howSpartanUsesIt: "A resting heart rate clearly above your baseline adds a gentle check-in to your plan and tempers intensity for the day."

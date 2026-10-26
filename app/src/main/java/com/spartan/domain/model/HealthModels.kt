@@ -53,6 +53,11 @@ data class MetricAssessment(
     val targetMessage: String,
 )
 
+/**
+ * A lab-derived insight. [metric] is the one metric the card is about, when it is about one (a
+ * blood-pressure card carries the half it was told from), so the UI can show or hide it by type
+ * rather than by its wording; null for a card drawn from several metrics.
+ */
 data class InsightCard(
     val title: String,
     val explanation: String,
@@ -60,6 +65,7 @@ data class InsightCard(
     val safeActions: List<String>,
     val clinicianTriggers: List<String>,
     val confidence: Confidence,
+    val metric: MetricType? = null,
 )
 
 data class PlannedWorkout(

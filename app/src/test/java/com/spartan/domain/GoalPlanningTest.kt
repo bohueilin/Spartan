@@ -656,10 +656,10 @@ class GoalPlanningTest {
 
         val withBaseline = noBaseline.copy(baselineValue = 62.0)
         val down = GoalEngine.progress(withBaseline, week(MetricType.RESTING_HEART_RATE, 60.0), today, trainingSessionsThisWeek = 2)
-        assertEquals("2 of 3 training sessions this week · resting HR -2.0 bpm vs baseline", down.summary)
+        assertEquals("2 of 3 training sessions this week · resting HR -2.0 bpm since your goal started", down.summary)
         assertEquals(plain.fraction, down.fraction, 0.0) // context never moves the score
         val up = GoalEngine.progress(withBaseline, week(MetricType.RESTING_HEART_RATE, 63.5), today, trainingSessionsThisWeek = 2)
-        assertEquals("2 of 3 training sessions this week · resting HR +1.5 bpm vs baseline", up.summary)
+        assertEquals("2 of 3 training sessions this week · resting HR +1.5 bpm since your goal started", up.summary)
         assertEquals(plain.onTrack, up.onTrack)
         // A baseline without fresh readings: no note rather than a guess.
         assertEquals("2 of 3 training sessions this week", GoalEngine.progress(withBaseline, emptyList(), today, trainingSessionsThisWeek = 2).summary)
@@ -680,7 +680,7 @@ class GoalPlanningTest {
         val p = GoalEngine.progress(g, week(MetricType.RECOVERY_SCORE, 60.0), today, recoverySessionsThisWeek = 3)
         assertEquals(0.75, p.fraction, 0.0001)
         assertTrue(p.onTrack)
-        assertEquals("3 of 4 recovery sessions this week · recovery +5.0% vs baseline", p.summary)
+        assertEquals("3 of 4 recovery sessions this week · recovery +5.0% since your goal started", p.summary)
         assertSafe(p.summary)
         assertEquals(1.0, GoalEngine.progress(g, emptyList(), today, recoverySessionsThisWeek = 6).fraction, 0.0)
         assertEquals(
@@ -694,13 +694,41 @@ class GoalPlanningTest {
         val g = goal(GoalType.STRESS_RESILIENCE, 5.0, baseline = 35.0)
         val p = GoalEngine.progress(g, week(MetricType.HRV_RMSSD, 40.0), today, 3)
         assertEquals(0.6, p.fraction, 0.0001)
-        assertEquals("3 of 5 calm sessions this week · HRV +5.0 ms vs baseline", p.summary)
+        assertEquals("3 of 5 calm sessions this week · HRV +5.0 ms since your goal started", p.summary)
         // Tenths round rather than truncate: +2.9 stays +2.9, never +2.8.
-        assertEquals("3 of 5 calm sessions this week · HRV +2.9 ms vs baseline", GoalEngine.progress(g, week(MetricType.HRV_RMSSD, 37.9), today, 3).summary)
+        assertEquals("3 of 5 calm sessions this week · HRV +2.9 ms since your goal started", GoalEngine.progress(g, week(MetricType.HRV_RMSSD, 37.9), today, 3).summary)
         // Outcome goals are untouched by the habit counters.
         val sleep = goal(GoalType.SLEEP_RECOVERY, 10.0, baseline = 70.0, start = today - 7)
         val s = GoalEngine.progress(sleep, week(MetricType.SLEEP_PERFORMANCE, 77.0), today, 3, 3, 3)
         assertEquals(1.0, s.fraction, 0.01)
+    }
+
+    @Test
+    fun outcomeProgress_thatMovedTheOtherWay_saysSoAgainstWhereTheGoalStarted() {
+        // 80 kg at the start, 81 kg this week: 2.2 lb up, said plainly and never as "lost".
+        val weight = GoalEngine.progress(goal(GoalType.WEIGHT_LOSS, 6.0, baseline = 80.0), week(MetricType.WEIGHT, 81.0), today)
+        assertEquals("2.2 lb up since your goal started, 3 wk left", weight.summary)
+        // Sleep performance 70% at the start, 66.5% this week: 5% lower.
+        val sleep = GoalEngine.progress(goal(GoalType.SLEEP_RECOVERY, 10.0, baseline = 70.0), week(MetricType.SLEEP_PERFORMANCE, 66.5), today)
+        assertEquals("5.0% lower since your goal started, 3 wk left", sleep.summary)
+        assertSafe(weight.summary)
+        assertSafe(sleep.summary)
+    }
+
+    @Test
+    fun goalCopy_neverSaysBaseline_whereYourUsualIsThePersonalRange() {
+        val summaries = listOf(
+            GoalEngine.progress(goal(GoalType.WEIGHT_LOSS, 6.0, baseline = 80.0), week(MetricType.WEIGHT, 81.0), today),
+            GoalEngine.progress(goal(GoalType.WEIGHT_LOSS, 6.0, baseline = 80.0), week(MetricType.WEIGHT, 79.0), today),
+            GoalEngine.progress(goal(GoalType.SLEEP_RECOVERY, 10.0, baseline = 70.0), week(MetricType.SLEEP_PERFORMANCE, 66.5), today),
+            GoalEngine.progress(goal(GoalType.SLEEP_RECOVERY, 10.0, baseline = 70.0), week(MetricType.SLEEP_PERFORMANCE, 73.5), today),
+            GoalEngine.progress(goal(GoalType.FITNESS, 3.0, baseline = 62.0), week(MetricType.RESTING_HEART_RATE, 60.0), today, trainingSessionsThisWeek = 2),
+            GoalEngine.progress(goal(GoalType.RECOVERY, 4.0, baseline = 55.0), week(MetricType.RECOVERY_SCORE, 60.0), today, recoverySessionsThisWeek = 3),
+            GoalEngine.progress(goal(GoalType.STRESS_RESILIENCE, 5.0, baseline = 35.0), week(MetricType.HRV_RMSSD, 40.0), today, 3),
+        )
+        summaries.forEach { p ->
+            listOfNotNull(p.summary, p.contextNote).forEach { assertFalse(it, it.contains("baseline", ignoreCase = true)) }
+        }
     }
 
     @Test

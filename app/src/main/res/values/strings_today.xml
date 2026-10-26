@@ -31,7 +31,6 @@
     <string name="today_strain_range_a11y">Strain target %1$d to %2$d, %3$s</string>
     <string name="today_strain_under">Strain target under %1$d · %2$s</string>
     <string name="today_strain_under_a11y">Strain target under %1$d, %2$s</string>
-    <string name="today_bed_by">Bed by %1$s</string>
 
     <!-- Pending verdict: no colour, no number, never a guess. -->
     <string name="today_pending_title">Plan pending</string>
@@ -52,8 +51,6 @@
     <string name="today_why_data">See the data behind this</string>
 
     <!-- Tonight: hours got vs hours needed, never a fixed eight hours. -->
-    <string name="today_tonight_no_target_title">No bedtime target yet</string>
-    <string name="today_tonight_no_target_body">Spartan sets tonight\'s target after a night of WHOOP sleep data, or once you add your usual bedtime in your plan settings.</string>
     <string name="today_tonight_wind_down_need">Start winding down at %1$s for about %2$s of sleep — your estimated need.</string>
     <string name="today_tonight_wind_down_user">Start winding down at %1$s. Lights-out is the usual bedtime from your plan settings.</string>
     <string name="today_tonight_wind_down">Start winding down at %1$s.</string>

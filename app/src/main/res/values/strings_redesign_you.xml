@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- You and its About page (redesign). No badges or claims: the profile header is name and facts only. -->
+<resources>
+    <!-- The profile header's name before onboarding gave one (never a second "You" under the title). -->
+    <string name="you_profile_unnamed">Your profile</string>
+    <!-- Sex set, age not: show the choice, and invite only the missing fact. %1$s = coach_sex_*. -->
+    <string name="you_profile_sex_only">%1$s · add your age for tighter ranges</string>
+    <string name="you_section_about">About</string>
+    <!-- Plain words only: the version number itself is shown on the About page, never in the list. -->
+    <string name="you_about_subtitle">Version, disclaimer and licences</string>
+    <!-- StressPatterns.PRE_WINDOW_LEAD_MINUTES as a phrase, for you_windows_none, you_windows_set and
+         coach_windows_intro. -->
+    <plurals name="you_windows_lead">
+        <item quantity="one">%d minute</item>
+        <item quantity="other">%d minutes</item>
+    </plurals>
+    <!-- %1$d windows; %2$s = you_windows_lead. Only the app arms the nudge, so only on days it is opened. -->
+    <plurals name="you_windows_set">
+        <item quantity="one">%1$d set · on days you open Spartan, a breathing-reset nudge %2$s before it</item>
+        <item quantity="other">%1$d set · on days you open Spartan, a breathing-reset nudge %2$s before each</item>
+    </plurals>
+    <!-- About's own privacy line, beside the full disclaimer (wellness_disclaimer) and the in-context line. -->
+    <string name="about_privacy_line">Your data stays on this device. See Privacy for export and deletion.</string>
+    <string name="about_licences_title">Licences</string>
+</resources>

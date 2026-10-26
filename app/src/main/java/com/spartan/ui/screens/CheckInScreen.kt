@@ -14,9 +14,9 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -84,14 +84,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -99,9 +100,11 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.window.core.layout.WindowWidthSizeClass
 import com.spartan.R
 import com.spartan.domain.engine.ActionPlaybook
@@ -110,6 +113,7 @@ import com.spartan.domain.engine.MetricBenefits
 import com.spartan.domain.engine.MorningVerdict
 import com.spartan.domain.engine.PendingReason
 import com.spartan.domain.engine.PlanClock
+import com.spartan.domain.engine.PlanConstraints
 import com.spartan.domain.engine.PlanUrgency
 import com.spartan.domain.engine.RuleIds
 import com.spartan.domain.engine.Signal
@@ -130,22 +134,27 @@ import com.spartan.domain.model.ActivityStatus
 import com.spartan.domain.model.DailyActivity
 import com.spartan.domain.model.MetricType
 import com.spartan.ui.components.CompletionCheck
+import com.spartan.ui.components.HeroCard
 import com.spartan.ui.components.IconTile
-import com.spartan.ui.components.MorningReveal
 import com.spartan.ui.components.PageGutter
 import com.spartan.ui.components.PrimaryButton
+import com.spartan.ui.components.RecoveryRing
+import com.spartan.ui.components.ScreenTitle
+import com.spartan.ui.components.SecondaryButton
 import com.spartan.ui.components.SpartanCard
 import com.spartan.ui.components.StatusPill
 import com.spartan.ui.components.Tone
-import com.spartan.ui.components.WellnessFooter
 import com.spartan.ui.components.categoryIcon
 import com.spartan.ui.components.rememberCompletionMorph
 import com.spartan.ui.components.toneColor
+import com.spartan.ui.theme.HeroColors
+import com.spartan.ui.theme.MinTouchTarget
 import com.spartan.ui.theme.Motion
 import com.spartan.ui.theme.Radius
 import com.spartan.ui.theme.Spacing
+import com.spartan.ui.theme.heroColors
 import com.spartan.ui.theme.rememberReducedMotion
-import com.spartan.ui.theme.zoneColor
+import com.spartan.ui.theme.zoneOnHeroColor
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -197,11 +206,87 @@ private val LIST_MAX_WIDTH = 600.dp
 /** The two-pane layout's width cap on expanded windows: the plan list plus the "Why today?" pane. */
 private val TWO_PANE_MAX_WIDTH = 1080.dp
 
+/** The hero ring at the default font size; [heroRingSize] grows it with the font. */
+private val HERO_RING_SIZE = 112.dp
+
+/** The space between the ring and the verdict text beside it. */
+private val HERO_RING_GAP = Spacing.xl
+
+/** The narrowest the verdict text may get beside the ring at the default font size. */
+private val HERO_TEXT_MIN_WIDTH = 128.dp
+
+/** Test hook for "one hero per screen": the verdict card, Ready or Pending. */
+internal const val TODAY_HERO_TAG = "today-hero"
+
 /**
- * Today — the hero screen, answering one question: what should I do today? The morning verdict
- * (colour + word + number, one strain target, tonight's bedtime) or a calm "plan pending", then
- * 3–5 checkable actions with the next one dominant, an expandable "Why today?", and tonight's sleep
- * target. Every interactive element carries TalkBack semantics and a 48dp target.
+ * The hero ring's diameter: it grows with the font (up to 1.8×) so the number inside never
+ * outgrows the ring at large text sizes, and never shrinks below its default.
+ */
+internal fun heroRingSize(fontScale: Float): Dp = HERO_RING_SIZE * fontScale.coerceIn(1f, 1.8f)
+
+/**
+ * True when the verdict text fits beside the ring in [availableWidth]: at least
+ * [HERO_TEXT_MIN_WIDTH] at the default font size, scaled with the font. Otherwise the text drops
+ * below the ring, so large text wraps instead of clipping.
+ */
+internal fun heroRingBeside(availableWidth: Dp, ringSize: Dp, fontScale: Float): Boolean =
+    availableWidth - ringSize - HERO_RING_GAP >= HERO_TEXT_MIN_WIDTH * fontScale.coerceAtLeast(1f)
+
+/**
+ * The greeting for a device-local minute of day: morning from 5 AM until noon, afternoon until
+ * 5 PM, then evening — and still evening late at night, so 1 AM is never "Good morning".
+ */
+internal fun greetingRes(minuteOfDay: Int): Int {
+    val hour = minuteOfDay / 60
+    return when {
+        hour < 5 -> R.string.checkin_good_evening
+        hour < 12 -> R.string.checkin_good_morning
+        hour < 17 -> R.string.checkin_good_afternoon
+        else -> R.string.checkin_good_evening
+    }
+}
+
+/** Tonight's wind-down: the one playbook action the Tonight card offers. */
+internal fun tonightWindDown(): SuggestedAction = ActionPlaybook.forMetric(MetricType.SLEEP_DEBT).first()
+
+/**
+ * Whether the Tonight card shows its wind-down line. Always without a bedtime target, and with one
+ * until lights-out passes; after that only when the wind-down is already [planned] ("In today's
+ * plan") — the card says "keep the wind-down short", and nothing offers a time already gone.
+ */
+internal fun tonightShowsWindDown(plan: BedtimePlan?, nowMinuteOfDay: Int, planned: Boolean): Boolean =
+    plan == null || planned || !SleepPlanner.isPastLightsOut(plan, nowMinuteOfDay)
+
+/**
+ * What the one primary action under the hero opens: the next open action's sheet — "Start today's
+ * plan" while nothing is resolved ([first]), else "Next: <title>". [lightsOutPassed] marks the sleep
+ * anchor ("In bed by 10:40 PM") once its time has gone, so the button says "Next: Lights out soon"
+ * rather than a time already past.
+ */
+internal data class TodayNextStep(val activityId: String, val title: String, val first: Boolean, val lightsOutPassed: Boolean = false)
+
+/**
+ * The next step for [ordered] (the plan in display order), tonight's [bedtime] and the device's
+ * [nowMinuteOfDay]: the first action still open. Null with no plan at all (the empty-plan card says
+ * what to do instead) and null once every action is done or skipped — then there is no primary
+ * button: the Tonight card owns the night (bedtime and wind-down), so nothing is offered twice, and
+ * there is never an invented plan for tomorrow or a button that only scrolls. Adding the wind-down
+ * makes it an open action, so the step then becomes "Next: <its title>".
+ */
+internal fun todayNextStep(ordered: List<DailyActivity>, bedtime: BedtimePlan?, nowMinuteOfDay: Int): TodayNextStep? {
+    val resolved = { activity: DailyActivity -> activity.status == ActivityStatus.DONE || activity.status == ActivityStatus.SKIPPED }
+    val next = ordered.firstOrNull { !resolved(it) } ?: return null
+    val lightsOutPassed = next.ruleId == RuleIds.SLEEP_ANCHOR && bedtime != null && SleepPlanner.isPastLightsOut(bedtime, nowMinuteOfDay)
+    return TodayNextStep(next.id, next.title, first = ordered.none(resolved), lightsOutPassed = lightsOutPassed)
+}
+
+/**
+ * Today — the hero screen, answering one question: what should I do today? One hero (the morning
+ * verdict as ring + colour + word + number and one strain target — or a calm "plan pending"), one
+ * primary action under it while an action is still open ([todayNextStep]), then 3–5 checkable
+ * actions, an expandable "Why today?", and a Tonight card that always offers an action and owns
+ * the night: tonight's bedtime and wind-down live there, never in the hero or a second button. Every interactive element carries TalkBack semantics and a 48dp target. The full
+ * disclaimer lives in You → About; Today ends with its one short in-context line.
  *
  * On an expanded window (840dp+, M3's breakpoint) with a Ready verdict, "Why today?" becomes a
  * supporting pane beside the plan, always open with its driver tiles; everything else keeps its
@@ -226,6 +311,7 @@ fun CheckInScreen(
     bedtime: BedtimePlan? = null,
     onAddAction: (SuggestedAction, MetricType) -> Unit = { _, _ -> },
     onMorningRevealPlayed: (Long) -> Unit = {},
+    onSavePlanConstraints: (PlanConstraints) -> Unit = {},
 ) {
     // Device-local minute of day, re-read each minute so an untouched plan escalates live.
     val nowMinuteOfDay by produceState(initialValue = LocalTime.now().let { it.hour * 60 + it.minute }) {
@@ -241,6 +327,8 @@ fun CheckInScreen(
     var debriefForId by rememberSaveable { mutableStateOf<String?>(null) }
     var openActivityId by rememberSaveable { mutableStateOf<String?>(null) }
     var showAllActions by rememberSaveable { mutableStateOf(false) }
+    // Plan settings, opened from the Tonight card's "Set your usual bedtime".
+    var showPlanSettings by rememberSaveable { mutableStateOf(false) }
     val completeWithDebrief: (String) -> Unit = { id ->
         onComplete(id)
         state.todayActivities.firstOrNull { it.id == id && it.category in DEBRIEF_CATEGORIES }?.let { debriefForId = it.id }
@@ -252,8 +340,10 @@ fun CheckInScreen(
     val ordered = remember(state.todayActivities) {
         state.todayActivities.sortedWith(compareBy({ it.priority.ordinal }, { it.bestTimeOfDay.ordinal }))
     }
+    // Nothing to act on until the first sync settles; after that, a primary step only while an action is open.
+    val nextStep = if (loading) null else todayNextStep(ordered, bedtime, nowMinuteOfDay)
     // The first action still open is the one to do next — always on screen, even past the fold.
-    val nextId = ordered.firstOrNull { it.status != ActivityStatus.DONE && it.status != ActivityStatus.SKIPPED }?.id
+    val nextId = nextStep?.activityId
     // Rows the collapsed list has shown stay shown for this visit, so checking the next action past
     // the fold never pulls its row away mid-morph. Only an explicit "Show less" resets them.
     var keptActionIds by remember { mutableStateOf(emptySet<String>()) }
@@ -266,18 +356,24 @@ fun CheckInScreen(
     val why = state.whyToday?.takeIf { verdict is MorningVerdict.Ready }
     val expandedWidth = currentWindowAdaptiveInfo().windowSizeClass.windowWidthSizeClass == WindowWidthSizeClass.EXPANDED
     val whyPane = why?.takeIf { expandedWidth }
+    // One primary state: a resolved plan becomes the hero's headline, never a second card.
+    val finished = planFinished(state)
     // One list state for both layouts, so a window resize across the breakpoint keeps the scroll.
     val listState = rememberLazyListState()
     val listContent: LazyListScope.() -> Unit = {
-        item(key = "header") { TodayHeader(state, nowMinuteOfDay) }
+        item(key = "header") { TodayTitle(state, nowMinuteOfDay) }
         // The verdict is never fabricated: Ready, Pending, or (before the first sync settles) the
         // shared loading skeleton below, which stands in for the whole tab.
         when {
             verdict is MorningVerdict.Ready -> item(key = "verdict") {
-                // Past lights-out the Tonight card says "Lights out soon"; the chip never shows a time already gone.
-                ReadyVerdictCard(verdict, state, bedtime?.takeUnless { SleepPlanner.isPastLightsOut(it, nowMinuteOfDay) }, onOpenRecoveryExplainer, onMorningRevealPlayed)
+                ReadyHero(verdict, state, finished, onOpenRecoveryExplainer, onMorningRevealPlayed)
             }
-            verdict is MorningVerdict.Pending || state.syncFailed -> item(key = "verdict") { PendingVerdictCard(state) }
+            verdict is MorningVerdict.Pending || state.syncFailed -> item(key = "verdict") { PendingHero(state, finished) }
+        }
+        nextStep?.let { step ->
+            item(key = "primary") {
+                TodayPrimaryAction(step = step, onOpenAction = { openActivityId = it }, modifier = animatedItem(reducedMotion))
+            }
         }
 
         if (loading) {
@@ -288,9 +384,6 @@ fun CheckInScreen(
             val nothingCached = verdict is MorningVerdict.Pending && verdict.reason == PendingReason.SYNC_FAILED
             if (state.syncFailed && !nothingCached) {
                 item(key = "sync-banner") { SafetyBanner(stringResource(R.string.checkin_sync_failed), animatedItem(reducedMotion)) }
-            }
-            if (planFinished(state)) {
-                item(key = "day-complete") { DayCompleteCard(animatedItem(reducedMotion)) }
             }
             item(key = "plan-header") { PlanHeader(state) }
             if (state.todayActivities.isEmpty()) {
@@ -331,8 +424,9 @@ fun CheckInScreen(
                 }
             }
             state.planSafetyBanner?.let { banner -> item(key = "safety-banner") { SafetyBanner(banner, animatedItem(reducedMotion)) } }
-            item(key = "tonight") { TonightCard(bedtime, nowMinuteOfDay, state, onAddAction) }
+            item(key = "tonight") { TonightCard(bedtime, nowMinuteOfDay, state, onAddAction, onSetBedtime = { showPlanSettings = true }) }
             if (state.consistencyFlags.any { it }) {
+                // A fact only: the Tonight card already carries what is next.
                 item(key = "consistency") { ConsistencyCard(state.consistencyFlags) }
             }
             if (!state.whoopConnected) {
@@ -342,7 +436,7 @@ fun CheckInScreen(
                 item(key = "reminders-offer") { RemindersOffer(onEnableReminders, onDismissRemindersOffer, animatedItem(reducedMotion)) }
             }
         }
-        item(key = "footer") { WellnessFooter() }
+        item(key = "in-context") { InContextLine() }
     }
     PullToRefreshBox(isRefreshing = state.isRefreshing, onRefresh = onRefresh, modifier = Modifier.fillMaxSize()) {
         if (whyPane != null) {
@@ -403,61 +497,72 @@ fun CheckInScreen(
             onSkip = { debriefForId = null },
         )
     }
-}
 
-/**
- * Placement/appearance animation for list items that insert, leave, or shift. Reduced motion drops
- * the movement; the opacity fades stay.
- */
-private fun LazyItemScope.animatedItem(reducedMotion: Boolean): Modifier = Modifier.animateItem(
-    fadeInSpec = tween(Motion.medium),
-    placementSpec = if (reducedMotion) null else tween(Motion.medium),
-    fadeOutSpec = tween(Motion.medium),
-)
-
-/** Date, provenance chip, and a quiet greeting — the verdict below is the screen's one headline. */
-@Composable
-private fun TodayHeader(state: MainUiState, nowMinuteOfDay: Int) {
-    val hour = nowMinuteOfDay / 60
-    val base = stringResource(
-        when {
-            hour < 12 -> R.string.checkin_good_morning
-            hour < 17 -> R.string.checkin_good_afternoon
-            else -> R.string.checkin_good_evening
-        },
-    )
-    val name = state.profile?.displayName?.takeIf { it.isNotBlank() && it != "You" }
-    val date = LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE, MMMM d", Locale.getDefault()))
-    Column(Modifier.fillMaxWidth().padding(top = Spacing.xxl, bottom = Spacing.xs)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(date, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-            if (state.whoopIsMock) SampleDataChip()
-        }
-        Text(
-            if (name != null) "$base, $name" else base,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(top = Spacing.xs),
+    if (showPlanSettings) {
+        PlanConstraintsSheet(
+            state = state,
+            onSave = { constraints ->
+                onSavePlanConstraints(constraints)
+                showPlanSettings = false
+            },
+            onDismiss = { showPlanSettings = false },
         )
     }
 }
 
 /**
- * Today's verdict: the morning reveal (once per cycle), one headline, then colour + word +
- * number in text and the day's two targets. The whole card is one TalkBack stop and opens Recovery.
+ * Placement/appearance animation for list items that insert, leave, or shift: the movement settles
+ * on a spring, the opacity fades are tweens. Reduced motion (the system setting or the calmer
+ * theme) drops both, so items appear, leave and move in their final state straight away.
  */
-@OptIn(ExperimentalLayoutApi::class)
+private fun LazyItemScope.animatedItem(reducedMotion: Boolean): Modifier = Modifier.animateItem(
+    fadeInSpec = if (reducedMotion) null else tween(Motion.medium),
+    placementSpec = if (reducedMotion) null else Motion.settle(),
+    fadeOutSpec = if (reducedMotion) null else tween(Motion.medium),
+)
+
+/**
+ * The screen's one headline ("Today"), with the time-aware greeting and the date as its supporting
+ * line and the sample-data chip trailing. Everything below it — the verdict included — is smaller.
+ */
 @Composable
-private fun ReadyVerdictCard(
+private fun TodayTitle(state: MainUiState, nowMinuteOfDay: Int) {
+    val base = stringResource(greetingRes(nowMinuteOfDay))
+    val name = state.profile?.displayName?.takeIf { it.isNotBlank() && it != "You" }
+    val greeting = if (name != null) stringResource(R.string.today_greeting_named, base, name) else base
+    val date = LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE, MMMM d", Locale.getDefault()))
+    ScreenTitle(
+        title = stringResource(R.string.tab_today),
+        subtitle = stringResource(R.string.today_join_dot, greeting, date),
+        trailing = if (state.whoopIsMock) { { SampleDataChip() } } else null,
+    )
+}
+
+/**
+ * Today's hero for a Ready verdict: the ring filled to exactly the recovery score (swept once per
+ * verdict day), the zone as word + number in its on-hero colour, one headline, the comparison, the
+ * day's strain target and where the numbers come from. Tonight's bedtime is not repeated here: it
+ * lives in the Tonight card. A resolved plan swaps only the headline ("Today's plan complete") —
+ * the ring and the zone facts stay. The ring leads with the text beside it when there is room; at
+ * large font sizes the text drops below the ring instead of clipping. The whole card is one
+ * TalkBack stop that opens the Recovery explainer.
+ */
+@Composable
+private fun ReadyHero(
     verdict: MorningVerdict.Ready,
     state: MainUiState,
-    bedtime: BedtimePlan?,
+    finished: Boolean,
     onOpenRecoveryExplainer: () -> Unit,
     onMorningRevealPlayed: (Long) -> Unit,
 ) {
-    val color = zoneColor(verdict.zone)
+    val hero = heroColors()
+    val zoneColor = zoneOnHeroColor(verdict.zone)
     // From the verdict AND the plan: a pain flag or a check-in prompt makes the day gentle, whatever the band.
-    val headline = stringResource(verdictHeadline(VerdictEngine.headline(verdict, state.todayActivities)))
+    val headline = if (finished) {
+        stringResource(R.string.today_plan_complete)
+    } else {
+        stringResource(verdictHeadline(VerdictEngine.headline(verdict, state.todayActivities)))
+    }
     val zoneText = stringResource(R.string.today_zone_value, verdict.zone.label, verdict.recoveryScore)
     val comparison = verdict.previousRecoveryScore?.let { previous ->
         when {
@@ -468,117 +573,231 @@ private fun ReadyVerdictCard(
     }
     val strainZone = verdict.strainTarget ?: state.strainTarget
     val strainChip = strainZone?.let { strainTargetLabel(it, spoken = false) }
-    val clock = clockFormatter()
-    val bedChip = bedtime?.let { stringResource(R.string.today_bed_by, minuteLabel(it.lightsOutMinute, clock)) }
-    val freshness = freshnessParts(state)
-    // In sample mode the freshness parts open with "Sample data", so TalkBack hears the provenance too.
+    val source = freshnessSource(state)
+    val reach = freshnessReach(state)
+    // In sample mode TalkBack hears "Sample data" with the verdict; on screen the title's chip says it once.
     val description = joinParts(
         listOfNotNull(
             headline,
             stringResource(R.string.today_zone_a11y, verdict.zone.label, verdict.recoveryScore),
             comparison,
             strainZone?.let { strainTargetLabel(it, spoken = true) },
-            bedChip,
-        ) + freshness,
+            source,
+            reach,
+        ),
         stringResource(R.string.today_join_sentence),
     )
-    SpartanCard(
-        modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = description },
+    val shownFreshness = listOfNotNull(source.takeUnless { state.whoopIsMock }, reach)
+    HeroCard(
+        modifier = Modifier.testTag(TODAY_HERO_TAG).semantics(mergeDescendants = true) { contentDescription = description },
         onClick = onOpenRecoveryExplainer,
         onClickLabel = stringResource(R.string.checkin_open_metric, MetricType.RECOVERY_SCORE.label),
     ) {
-        if (freshness.isNotEmpty()) FreshnessLine(joinParts(freshness, stringResource(R.string.today_join_dot)))
-        MorningReveal(
-            recoveryScore = verdict.recoveryScore,
-            ringColor = color,
-            playOnce = verdict.cycleEpochDay != state.morningRevealPlayedForDay,
-            onPlayed = { onMorningRevealPlayed(verdict.cycleEpochDay) },
-            modifier = Modifier
-                .align(Alignment.CenterHorizontally)
-                .padding(top = Spacing.sm)
-                .widthIn(max = 240.dp)
-                .fillMaxWidth(0.66f),
-        )
-        Text(
-            headline,
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(top = Spacing.md).semantics { heading() },
-        )
-        // Colour + word + number — the dot only reinforces what the text already says.
-        Row(Modifier.padding(top = Spacing.sm), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(10.dp).clip(CircleShape).background(color))
-            Spacer(Modifier.width(Spacing.sm))
-            Text(zoneText, style = MaterialTheme.typography.titleMedium, color = color)
-        }
-        comparison?.let {
-            Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = Spacing.xs))
-        }
-        if (strainChip != null || bedChip != null) {
-            FlowRow(
-                Modifier.padding(top = Spacing.lg),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-            ) {
-                strainChip?.let { TargetChip(it) }
-                bedChip?.let { TargetChip(it) }
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val fontScale = LocalDensity.current.fontScale
+            val ringSize = heroRingSize(fontScale).coerceAtMost(maxWidth)
+            val ring: @Composable (Modifier) -> Unit = { ringModifier ->
+                RecoveryRing(
+                    score = verdict.recoveryScore,
+                    arcColor = zoneColor,
+                    trackColor = hero.track,
+                    playOnce = verdict.cycleEpochDay != state.morningRevealPlayedForDay,
+                    onPlayed = { onMorningRevealPlayed(verdict.cycleEpochDay) },
+                    modifier = ringModifier.size(ringSize),
+                ) {
+                    RingNumber(verdict.recoveryScore, hero.content)
+                }
             }
+            if (heroRingBeside(maxWidth, ringSize, fontScale)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    ring(Modifier)
+                    Spacer(Modifier.width(HERO_RING_GAP))
+                    HeroVerdictText(zoneText, zoneColor, headline, comparison, hero, Modifier.weight(1f))
+                }
+            } else {
+                // Full width, so the ring centres on the card, not within the widest line of text.
+                Column(Modifier.fillMaxWidth()) {
+                    ring(Modifier.align(Alignment.CenterHorizontally))
+                    HeroVerdictText(zoneText, zoneColor, headline, comparison, hero, Modifier.fillMaxWidth().padding(top = Spacing.lg))
+                }
+            }
+        }
+        strainChip?.let { HeroChip(it, hero, Modifier.padding(top = Spacing.xl)) }
+        if (shownFreshness.isNotEmpty()) {
+            FreshnessLine(joinParts(shownFreshness, stringResource(R.string.today_join_dot)), hero.contentVariant, Modifier.padding(top = Spacing.lg))
         }
     }
 }
 
 /**
- * No verdict yet: no ring, no colour, no number — what Spartan is waiting for, the cycle rule, and
- * a pointer to the holding plan below. Never a guess at the score.
+ * The verdict's words beside (or under) the ring: colour + word + number first — the zone colour
+ * only reinforces what the text says — then the one headline (titleLarge: the screen title is the
+ * headline) and the comparison with yesterday.
  */
 @Composable
-private fun PendingVerdictCard(state: MainUiState) {
-    val why = state.whyToday
-    val freshness = freshnessParts(state)
-    SpartanCard(modifier = Modifier.semantics(mergeDescendants = true) {}) {
-        if (freshness.isNotEmpty()) FreshnessLine(joinParts(freshness, stringResource(R.string.today_join_dot)))
-        Row(Modifier.padding(top = Spacing.md), verticalAlignment = Alignment.CenterVertically) {
-            IconTile(Icons.Outlined.HourglassEmpty, MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.width(Spacing.lg))
-            Text(
-                stringResource(R.string.today_pending_title),
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.semantics { heading() },
-            )
-        }
+private fun HeroVerdictText(
+    zoneText: String,
+    zoneColor: Color,
+    headline: String,
+    comparison: String?,
+    hero: HeroColors,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier) {
+        Text(zoneText, style = MaterialTheme.typography.titleMedium, color = zoneColor)
         Text(
-            why?.summary ?: stringResource(R.string.today_pending_fallback),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(top = Spacing.md),
+            headline,
+            style = MaterialTheme.typography.titleLarge,
+            color = hero.content,
+            modifier = Modifier.padding(top = Spacing.xs).semantics { heading() },
         )
-        // The engine's reasons carry the cycle rule (or, with no data at all, how to get some).
-        (why?.reasons ?: listOf(stringResource(R.string.today_pending_cycle_rule))).forEach { reason ->
-            Text(reason, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = Spacing.sm))
-        }
-        why?.conclusion?.let {
-            Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(top = Spacing.sm))
+        comparison?.let {
+            Text(it, style = MaterialTheme.typography.bodyMedium, color = hero.contentVariant, modifier = Modifier.padding(top = Spacing.xs))
         }
     }
 }
 
+/**
+ * The real score inside the ring. The percent sign is set at half size, so even "100%" fits inside
+ * the ring; the number is a display numeral, not a heading, and silent to TalkBack — the card's
+ * description already says it with its zone.
+ */
 @Composable
-private fun FreshnessLine(text: String) {
-    Text(text, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+private fun RingNumber(score: Int, color: Color) {
+    val text = stringResource(R.string.today_ring_value, score)
+    val styled = remember(text) {
+        buildAnnotatedString {
+            append(text)
+            text.forEachIndexed { index, char -> if (char == '%') addStyle(SpanStyle(fontSize = 0.5.em), index, index + 1) }
+        }
+    }
+    Text(styled, style = MaterialTheme.typography.displaySmall, color = color, modifier = Modifier.clearAndSetSemantics {})
 }
 
-/** A non-interactive target chip ("Strain target 14–17 · High", "Bed by 10:40 PM"). */
+/**
+ * No verdict yet: the hero without ring, colour or number — what Spartan is waiting for and the
+ * cycle rule, never a guess at the score. Once the holding plan is resolved the headline says so
+ * ("Today's holding plan complete") and its secondary line is [holdingPlanNote] — data only, never
+ * "Plan pending" under "complete": one primary state, never two headlines. That note already says
+ * how far the data reaches, so the freshness line then keeps only the source. In sample mode the
+ * title's chip says "Sample data" once, so it is not repeated here.
+ */
 @Composable
-private fun TargetChip(text: String) {
-    Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer) {
+private fun PendingHero(state: MainUiState, finished: Boolean) {
+    val hero = heroColors()
+    val why = state.whyToday
+    val freshness = listOfNotNull(
+        freshnessSource(state).takeUnless { state.whoopIsMock },
+        if (finished) null else freshnessReach(state),
+    )
+    val note = if (finished) holdingPlanNote(state) else why?.summary ?: stringResource(R.string.today_pending_fallback)
+    HeroCard(modifier = Modifier.testTag(TODAY_HERO_TAG).semantics(mergeDescendants = true) {}) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            // Neutral on purpose: a pending verdict has no zone, so not even the check is green.
+            IconTile(if (finished) Icons.Rounded.Check else Icons.Outlined.HourglassEmpty, hero.content)
+            Spacer(Modifier.width(Spacing.lg))
+            Text(
+                stringResource(if (finished) R.string.today_holding_plan_complete else R.string.today_pending_title),
+                style = MaterialTheme.typography.titleLarge,
+                color = hero.content,
+                modifier = Modifier.weight(1f).semantics { heading() },
+            )
+        }
+        if (finished) {
+            Text(note, style = MaterialTheme.typography.bodyMedium, color = hero.contentVariant, modifier = Modifier.padding(top = Spacing.md))
+        } else {
+            Text(note, style = MaterialTheme.typography.bodyLarge, color = hero.content, modifier = Modifier.padding(top = Spacing.md))
+            // The engine's reasons carry the cycle rule (or, with no data at all, how to get some).
+            (why?.reasons ?: listOf(stringResource(R.string.today_pending_cycle_rule))).forEach { reason ->
+                Text(reason, style = MaterialTheme.typography.bodyMedium, color = hero.contentVariant, modifier = Modifier.padding(top = Spacing.sm))
+            }
+            why?.conclusion?.let {
+                Text(it, style = MaterialTheme.typography.bodyMedium, color = hero.content, modifier = Modifier.padding(top = Spacing.sm))
+            }
+        }
+        if (freshness.isNotEmpty()) {
+            FreshnessLine(joinParts(freshness, stringResource(R.string.today_join_dot)), hero.contentVariant, Modifier.padding(top = Spacing.lg))
+        }
+    }
+}
+
+/**
+ * A finished holding plan's secondary line, from the real pending reason and the newest day Spartan
+ * has (the day the freshness line would name): "Waiting on newer WHOOP data · newest from Fri,
+ * Oct 23", "Today's cycle is still being scored", or the failed-refresh / no-data line. No day is
+ * ever guessed: without one, the stale line names none.
+ */
+@Composable
+private fun holdingPlanNote(state: MainUiState): String {
+    val verdict = state.verdict as? MorningVerdict.Pending
+    val newestDay = verdict?.lastCycleEpochDay ?: state.dataThroughEpochDay
+    return when (verdict?.reason) {
+        PendingReason.NO_COMPLETED_CYCLE -> stringResource(R.string.today_holding_note_cycle)
+        PendingReason.STALE -> when (newestDay) {
+            null -> stringResource(R.string.today_holding_note_stale)
+            LocalDate.now().toEpochDay() - 1 -> stringResource(R.string.today_holding_note_stale_yesterday)
+            else -> stringResource(R.string.today_holding_note_stale_date, shortDayLabel(newestDay))
+        }
+        PendingReason.NO_DATA -> stringResource(R.string.today_holding_note_no_data)
+        // No verdict at all here means the first sync failed with nothing cached.
+        PendingReason.SYNC_FAILED, null -> stringResource(R.string.today_holding_note_sync_failed)
+    }
+}
+
+@Composable
+private fun FreshnessLine(text: String, color: Color, modifier: Modifier = Modifier) {
+    Text(text, style = MaterialTheme.typography.labelMedium, color = color, modifier = modifier)
+}
+
+/**
+ * A non-interactive target chip on the hero ("Strain target 14–17 · High"): a quiet outline in the
+ * hero's secondary colour around full-contrast hero text, so it reads as a fact, not a button. Like
+ * [StatusPill] the shape is shapes.small, not a pill: at large font sizes a chip that wraps to two
+ * lines keeps every glyph inside its corners.
+ */
+@Composable
+private fun HeroChip(text: String, hero: HeroColors, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        shape = MaterialTheme.shapes.small,
+        color = hero.container,
+        contentColor = hero.content,
+        border = BorderStroke(1.dp, hero.contentVariant),
+    ) {
         Text(
             text,
             style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSecondaryContainer,
+            color = hero.content,
             modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm),
         )
     }
+}
+
+/** Test hook for "one primary action": the button under the hero, present only when it acts. */
+internal const val TODAY_PRIMARY_TAG = "today-primary"
+
+/**
+ * The one primary action, directly under the hero, full width — shown only while an action is
+ * open: "Start today's plan" (nothing resolved yet) or "Next: <title>", opening that action's
+ * sheet. Its TalkBack label starts with the visible text and says what the tap does.
+ */
+@Composable
+private fun TodayPrimaryAction(step: TodayNextStep, onOpenAction: (String) -> Unit, modifier: Modifier = Modifier) {
+    val title = if (step.lightsOutPassed) stringResource(R.string.tonight_title_late) else step.title
+    val text = if (step.first) stringResource(R.string.today_primary_start) else stringResource(R.string.today_primary_next, title)
+    val description = if (step.first) {
+        stringResource(R.string.today_primary_start_a11y, title)
+    } else {
+        stringResource(R.string.today_primary_next_a11y, title)
+    }
+    PrimaryButton(
+        text = text,
+        onClick = { onOpenAction(step.activityId) },
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag(TODAY_PRIMARY_TAG)
+            .semantics { contentDescription = description },
+    )
 }
 
 /** The one emphasised headline for the verdict, as [VerdictEngine.headline] picked it. */
@@ -608,31 +827,34 @@ private fun strainTargetLabel(zone: StrainZone, spoken: Boolean): String = when 
 
 /**
  * Where today's numbers come from (research §1.5.6): "Sample data" or "Imported 6:42 AM" (only a
- * WHOOP CSV import stamps a time; none is shown without one), then how far the data reaches, read
- * against the verdict so the line never contradicts the card under it: "Data through today's
- * cycle" for a Ready verdict, "Today's cycle is still in progress" while it is unscored, "Data
- * through <that day>" when stale, and a neutral "Couldn't refresh just now" when a sync failed
- * with nothing cached. Empty when nothing is known yet.
+ * WHOOP CSV import stamps a time; none is shown without one). Null when neither is known.
  */
 @Composable
-private fun freshnessParts(state: MainUiState): List<String> {
+private fun freshnessSource(state: MainUiState): String? {
+    if (state.whoopIsMock) return stringResource(R.string.today_fresh_sample)
     val clock = clockFormatter()
-    val today = LocalDate.now()
-    val source = if (state.whoopIsMock) {
-        stringResource(R.string.today_fresh_sample)
-    } else {
-        state.lastSyncedAtMillis?.let { millis ->
-            val imported = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault())
-            val at = if (imported.toLocalDate() == today) {
-                imported.toLocalTime().format(clock)
-            } else {
-                imported.format(DateTimeFormatter.ofPattern("MMM d", Locale.getDefault()))
-            }
-            stringResource(R.string.today_fresh_imported, at)
+    return state.lastSyncedAtMillis?.let { millis ->
+        val imported = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault())
+        val at = if (imported.toLocalDate() == LocalDate.now()) {
+            imported.toLocalTime().format(clock)
+        } else {
+            imported.format(DateTimeFormatter.ofPattern("MMM d", Locale.getDefault()))
         }
+        stringResource(R.string.today_fresh_imported, at)
     }
+}
+
+/**
+ * How far the data reaches, read against the verdict so the line never contradicts the card under
+ * it: "Data through today's cycle" for a Ready verdict, "Today's cycle is still in progress" while
+ * it is unscored, "Data through <that day>" when stale, and a neutral "Couldn't refresh just now"
+ * when a sync failed with nothing cached. Null when nothing is known yet.
+ */
+@Composable
+private fun freshnessReach(state: MainUiState): String? {
+    val today = LocalDate.now()
     val verdict = state.verdict
-    val through = if (verdict is MorningVerdict.Pending) {
+    return if (verdict is MorningVerdict.Pending) {
         when (verdict.reason) {
             PendingReason.NO_COMPLETED_CYCLE -> stringResource(R.string.today_fresh_cycle_in_progress)
             PendingReason.STALE -> (verdict.lastCycleEpochDay ?: state.dataThroughEpochDay)?.let { day ->
@@ -644,7 +866,6 @@ private fun freshnessParts(state: MainUiState): List<String> {
     } else {
         state.dataThroughEpochDay?.let { day -> dataThroughLabel(day, today, staleOnly = false) }
     }
-    return listOfNotNull(source, through)
 }
 
 /**
@@ -657,12 +878,13 @@ private fun dataThroughLabel(day: Long, today: LocalDate, staleOnly: Boolean): S
     return when {
         age <= 0L && !staleOnly -> stringResource(R.string.today_fresh_through_today)
         age == 1L -> stringResource(R.string.today_fresh_through_yesterday)
-        else -> stringResource(
-            R.string.today_fresh_through_date,
-            LocalDate.ofEpochDay(day).format(DateTimeFormatter.ofPattern("EEE, MMM d", Locale.getDefault())),
-        )
+        else -> stringResource(R.string.today_fresh_through_date, shortDayLabel(day))
     }
 }
+
+/** An epoch day as "Sat, Oct 22" in the device's locale. */
+private fun shortDayLabel(day: Long): String =
+    LocalDate.ofEpochDay(day).format(DateTimeFormatter.ofPattern("EEE, MMM d", Locale.getDefault()))
 
 /** [parts] folded through a two-argument [format] ("%1$s · %2$s"), so separators stay in resources. */
 private fun joinParts(parts: List<String>, format: String): String =
@@ -678,7 +900,8 @@ private fun PlanHeader(state: MainUiState) {
     val done = state.todayActivities.count { it.status == ActivityStatus.DONE }
     val minutes = state.todayActivities.filter { it.status != ActivityStatus.SKIPPED }.sumOf { it.estimatedMinutes }
     val reducedMotion = rememberReducedMotion()
-    val progress by animateFloatAsState(if (total == 0) 0f else done.toFloat() / total, if (reducedMotion) snap() else tween(Motion.medium), label = "progress")
+    // A real value: the no-overshoot measure spring, so the bar never shows more done than is done.
+    val progress by animateFloatAsState(if (total == 0) 0f else done.toFloat() / total, if (reducedMotion) snap() else Motion.measure(), label = "progress")
     val progressDescription = stringResource(R.string.checkin_progress_a11y, done, total)
     Column(Modifier.padding(top = Spacing.section - Spacing.md, bottom = Spacing.xs)) {
         Row(verticalAlignment = Alignment.Bottom) {
@@ -710,7 +933,11 @@ private fun PlanHeader(state: MainUiState) {
 
 /**
  * One plan item: what it is, how long, when, and a check. Tapping opens everything else. The next
- * action to do is the visually dominant row; a checked row morphs its card (corner + container).
+ * action carries a "Next up" label and a little more room, but its title stays titleMedium so it
+ * never competes with the hero. A done row reads as done, not deleted: no strikethrough, its title
+ * in the normal onSurface style, the filled green check, and the card morph (corner + a faint green
+ * container). A skipped row keeps its "Skipped for today" pill and a quieter title, also without
+ * strikethrough.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -724,27 +951,19 @@ private fun PlanRow(
     modifier: Modifier = Modifier,
 ) {
     val done = activity.status == ActivityStatus.DONE
-    val dimmed = done || activity.status == ActivityStatus.SKIPPED
+    val skipped = activity.status == ActivityStatus.SKIPPED
+    val resolved = done || skipped
     val urgency = urgencyOf(activity, nowMinuteOfDay)
     val morph = rememberCompletionMorph(done)
     val colors = MaterialTheme.colorScheme
-    // A done row sits on primaryContainer, so all of its content pairs with onPrimaryContainer.
-    val titleColor = when {
-        done -> colors.onPrimaryContainer
-        dimmed -> colors.onSurfaceVariant
-        else -> colors.onSurface
-    }
-    val metaColor = if (done) colors.onPrimaryContainer else colors.onSurfaceVariant
-    val iconTint = when {
-        done -> colors.onPrimaryContainer
-        dimmed -> colors.onSurfaceVariant
-        else -> colors.primary
-    }
+    // The faint green done container keeps onSurface / onSurfaceVariant at full contrast.
+    val titleColor = if (skipped) colors.onSurfaceVariant else colors.onSurface
+    val iconTint = if (skipped) colors.onSurfaceVariant else colors.primary
     val verticalPadding = if (isNext) Spacing.lg else Spacing.md
     ActionCardSurface(
         cornerRadius = morph.cornerRadius,
         containerColor = morph.containerColor,
-        contentColor = if (done) colors.onPrimaryContainer else colors.onSurface,
+        contentColor = colors.onSurface,
         onClick = onOpen,
         onClickLabel = stringResource(R.string.checkin_open_activity, activity.title),
         modifier = modifier,
@@ -759,19 +978,14 @@ private fun PlanRow(
                 if (isNext) {
                     Text(stringResource(R.string.today_plan_next), style = MaterialTheme.typography.labelMedium, color = colors.primary)
                 }
-                Text(
-                    activity.title,
-                    style = if (isNext) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
-                    textDecoration = if (dimmed) TextDecoration.LineThrough else null,
-                    color = titleColor,
-                )
+                Text(activity.title, style = MaterialTheme.typography.titleMedium, color = titleColor)
                 Text(
                     stringResource(R.string.checkin_minutes_time_of_day, activity.estimatedMinutes, timeOfDayLabel(activity)),
                     style = if (isNext) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodySmall,
-                    color = metaColor,
+                    color = colors.onSurfaceVariant,
                 )
                 val statusText = statusLine(activity, calendarIsStub)
-                val showRequired = activity.priority == ActivityPriority.REQUIRED && !dimmed
+                val showRequired = activity.priority == ActivityPriority.REQUIRED && !resolved
                 if (showRequired || urgency != PlanUrgency.NONE || statusText != null) {
                     FlowRow(
                         Modifier.padding(top = Spacing.sm),
@@ -794,8 +1008,8 @@ private fun PlanRow(
 }
 
 /**
- * An action row's card: [SpartanCard]'s look (soft, wide shadow in light mode; hairline on a lifted
- * surface in dark mode) carrying the completion morph's corner radius and container colour.
+ * An action row's card: [SpartanCard]'s look — flat, 0dp, with a hairline outline in both themes,
+ * no shadow — carrying the completion morph's corner radius and container colour.
  */
 @Composable
 private fun ActionCardSurface(
@@ -808,15 +1022,9 @@ private fun ActionCardSurface(
     content: @Composable () -> Unit,
 ) {
     val shape = RoundedCornerShape(cornerRadius)
-    val dark = isSystemInDarkTheme()
-    val shadowTint = MaterialTheme.colorScheme.scrim
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .then(
-                if (dark) Modifier
-                else Modifier.shadow(10.dp, shape, ambientColor = shadowTint.copy(alpha = 0.06f), spotColor = shadowTint.copy(alpha = 0.10f)),
-            )
             .clip(shape)
             .clickable(onClickLabel = onClickLabel, onClick = onClick),
         shape = shape,
@@ -839,11 +1047,11 @@ private fun PlanCheck(done: Boolean, label: String, onToggle: () -> Unit) {
     val notCompletedDescription = stringResource(R.string.checkin_not_completed)
     Box(
         Modifier
-            .size(48.dp)
+            .size(MinTouchTarget)
             .toggleable(
                 value = done,
                 interactionSource = remember { MutableInteractionSource() },
-                indication = ripple(bounded = false, radius = 24.dp),
+                indication = ripple(bounded = false, radius = MinTouchTarget / 2),
                 role = Role.Checkbox,
                 onValueChange = {
                     if (!done) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -869,9 +1077,10 @@ private fun ShowMoreToggle(expanded: Boolean, hiddenCount: Int, onToggle: () -> 
 }
 
 /**
- * "Why today?", collapsed by default: the one-line summary, then on demand the observations behind
- * the plan, what the plan does about them, the four signals, and a way down to the data. The copy
- * comes from the engine — correlational and uncertain, never a cause or a diagnosis.
+ * "Why today?", collapsed by default: a fixed "What shaped today's plan" — never the hero's zone,
+ * number and comparison again — then on demand the observations behind the plan, what the plan
+ * does about them, the four signals, and a way down to the data. The copy comes from the engine —
+ * correlational and uncertain, never a cause or a diagnosis.
  */
 @Composable
 private fun WhyTodayCard(
@@ -882,7 +1091,7 @@ private fun WhyTodayCard(
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
     val reducedMotion = rememberReducedMotion()
-    val chevron by animateFloatAsState(if (expanded) 180f else 0f, if (reducedMotion) snap() else tween(Motion.medium), label = "whyChevron")
+    val chevron by animateFloatAsState(if (expanded) 180f else 0f, if (reducedMotion) snap() else Motion.settle(), label = "whyChevron")
     val stateText = stringResource(if (expanded) R.string.today_why_expanded else R.string.today_why_collapsed)
     SpartanCard(contentPadding = PaddingValues(0.dp)) {
         Row(
@@ -904,7 +1113,7 @@ private fun WhyTodayCard(
             Column(Modifier.weight(1f)) {
                 Text(stringResource(R.string.today_why_title), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
                 Text(
-                    why.summary,
+                    stringResource(R.string.today_why_subtitle),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = Spacing.xs),
@@ -913,10 +1122,11 @@ private fun WhyTodayCard(
             Spacer(Modifier.width(Spacing.md))
             Icon(Icons.Outlined.ExpandMore, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.rotate(chevron))
         }
+        // The size settles on a spring; only the opacity keeps a tween. Reduced motion snaps open and shut.
         AnimatedVisibility(
             visible = expanded,
-            enter = if (reducedMotion) EnterTransition.None else expandVertically(tween(Motion.medium)) + fadeIn(tween(Motion.medium)),
-            exit = if (reducedMotion) ExitTransition.None else shrinkVertically(tween(Motion.medium)) + fadeOut(tween(Motion.medium)),
+            enter = if (reducedMotion) EnterTransition.None else expandVertically(Motion.settle()) + fadeIn(tween(Motion.medium)),
+            exit = if (reducedMotion) ExitTransition.None else shrinkVertically(Motion.settle()) + fadeOut(tween(Motion.medium)),
         ) {
             WhyTodayDetails(
                 why = why,
@@ -932,7 +1142,7 @@ private fun WhyTodayCard(
 /**
  * "Why today?" as a supporting pane beside the plan on expanded windows: always open, so the
  * observations, what the plan does about them and the driver tiles sit next to the actions they
- * explain. It scrolls on its own; the copy is the same engine output as the collapsible card.
+ * explain. It scrolls on its own; the header and copy are the same as the collapsible card's.
  */
 @Composable
 private fun WhyTodayPane(
@@ -955,7 +1165,7 @@ private fun WhyTodayPane(
                 modifier = Modifier.semantics { heading() },
             )
             Text(
-                why.summary,
+                stringResource(R.string.today_why_subtitle),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = Spacing.xs, bottom = Spacing.lg),
@@ -1084,7 +1294,8 @@ private fun ActivitySheet(
                 IconTile(categoryIcon(activity.category), MaterialTheme.colorScheme.primary, size = 52.dp)
                 Spacer(Modifier.width(Spacing.lg))
                 Column(Modifier.weight(1f)) {
-                    Text(activity.title, style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.semantics { heading() })
+                    // titleLarge: the screen title stays the one headline, even under the sheet.
+                    Text(activity.title, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.semantics { heading() })
                     Text(
                         stringResource(R.string.checkin_minutes_time_of_day, activity.estimatedMinutes, timeOfDayLabel(activity)),
                         style = MaterialTheme.typography.bodyMedium,
@@ -1240,17 +1451,28 @@ internal fun clockFormatter(): DateTimeFormatter {
 /**
  * Tonight's lights-out and wind-down from the user's own sleep need (or the bedtime they gave) —
  * never a fixed eight hours. Last night reads as hours got of hours needed; debt is shown alongside,
- * to pay back over a few nights. Without a target, says what Spartan needs to set one.
+ * to pay back over a few nights, and the wind-down routine is one tap from the plan. Without a target
+ * the card is never a dead end: "Plan tonight's sleep", one line, "Set your usual bedtime" (which
+ * opens plan settings) and the wind-down below it; with no WHOOP sleep from last night either, the
+ * line says what to do — import the latest export, or set a bedtime. The card owns the night: no
+ * primary button repeats its actions. Past lights-out the wind-down line shows only once it is in
+ * the plan ([tonightShowsWindDown]).
  */
 @Composable
-private fun TonightCard(plan: BedtimePlan?, nowMinuteOfDay: Int, state: MainUiState, onAddAction: (SuggestedAction, MetricType) -> Unit) {
+private fun TonightCard(
+    plan: BedtimePlan?,
+    nowMinuteOfDay: Int,
+    state: MainUiState,
+    onAddAction: (SuggestedAction, MetricType) -> Unit,
+    onSetBedtime: () -> Unit,
+) {
     val clock = clockFormatter()
-    val windDown = ActionPlaybook.forMetric(MetricType.SLEEP_DEBT).first()
+    val windDown = tonightWindDown()
     val title: String
     val body: String
     if (plan == null) {
         title = stringResource(R.string.today_tonight_no_target_title)
-        body = stringResource(R.string.today_tonight_no_target_body)
+        body = stringResource(tonightNoTargetBody(hasLastNight = state.sleptHours != null))
     } else {
         val lightsOut = minuteLabel(plan.lightsOutMinute, clock)
         val windDownAt = minuteLabel(plan.windDownMinute, clock)
@@ -1280,11 +1502,11 @@ private fun TonightCard(plan: BedtimePlan?, nowMinuteOfDay: Int, state: MainUiSt
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconTile(Icons.Outlined.Bedtime, MaterialTheme.colorScheme.primary)
             Spacer(Modifier.width(Spacing.lg))
-            Column {
+            Column(Modifier.weight(1f)) {
                 Text(stringResource(R.string.tonight_eyebrow), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                 Text(
                     title,
-                    style = MaterialTheme.typography.titleLarge,
+                    style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.semantics { heading() },
                 )
@@ -1304,21 +1526,43 @@ private fun TonightCard(plan: BedtimePlan?, nowMinuteOfDay: Int, state: MainUiSt
                 modifier = Modifier.padding(top = Spacing.sm),
             )
         }
-        HorizontalDivider(Modifier.padding(vertical = Spacing.lg), color = MaterialTheme.colorScheme.outlineVariant)
-        ActionLine(windDown, ActionPlaybook.isPlanned(windDown, state.todayActivities)) { onAddAction(windDown, MetricType.SLEEP_DEBT) }
+        if (plan == null) {
+            val settingsDescription = stringResource(R.string.today_set_bedtime_a11y)
+            SecondaryButton(
+                text = stringResource(R.string.today_set_bedtime),
+                onClick = onSetBedtime,
+                modifier = Modifier.fillMaxWidth().padding(top = Spacing.lg).semantics { contentDescription = settingsDescription },
+            )
+        }
+        val windDownPlanned = ActionPlaybook.isPlanned(windDown, state.todayActivities)
+        if (tonightShowsWindDown(plan, nowMinuteOfDay, windDownPlanned)) {
+            HorizontalDivider(Modifier.padding(vertical = Spacing.lg), color = MaterialTheme.colorScheme.outlineVariant)
+            ActionLine(windDown, windDownPlanned) { onAddAction(windDown, MetricType.SLEEP_DEBT) }
+        }
     }
 }
 
-/** Seven calm dots, oldest → today. Consistency shown, never a streak to lose. */
+/**
+ * The Tonight card's line without a target: with last night's WHOOP sleep, what a bedtime does;
+ * without it, what to do (import the latest export, or set a bedtime) — never only what is missing.
+ */
+internal fun tonightNoTargetBody(hasLastNight: Boolean): Int =
+    if (hasLastNight) R.string.today_tonight_set_bedtime_body else R.string.today_tonight_no_sleep_body
+
+/**
+ * Seven calm dots, oldest → today. Consistency shown, never a streak to lose. A fact only: what is
+ * next tonight lives in the Tonight card, so it is never repeated here. One TalkBack stop that reads
+ * the title and the facts line once each; the dots are decorative and silent.
+ */
 @Composable
 private fun ConsistencyCard(flags: List<Boolean>) {
     val activeDays = flags.count { it }
-    val description = stringResource(R.string.checkin_consistency_a11y, activeDays)
-    SpartanCard(modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = description }) {
+    val facts = stringResource(R.string.checkin_consistency_a11y, activeDays)
+    SpartanCard(modifier = Modifier.semantics(mergeDescendants = true) {}) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(stringResource(R.string.checkin_consistency_label), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
-                Text(stringResource(R.string.checkin_consistency_a11y, activeDays), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.checkin_consistency_label), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+                Text(facts, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                 flags.forEachIndexed { index, active ->
@@ -1427,21 +1671,18 @@ private fun EmptyPlan() {
     }
 }
 
-/** The calm completion moment — an ending, not a firework. */
+/**
+ * Today's one in-context safety line, quietly at the end of the list. The full general-wellness
+ * disclaimer lives once, in You → About.
+ */
 @Composable
-private fun DayCompleteCard(modifier: Modifier = Modifier) {
-    Surface(modifier.fillMaxWidth(), shape = RoundedCornerShape(Radius.card), color = MaterialTheme.colorScheme.primaryContainer) {
-        Row(Modifier.padding(Spacing.xl), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary), contentAlignment = Alignment.Center) {
-                Icon(Icons.Rounded.Check, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary)
-            }
-            Spacer(Modifier.width(Spacing.lg))
-            Column {
-                Text(stringResource(R.string.checkin_day_complete), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                Text(stringResource(R.string.checkin_day_complete_sub), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onPrimaryContainer)
-            }
-        }
-    }
+private fun InContextLine() {
+    Text(
+        stringResource(R.string.today_in_context),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(top = Spacing.lg),
+    )
 }
 
 private fun timeOfDayLabel(activity: DailyActivity): String =
@@ -1449,7 +1690,7 @@ private fun timeOfDayLabel(activity: DailyActivity): String =
     activity.bestTimeOfDay.name.lowercase(Locale.ROOT).replaceFirstChar { it.titlecase(Locale.getDefault()) }
 
 /** The whole plan is resolved and at least one thing was actually done. */
-private fun planFinished(state: MainUiState): Boolean =
+internal fun planFinished(state: MainUiState): Boolean =
     state.todayActivities.isNotEmpty() &&
         state.todayActivities.any { it.status == ActivityStatus.DONE } &&
         state.todayActivities.all { it.status == ActivityStatus.DONE || it.status == ActivityStatus.SKIPPED }

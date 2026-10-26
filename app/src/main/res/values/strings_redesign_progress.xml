@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Progress redesign (spec §1-2 "Progress"): goal hero first, week stats that say what they count,
+     forgiving consistency, projections as a range band. Never a big 0, never an invented number. -->
+<resources>
+    <!-- Goal hero, no goal yet: what a focused goal does; the button reuses progress_goal_empty_title. -->
+    <string name="progress_goal_hero_empty_title">One focused goal shapes your week</string>
+    <string name="progress_goal_hero_empty_body">Pick what matters most right now. Spartan checks it against safe, sustainable rates, then bends each day\'s plan toward it.</string>
+
+    <!-- Goal hero ring. Inside the ring: the sessions done and "of 3", or at zero the sessions to go. -->
+    <string name="progress_goal_ring_of">of %1$d</string>
+    <string name="progress_goal_ring_to_go">to go</string>
+    <string name="progress_goal_ring_none_a11y">None yet this week, %1$d to go</string>
+    <!-- Outcome goals: the engine's real share of the way to the goal, uncapped in words. Worded so
+         it cannot be read as the metric itself (a sleep goal's title already holds a percentage).
+         The label is wider than the ring's inner circle, so it sits under the ring. -->
+    <string name="progress_goal_ring_percent">%1$d%%</string>
+    <string name="progress_goal_ring_percent_label">of the way there</string>
+    <string name="progress_goal_ring_percent_a11y">%1$d%% of the way to your goal</string>
+
+    <!-- Week stats: every value carries a one-line definition. -->
+    <string name="progress_active_days_def">Days with at least one completed action</string>
+    <plurals name="progress_avg_recovery_def">
+        <item quantity="one">Daily recovery score, averaged over %1$d day with data</item>
+        <item quantity="other">Daily recovery score, averaged over %1$d days with data</item>
+    </plurals>
+    <plurals name="progress_avg_sleep_def">
+        <item quantity="one">Sleep you got vs. sleep you needed, averaged over %1$d night</item>
+        <item quantity="other">Sleep you got vs. sleep you needed, averaged over %1$d nights</item>
+    </plurals>
+    <plurals name="progress_avg_hrv_def">
+        <item quantity="one">Overnight heart rate variability, averaged over %1$d night</item>
+        <item quantity="other">Overnight heart rate variability, averaged over %1$d nights</item>
+    </plurals>
+    <string name="progress_strength_def">Strength workouts you logged in these 7 days</string>
+    <string name="progress_strength_none">None yet this week</string>
+
+    <!-- Consistency: runs only. The active-day count is the stat tile's and a habit goal's weekly
+         count the hero ring's. A one-day run that is not a comeback is never named as "1 day". -->
+    <string name="progress_consistency_run_started">Your run has started. Each active day adds to it.</string>
+
+    <!-- Projections: low consistency leads with the lever, not the numbers. The active-day count is
+         already on the stat tile, so the lever does not repeat it. -->
+    <string name="progress_lever_title">Your lever right now is consistency, not these numbers.</string>
+    <string name="progress_lever_body">At this pace the ranges below stay narrow. The step that counts is your next active day.</string>
+    <string name="progress_lever_body_none">Ranges appear once you have a few active days. The step that counts is one action on Today.</string>
+    <string name="progress_projection_now">Now · %1$s</string>
+    <string name="progress_projection_now_zone">Now · %1$s · %2$s zone</string>
+    <string name="progress_projection_week8">Week 8 · %1$s</string>
+    <string name="progress_projection_range">%1$s–%2$s</string>
+    <string name="progress_projection_value_zone_a11y">%1$s, %2$s zone</string>
+    <string name="progress_projection_a11y">%1$s: %2$s now. Illustrative range by week 8: %3$s to %4$s.</string>
+    <string name="progress_projection_a11y_single">%1$s: %2$s now. Illustrative value by week 8: about %3$s.</string>
+    <string name="progress_projection_a11y_flat">%1$s: %2$s now.</string>
+
+    <!-- Weekly review and trends -->
+    <string name="progress_review_header">Weekly review</string>
+    <string name="progress_trend_row">%1$s · %2$s</string>
+</resources>

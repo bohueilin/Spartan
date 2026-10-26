@@ -52,12 +52,13 @@ class ReviewEngine(
         val toughNights = recentReflections.filter { it.mood == ReflectionMood.TOUGH }.mapNotNull { sleepByDay[it.dateEpochDay] }
         val strongNights = recentReflections.filter { it.mood == ReflectionMood.STRONG }.mapNotNull { sleepByDay[it.dateEpochDay] }
         // Two matching days minimum, and one counterexample silences the pattern: never overclaim.
+        // Each line states only what lined up, never a cause — it is a journal correlation.
         val fromReflections = buildList {
             if (toughNights.size >= 2 && toughNights.all { it < 6.0 }) {
-                add("Your ${toughNights.size} tough days all followed nights under 6 hours of sleep — protecting sleep may be the easiest lever this week.")
+                add("Your ${toughNights.size} tough days ${bothOrAll(toughNights.size)} came after nights under 6 hours of sleep. Worth noticing as you plan this week's bedtimes.")
             }
             if (strongNights.size >= 2 && strongNights.all { it >= 7.0 }) {
-                add("Your ${strongNights.size} strong days all followed nights of 7 or more hours of sleep — that rhythm looks worth protecting.")
+                add("Your ${strongNights.size} strong days ${bothOrAll(strongNights.size)} came after nights of 7 or more hours of sleep. A pattern worth noticing.")
             }
             if (isEmpty() && recentReflections.isNotEmpty()) add("Keep reflecting — patterns need a few more nights to show.")
         }
@@ -73,7 +74,7 @@ class ReviewEngine(
             latestBp = latestPairedBp(metrics),
             latestFastingGlucose = glucose,
             improved = improved.ifEmpty { listOf("You collected data to make next week more informed.") },
-            needsAttention = needsAttention.ifEmpty { listOf("No urgent trend flags from the current local data.") },
+            needsAttention = needsAttention.ifEmpty { listOf(NOTHING_NEEDS_ATTENTION) },
             nextWeekFocus = if (recentLogs.isNotEmpty() && adherence < 60) {
                 "Make the plan easier to complete."
             } else {
@@ -115,4 +116,12 @@ class ReviewEngine(
     }
 
     private fun List<Double>.averageOrNull(): Double? = if (isEmpty()) null else average()
+
+    /** "both" for a pair, "all" for more. */
+    private fun bothOrAll(count: Int): String = if (count == 2) "both" else "all"
+
+    companion object {
+        /** The "Needs attention" line when nothing does: a neutral note, never a caution. */
+        const val NOTHING_NEEDS_ATTENTION = "No urgent trend flags from the current local data."
+    }
 }

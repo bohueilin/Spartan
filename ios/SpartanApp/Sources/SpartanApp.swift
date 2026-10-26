@@ -1,10 +1,10 @@
 // SpartanApp.swift — app entry point + Spartan design tokens for iOS.
 //
 // Faithful port of the Android theme (app/src/main/java/com/spartan/ui/theme/Theme.kt and
-// Tokens.kt): OLED-dark-forward with a single athletic teal accent, and the WCAG-audited
-// light-mode band variants (the bright band colors fail 3:1 on light surfaces, so light
-// mode uses darkened equivalents, all >= 4.5:1 on white — see docs/ACCESSIBILITY.md in the
-// Android tree).
+// Tokens.kt): a barely-tinted light canvas (or near-black dark) with white outlined cards, a
+// single deep-teal accent, and the WCAG-audited light-mode band variants (the bright band colors
+// fail 3:1 on light surfaces, so light mode uses darkened equivalents, all >= 4.5:1 on white —
+// see docs/ACCESSIBILITY.md in the Android tree).
 //
 // Honest status: this SwiftUI layer is source-complete but awaits an Xcode compile pass
 // (xcodegen generate + xcodebuild) on a machine with the iOS SDK.
@@ -69,27 +69,32 @@ extension Color {
     }
 
     // Core scheme (Theme.kt LightColors / DarkColors).
-    static let spartanBackground = spartanDynamic(light: 0xFFFFFF, dark: 0x0A0F0E)
+    static let spartanBackground = spartanDynamic(light: 0xF6F8F7, dark: 0x0A0F0E)
     static let spartanSurface = spartanDynamic(light: 0xFFFFFF, dark: 0x121817)
     static let spartanSurfaceVariant = spartanDynamic(light: 0xE6ECEB, dark: 0x1E2A26)
-    // Light accent/tertiary darkened one step (0x0E7C6E→0x0B685C, 0x9A6A1B→0x7E5613) so 11pt-bold
-    // chip text passes 4.5:1 on its own 12–16% tinted containers, not just on plain surfaces —
-    // mirrors the same fix in the Android Theme.kt.
-    static let spartanAccent = spartanDynamic(light: 0x0B685C, dark: 0x3FE0C8)
-    static let spartanOnAccent = spartanDynamic(light: 0xFFFFFF, dark: 0x04211D)
+    // Deep-teal accent (Theme.kt primary): 8.0:1 on white, 7.5:1 on the background and ≥5.9:1 on
+    // its own 12–18% tinted chips; the dark accent pairs with onAccent at 7.65:1. Tertiary stays
+    // darkened (0x9A6A1B→0x7E5613) so 11pt-bold chip text passes 4.5:1 on its 16% tint.
+    static let spartanAccent = spartanDynamic(light: 0x0B5B4F, dark: 0x84D5C4)
+    static let spartanOnAccent = spartanDynamic(light: 0xFFFFFF, dark: 0x00382F)
     static let spartanSecondary = spartanDynamic(light: 0x2C3A44, dark: 0xB7C4C2)
     static let spartanTertiary = spartanDynamic(light: 0x7E5613, dark: 0xE7B25A)
-    static let spartanOnSurface = spartanDynamic(light: 0x11201E, dark: 0xEAF1EF)
-    static let spartanOnSurfaceVariant = spartanDynamic(light: 0x4A5654, dark: 0x9DB0AB)
+    static let spartanOnSurface = spartanDynamic(light: 0x101A18, dark: 0xEAF1EF)
+    // Secondary text darkened to 0x46564F: 7.77:1 on white, 7.28:1 on the background.
+    static let spartanOnSurfaceVariant = spartanDynamic(light: 0x46564F, dark: 0x9DB0AB)
+    // Not Android's new outline (0x738581): iOS draws card borders and the ring track with this
+    // token, which Android now draws with the lighter outlineVariant / surfaceContainerHighest.
+    // surfaceVariant above likewise keeps 0xE6ECEB (Android's surfaceContainerHighest), so the
+    // loading skeletons stay visible on the tinted background.
     static let spartanOutline = spartanDynamic(light: 0x9BADAA, dark: 0x3D4F48)
 
-    // Readiness band colors (Tokens.kt SpartanBands), incl. WCAG light-mode variants
-    // (easy/rest darkened so band text passes 4.5:1 on 18%-alpha tinted chips too; primed is
-    // 0x0B6E3D, not 0x0E7B43: 6.34:1 on white and ~5.1:1 on its own 14% pill tint, where the
-    // old green fell to ~4.4:1 — WCAG relative-luminance ratio, see docs/ACCESSIBILITY.md).
-    static let spartanBandPrimed = spartanDynamic(light: 0x0B6E3D, dark: 0x38D07E)
-    static let spartanBandEasy = spartanDynamic(light: 0x7C570E, dark: 0xE7B25A)
-    static let spartanBandRest = spartanDynamic(light: 0xA0381D, dark: 0xE67A5A)
+    // Readiness band / recovery-zone text colors (Tokens.kt SpartanBands), incl. WCAG light-mode
+    // variants: green 0x15693C, amber 0x875200 and red 0xB3261E are each ≥6.4:1 on white and
+    // ≥4.8:1 on their own 14% pill and 18% chip tints (WCAG relative-luminance ratio, see
+    // docs/ACCESSIBILITY.md). They are text-grade, so the ring arc needs no separate mark color.
+    static let spartanBandPrimed = spartanDynamic(light: 0x15693C, dark: 0x38D07E)
+    static let spartanBandEasy = spartanDynamic(light: 0x875200, dark: 0xE7B25A)
+    static let spartanBandRest = spartanDynamic(light: 0xB3261E, dark: 0xE67A5A)
 }
 
 private extension UIColor {

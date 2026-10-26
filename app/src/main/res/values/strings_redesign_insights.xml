@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Insights redesign (spec §1–2 "Insights"): one signal per card, with its value, its position
+  against the user's own usual, its chart, one plain-language line and at most one action.
+  Wellness language only: what a reading means for today and a gentle next step — no diagnosis,
+  no claims about the body's systems, no promises about what will follow, never better/worse grades.
+  Metric detail's "What this means for you" reads the same lines.
+-->
+<resources>
+    <!-- TalkBack: the value as spoken first in a signal's sentence, "HRV 58 ms" (name, value) -->
+    <string name="glossary_a11y_value">%1$s %2$s</string>
+
+    <!-- The line under a card's value, starting with the trend: "Rising over 7 days · 81% on Tue" -->
+    <plurals name="insights_trend_rising">
+        <item quantity="one">Rising over %1$d day</item>
+        <item quantity="other">Rising over %1$d days</item>
+    </plurals>
+    <plurals name="insights_trend_falling">
+        <item quantity="one">Falling over %1$d day</item>
+        <item quantity="other">Falling over %1$d days</item>
+    </plurals>
+    <plurals name="insights_trend_steady">
+        <item quantity="one">Steady over %1$d day</item>
+        <item quantity="other">Steady over %1$d days</item>
+    </plurals>
+    <!-- A learning card's line under the value, beside the "Learning your usual" pill. Quantity: %2$d, the days needed -->
+    <plurals name="insights_learning_days">
+        <item quantity="one">%1$d of %2$d day so far</item>
+        <item quantity="other">%1$d of %2$d days so far</item>
+    </plurals>
+
+    <!-- A card's plain-language line: what today's reading means, then any metric tip ("Pay it back…") -->
+    <string name="insights_sentences">%1$s %2$s</string>
+    <!-- While learning: no count here (the line under the value has it) and no second "learning" -->
+    <string name="insights_meaning_learning">Keep wearing WHOOP, and your usual range will show up here.</string>
+    <!-- Recovery: its position against the usual AND its zone, so the line never contradicts the zone pill.
+         Every WITHIN line opens with the pill's own words, "In your usual range". -->
+    <string name="insights_meaning_recovery_green_above">Higher than your usual, in the Green zone. A good day for a quality session if you feel up to it.</string>
+    <string name="insights_meaning_recovery_green_within">In your usual range, in the Green zone. Your planned training fits if you feel up to it.</string>
+    <string name="insights_meaning_recovery_green_below">Lower than your usual, but still in the Green zone. Your planned training fits; no need to push past it.</string>
+    <string name="insights_meaning_recovery_yellow_above">Higher than your usual, still in the Yellow zone. A steady, moderate session fits.</string>
+    <string name="insights_meaning_recovery_yellow_within">In your usual range, in the Yellow zone. A balanced day of steady work fits.</string>
+    <string name="insights_meaning_recovery_yellow_below">Lower than your usual, in the Yellow zone. Easier movement fits today better than intensity.</string>
+    <string name="insights_meaning_recovery_red_above">Higher than your usual, still in the Red zone. Keep today light and protect tonight\'s sleep.</string>
+    <string name="insights_meaning_recovery_red_within">In your usual range, in the Red zone. Light movement and an early night fit today.</string>
+    <string name="insights_meaning_recovery_red_below">Lower than your usual, in the Red zone. Gentle movement fits today better than intensity.</string>
+    <string name="insights_meaning_hrv_above">Higher than your usual. Keep your sleep and training rhythm steady.</string>
+    <string name="insights_meaning_hrv_within">In your usual range. Consistent sleep and easy aerobic work help keep it here.</string>
+    <string name="insights_meaning_hrv_below">Lower than your usual. It often dips after short sleep, alcohol or hard training, so keep today easier and protect tonight\'s sleep.</string>
+    <string name="insights_meaning_rhr_above">Higher than your usual. Drink some water, keep training easy, and notice how you slept.</string>
+    <string name="insights_meaning_rhr_within">In your usual range. Regular easy aerobic work tends to lower it slowly, over months.</string>
+    <string name="insights_meaning_rhr_below">Lower than your usual. A steady routine helps keep it there.</string>
+    <string name="insights_meaning_sleep_above">You got more of the sleep you needed than usual. Keep the same rhythm tonight.</string>
+    <string name="insights_meaning_sleep_within">In your usual range. Consistent bed and wake times keep it steady.</string>
+    <string name="insights_meaning_sleep_below">You got less of the sleep you needed. A wind-down tonight can help you catch up.</string>
+    <string name="insights_meaning_debt_above">More sleep debt than usual. An earlier lights-out tonight is a start.</string>
+    <string name="insights_meaning_debt_within">In your usual range for sleep debt.</string>
+    <string name="insights_meaning_debt_below">Less sleep debt than usual.</string>
+    <string name="insights_meaning_respiratory_above">Higher than your usual. It can rise after hard effort, heat or a short night, so take it easy and notice how you feel.</string>
+    <string name="insights_meaning_respiratory_within">In your usual range. It is one of your steadiest signals, so a change stands out.</string>
+    <string name="insights_meaning_respiratory_below">Lower than your usual. It tends to stay steady, so the trend matters more than one night.</string>
+    <string name="insights_meaning_strain_above">A bigger day than usual. Pair it with extra recovery tonight.</string>
+    <string name="insights_meaning_strain_within">In your usual range for a day\'s load.</string>
+    <string name="insights_meaning_strain_below">A lighter day than usual.</string>
+    <string name="insights_meaning_other">Compare this with your recent trend rather than any single reading.</string>
+
+    <!-- Metric detail's chart, to TalkBack: "HRV, last 31 readings: lowest 28 ms, highest 41 ms, latest 33 ms".
+         Recovery's latest (%5$s) carries its zone: "latest 64%, Yellow zone" -->
+    <plurals name="detail_chart_a11y">
+        <item quantity="one">%1$s, last %2$d reading: lowest %3$s, highest %4$s, latest %5$s</item>
+        <item quantity="other">%1$s, last %2$d readings: lowest %3$s, highest %4$s, latest %5$s</item>
+    </plurals>
+    <!-- …then the usual band, when there is one: "…, your usual 28 to 38 ms" -->
+    <string name="detail_chart_a11y_usual">%1$s, your usual %2$s</string>
+</resources>
