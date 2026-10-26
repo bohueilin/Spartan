@@ -40,15 +40,15 @@
     <string name="glossary_strain_target">Today\'s target: %1$s %2$d–%3$d</string>
     <string name="glossary_population_label">General adult reference</string>
 
-    <!-- TalkBack: one sentence for the numbers; the chart stays decorative -->
-    <string name="glossary_a11y_above">%1$s %2$s, above your usual of %3$s</string>
-    <string name="glossary_a11y_below">%1$s %2$s, below your usual of %3$s</string>
-    <string name="glossary_a11y_within">%1$s %2$s, within your usual of %3$s</string>
+    <!-- TalkBack: one sentence for the numbers, after the spoken value ("HRV 58 ms"); the marks stay silent -->
+    <string name="glossary_a11y_above">above your usual of %1$s</string>
+    <string name="glossary_a11y_below">below your usual of %1$s</string>
+    <string name="glossary_a11y_within">within your usual of %1$s</string>
     <string name="glossary_a11y_range">%1$s to %2$s</string>
-    <!-- Quantity: %4$d, the days needed to learn a usual -->
+    <!-- Quantity: %2$d, the days needed to learn a usual -->
     <plurals name="glossary_a11y_learning">
-        <item quantity="one">%1$s %2$s, Spartan is still learning your usual, %3$d of %4$d day</item>
-        <item quantity="other">%1$s %2$s, Spartan is still learning your usual, %3$d of %4$d days</item>
+        <item quantity="one">Spartan is still learning your usual, %1$d of %2$d day</item>
+        <item quantity="other">Spartan is still learning your usual, %1$d of %2$d days</item>
     </plurals>
     <string name="glossary_a11y_separator">", "</string>
 </resources>

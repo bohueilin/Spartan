@@ -265,6 +265,16 @@ class ProjectionEngineTest {
     }
 
     @Test
+    fun disclaimer_saysTheRangesAreIllustrative_withoutAMedicalLine() {
+        // What the ranges are: estimates, not a prediction or a guarantee, and results vary.
+        assertTrue(ProjectionEngine.DISCLAIMER.startsWith("Illustrative estimates"))
+        assertTrue(ProjectionEngine.DISCLAIMER.contains("not a prediction or a guarantee for you."))
+        assertTrue(ProjectionEngine.DISCLAIMER.endsWith("Individual results vary."))
+        // The general disclaimer lives in You → About and Today's one line, never under the projections.
+        assertFalse(ProjectionEngine.DISCLAIMER.contains("medical", ignoreCase = true))
+    }
+
+    @Test
     fun allRenderedCopy_passesSafetyEngine() {
         assertTrue(safety.validateCopy(ProjectionEngine.DISCLAIMER))
         for (days in listOf(0, 1, 3, 5, 7)) {

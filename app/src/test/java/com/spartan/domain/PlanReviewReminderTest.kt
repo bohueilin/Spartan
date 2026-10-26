@@ -101,7 +101,8 @@ class PlanReviewReminderTest {
         )
 
         val labsOnly = ReviewEngine().summarize(metrics, emptyList(), referenceDate = today)
-        assertEquals(listOf("No urgent trend flags from the current local data."), labsOnly.needsAttention)
+        assertEquals(listOf(ReviewEngine.NOTHING_NEEDS_ATTENTION), labsOnly.needsAttention)
+        assertEquals("No urgent trend flags from the current local data.", ReviewEngine.NOTHING_NEEDS_ATTENTION)
         assertEquals(118.0, labsOnly.latestFastingGlucose!!, 0.0)
         assertEquals("142/92", labsOnly.latestBp)
 
@@ -242,8 +243,17 @@ class PlanReviewReminderTest {
 
         assertEquals(listOf(keepReflecting), one)
         assertEquals(
-            listOf("Your 2 tough days all followed nights under 6 hours of sleep — protecting sleep may be the easiest lever this week."),
+            listOf("Your 2 tough days both came after nights under 6 hours of sleep. Worth noticing as you plan this week's bedtimes."),
             two,
+        )
+        // Three or more read "all".
+        val three = fromReflections(
+            listOf(sleep(1, 5.0), sleep(3, 5.5), sleep(5, 4.5)),
+            listOf(reflect(1, TOUGH), reflect(3, TOUGH), reflect(5, TOUGH)),
+        )
+        assertEquals(
+            listOf("Your 3 tough days all came after nights under 6 hours of sleep. Worth noticing as you plan this week's bedtimes."),
+            three,
         )
     }
 
@@ -261,7 +271,7 @@ class PlanReviewReminderTest {
         val reflections = listOf(reflect(0, STRONG), reflect(2, STRONG), reflect(4, STRONG))
 
         assertEquals(
-            listOf("Your 3 strong days all followed nights of 7 or more hours of sleep — that rhythm looks worth protecting."),
+            listOf("Your 3 strong days all came after nights of 7 or more hours of sleep. A pattern worth noticing."),
             fromReflections(metrics, reflections),
         )
         // Same evidence bar as the tough rule: one day, or one counterexample, says nothing.
@@ -307,6 +317,9 @@ class PlanReviewReminderTest {
 
         assertEquals(3, lines.size)
         assertTrue(lines.all(SafetyEngine()::validateCopy))
+        // A journal correlation states what lined up, never a cause or a lever.
+        val causal = Regex("""followed|because|lever|protecting|caused|leads to|so that""", RegexOption.IGNORE_CASE)
+        lines.forEach { assertFalse(it, causal.containsMatchIn(it)) }
     }
 
     @Test

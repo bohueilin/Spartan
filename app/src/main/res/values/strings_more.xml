@@ -8,7 +8,7 @@
     <!-- With Wallpaper colours on, the wallpaper palette wins: only the motion half of the calmer theme applies. -->
     <string name="more_calmer_theme_body_wallpaper">No celebration motion · colours come from your wallpaper</string>
     <string name="more_wallpaper_colours">Wallpaper colours</string>
-    <string name="more_wallpaper_colours_body">Use colours from your wallpaper</string>
+    <string name="more_wallpaper_colours_body">Colours from your wallpaper</string>
 
     <!-- Connections + Diagnostics: the WHOOP export contract, in plain language (research §2.2, §6.2) -->
     <string name="more_export_title">How a WHOOP export works</string>
@@ -39,7 +39,7 @@
         <item quantity="one">Current run: %1$d day</item>
         <item quantity="other">Current run: %1$d days</item>
     </plurals>
-    <string name="more_back_on_track">Back on track</string>
+    <string name="more_back_on_track">Back on track — no reset</string>
     <string name="more_back_on_track_body">Today picks up where you left off. Your earlier days still count.</string>
     <string name="more_grace_used">A missed day didn\'t break your run. One a week is built in.</string>
     <string name="more_consistency_empty">Your next run starts with one activity on Today.</string>

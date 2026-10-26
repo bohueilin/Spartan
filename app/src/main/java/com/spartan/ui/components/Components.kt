@@ -1,7 +1,6 @@
 package com.spartan.ui.components
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -14,7 +13,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -62,33 +60,30 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.spartan.R
 import com.spartan.domain.model.ActivityCategory
 import com.spartan.domain.model.MetricType
+import com.spartan.ui.theme.MinTouchTarget
 import com.spartan.ui.theme.Radius
 import com.spartan.ui.theme.Spacing
 import com.spartan.ui.theme.SpartanBands
+import com.spartan.ui.theme.heroColors
 
 /** Page gutter shared by every screen, so edges line up when switching tabs. */
 val PageGutter = Spacing.xxl
 
 /**
- * The one card. Light mode lifts it with a soft, wide shadow (depth without lines); dark mode,
- * where shadows vanish, uses a lifted surface plus a hairline instead.
+ * The one card: flat (0dp, no stacked shadows) with a hairline outline, in both themes — the hero
+ * ([HeroCard]) is the only filled, emphasised surface on a screen. Metric and action cards share
+ * the card radius (20dp).
  */
 @Composable
 fun SpartanCard(
@@ -98,15 +93,10 @@ fun SpartanCard(
     contentPadding: PaddingValues = PaddingValues(Spacing.xl),
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val dark = isSystemInDarkTheme()
     val shape = RoundedCornerShape(Radius.card)
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .then(
-                if (dark) Modifier
-                else Modifier.shadow(10.dp, shape, ambientColor = Color.Black.copy(alpha = 0.06f), spotColor = Color.Black.copy(alpha = 0.10f)),
-            )
             .clip(shape)
             .then(if (onClick != null) Modifier.clickable(onClickLabel = onClickLabel, onClick = onClick) else Modifier),
         shape = shape,
@@ -118,8 +108,37 @@ fun SpartanCard(
 }
 
 /**
- * The general-wellness disclaimer that closes every plan and trends screen (research §3.4): what
- * Spartan is, what it is not, and when to talk to a clinician. One string, so no screen drifts.
+ * The one hero per screen: a filled deep-teal surface ([heroColors]) at the hero radius (28dp),
+ * flat. Text inside defaults to the hero's content colour (white, 8.0:1); use
+ * [HeroColors.contentVariant] for secondary lines and zoneOnHeroColor for the zone.
+ */
+@Composable
+fun HeroCard(
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+    onClickLabel: String? = null,
+    contentPadding: PaddingValues = PaddingValues(Spacing.xxl),
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val hero = heroColors()
+    val shape = RoundedCornerShape(Radius.hero)
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .then(if (onClick != null) Modifier.clickable(onClickLabel = onClickLabel, onClick = onClick) else Modifier),
+        shape = shape,
+        color = hero.container,
+        contentColor = hero.content,
+    ) {
+        Column(Modifier.padding(contentPadding), content = content)
+    }
+}
+
+/**
+ * The full general-wellness disclaimer: what Spartan is, what it is not, and when to talk to a
+ * clinician. Shown once, in You → About — every other screen carries no footer, and Today keeps
+ * only its short in-context line. One string, so it never drifts.
  */
 @Composable
 fun WellnessFooter(modifier: Modifier = Modifier) {
@@ -217,7 +236,10 @@ fun IconTile(icon: ImageVector, tint: Color, size: Dp = 44.dp) {
     }
 }
 
-/** A tappable settings-style row: leading tile, title, optional subtitle, chevron. */
+/**
+ * A tappable settings-style row: leading tile, title, optional subtitle, chevron. [onClickLabel]
+ * names the destination for TalkBack ("Open Recovery") when the title alone does not.
+ */
 @Composable
 fun ListRow(
     icon: ImageVector,
@@ -225,10 +247,11 @@ fun ListRow(
     subtitle: String? = null,
     onClick: () -> Unit,
     showDivider: Boolean = true,
+    onClickLabel: String? = null,
 ) {
     Column {
         Row(
-            Modifier.fillMaxWidth().clickable(onClick = onClick).heightIn(min = 64.dp).padding(vertical = Spacing.md),
+            Modifier.fillMaxWidth().clickable(onClickLabel = onClickLabel, onClick = onClick).heightIn(min = 64.dp).padding(vertical = Spacing.md),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconTile(icon, MaterialTheme.colorScheme.onSurface, size = 40.dp)
@@ -246,12 +269,43 @@ fun ListRow(
     }
 }
 
-/** The single primary call to action: full-width, 52dp, pill-shaped. */
+/**
+ * The single primary call to action: full-width, 52dp, pill-shaped. Its label is centred, so a
+ * label that wraps at large text stays balanced. [onHero] inverts it (hero content on the hero
+ * container) for the one action that sits on a [HeroCard] — the standard deep teal would vanish on
+ * the deep-teal hero. 8.0:1 / 9.0:1 either way (TokenContrastTest).
+ */
 @Composable
-fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, icon: ImageVector? = null) {
-    Button(onClick = onClick, enabled = enabled, modifier = modifier.heightIn(min = 52.dp), shape = CircleShape) {
+fun PrimaryButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    icon: ImageVector? = null,
+    onHero: Boolean = false,
+) {
+    val hero = heroColors()
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier.heightIn(min = 52.dp),
+        shape = CircleShape,
+        colors = if (onHero) ButtonDefaults.buttonColors(containerColor = hero.content, contentColor = hero.container) else ButtonDefaults.buttonColors(),
+    ) {
         icon?.let { Icon(it, contentDescription = null, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(Spacing.sm)) }
-        Text(text, style = MaterialTheme.typography.labelLarge)
+        Text(text, style = MaterialTheme.typography.labelLarge, textAlign = TextAlign.Center)
+    }
+}
+
+/** A quiet action on the hero: a text button in the hero's content colour, at least 48dp tall. */
+@Composable
+fun HeroTextButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    TextButton(
+        onClick = onClick,
+        modifier = modifier.heightIn(min = MinTouchTarget),
+        colors = ButtonDefaults.textButtonColors(contentColor = heroColors().content),
+    ) {
+        Text(text, style = MaterialTheme.typography.labelLarge, textAlign = TextAlign.Center)
     }
 }
 
@@ -333,49 +387,6 @@ fun DetailScaffold(
 fun DetailPage(title: String, onBack: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
     DetailScaffold(title, onBack) {
         item { Column(verticalArrangement = Arrangement.spacedBy(Spacing.md), content = content) }
-    }
-}
-
-/**
- * A trend line drawn oldest → newest with a gradient area fill, an optional shaded band for the
- * user's personal normal range, and a dot on the newest value. Decorative to TalkBack — callers
- * state the takeaway in text.
- */
-@Composable
-fun Sparkline(
-    values: List<Double>,
-    color: Color,
-    modifier: Modifier = Modifier,
-    normalLow: Double? = null,
-    normalHigh: Double? = null,
-    height: Dp = 56.dp,
-) {
-    if (values.size < 2) return
-    val bandColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f)
-    val dotRing = MaterialTheme.colorScheme.surface
-    Canvas(modifier.fillMaxWidth().height(height).clearAndSetSemantics {}) {
-        val all = values + listOfNotNull(normalLow, normalHigh)
-        val min = all.min()
-        val max = all.max()
-        val span = (max - min).takeIf { it > 0.0 } ?: 1.0
-        val pad = 6.dp.toPx()
-        val h = size.height - pad * 2
-        fun y(v: Double) = pad + (h - ((v - min) / span).toFloat() * h)
-        if (normalLow != null && normalHigh != null) {
-            drawRect(bandColor, topLeft = Offset(0f, y(normalHigh)), size = androidx.compose.ui.geometry.Size(size.width, y(normalLow) - y(normalHigh)))
-        }
-        val points = values.mapIndexed { i, v -> Offset(size.width * i / values.lastIndex, y(v)) }
-        val line = Path().apply { points.forEachIndexed { i, p -> if (i == 0) moveTo(p.x, p.y) else lineTo(p.x, p.y) } }
-        val area = Path().apply {
-            addPath(line)
-            lineTo(points.last().x, size.height)
-            lineTo(points.first().x, size.height)
-            close()
-        }
-        drawPath(area, Brush.verticalGradient(listOf(color.copy(alpha = 0.22f), color.copy(alpha = 0f))))
-        drawPath(line, color, style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round))
-        drawCircle(dotRing, radius = 6.dp.toPx(), center = points.last())
-        drawCircle(color, radius = 4.dp.toPx(), center = points.last())
     }
 }
 

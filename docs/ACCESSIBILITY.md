@@ -1,5 +1,46 @@
 # Spartan — Accessibility
 
+## Redesign tokens (WCAG 2.x AA) — 2026-10-25
+
+The world-class redesign (`SPARTAN_WORLD_CLASS_SPEC.md`) replaced the light palette. Every text and
+mark pair below is asserted in `app/src/test/java/com/spartan/ui/TokenContrastTest.kt` for light,
+dark, calm light and calm dark (text 4.5:1, non-text 3:1; tints composited over their surface).
+
+| Pair | Dark | Light |
+|---|---|---|
+| Body `onSurface` / `surface` | 15.68:1 | 17.75:1 |
+| Muted `onSurfaceVariant` (`#46564F` light) / `surface` | 7.90:1 | 7.77:1 |
+| Muted `onSurfaceVariant` / `surfaceVariant` | 6.53:1 | 7.07:1 |
+| Muted `onSurfaceVariant` / `background` | 8.49:1 | 7.28:1 |
+| `primary` (`#0B5B4F` light) text / `surface` | 10.52:1 | 8.00:1 |
+| `onPrimary` / `primary` (filled button) | 7.65:1 | 8.00:1 |
+| Zone green text (`#15693C` light) / `surface` · on its 18% tint | 8.98 · 6.32:1 | 6.74 · 5.12:1 |
+| Zone amber text (`#875200` light) / `surface` · on its 18% tint | 9.34 · 6.48:1 | 6.49 · 4.96:1 |
+| Zone red text (`#B3261E`) / `surface` · on its 18% tint | 6.24 · 4.79:1 | 6.54 · 4.84:1 |
+| `outline` (switch and field boundary) / `surface` | 4.13:1 | 3.89:1 |
+
+**Spec colours kept as marks only.** The spec's green `#1B7A4D` is 4.39:1 on its own 14% pill
+tint and the amber `#C47A00` 3.43:1 on white, so neither may be text; zone text uses the darkened
+`#15693C` / `#875200`. Green and red (`#B3261E`) stay the zone marks for rings, chart lines and the
+completion check. A chart line is drawn over its own shaded band and area fill, and there the
+spec's amber is only 2.45:1, so the amber mark is `#A36500` (3.19:1 on its band and area, 4.75:1 on
+white); every chart line is ≥3:1 on its own band (green 3.48, red 3.92, accents ≥3.41, dark ≥3.86).
+The amber `#F7C948` appears only on the deep-teal hero (5.11:1).
+
+**The hero** (`#0B5B4F` in both themes; Calmer `#2F4F4A`) is not taken from the colour scheme, so
+wallpaper colours can never put a Yellow ring on a yellow card. On it: white text 8.00 / 8.98:1,
+secondary `#C9E3DC` 5.91 / 6.63:1, zone green `#7EE2A8` 5.08 / 5.70:1, amber `#F7C948` 5.11 /
+5.73:1, red `#FFB4AB` 4.71 / 5.29:1; each ring arc is ≥3.18:1 against its 16%-white track.
+
+**Chart identity colours** (never zone meaning): light HRV 5.23, resting HR 6.72, sleep 7.64,
+respiratory 6.02, strain 7.13:1 on white; dark all ≥9.4:1 on `surface`.
+
+**Completion check:** the filled circle is zone green (5.33:1 light / 8.98:1 dark on the row) with
+a white / near-black check (5.33 / 8.46:1). A done row keeps its normal title colour on a faint
+green tint (title 15.90:1, meta 6.96:1) — no strikethrough, so it reads as done, not disabled.
+
+The older audits below record the pre-redesign palette and the fixes that led to it.
+
 ## Contrast audit (WCAG 2.x AA) — executed 2026-07-09, re-run 2026-08-11 and 2026-10-24
 
 Computed programmatically over the theme tokens in `ui/theme/Theme.kt` + `ui/theme/Tokens.kt`
@@ -79,8 +120,12 @@ The unchecked ring is the only visual sign of the Today screen's main control, s
 - 48dp minimum touch targets (checkbox hit area is 48dp around the 28dp ring, with a round,
   unbounded 24dp-radius ripple that fills the target;
   `CheckInScreenTest.activityCheckbox_meetsTouchTargetMinimum` asserts it on device).
-- Color is never the only signal: band color is always paired with a text label ("Take it easy"),
-  priority chips carry text, completed activities get strikethrough + "Completed" status text.
+- Color is never the only signal: the recovery zone is always its word and number ("Yellow ·
+  64%"), band color is paired with a text label, priority chips carry text, and a completed
+  activity shows a filled check and its "Completed" state (no strikethrough since 2026-10-25).
+- Every chart is one TalkBack node whose description states the value, the user's usual range
+  and the trend; the verdict hero is one stop that reads headline, zone, number, comparison,
+  targets and data freshness.
 - Dynamic type: all text uses the Material 3 type scale (sp); no fixed-height text containers and
   no truncation of key copy. `StatusPill`, the `ListRow` subtitle and the video card's title and
   meta wrap instead of clipping or ellipsizing; the activity sheet's pills sit in a `FlowRow`.
@@ -97,8 +142,9 @@ Setup: Settings → Accessibility → TalkBack ON. Fresh install of the release 
 
 1. **Onboarding.** Swipe through: wordmark → headline → description → name field → height field →
    Begin. Verify each field announces its label; Begin announces as a button.
-2. **Check-in first-open.** Verify focus order: SPARTAN → SAMPLE DATA chip → readiness ring
-   (announces "Recovery NN percent, <band>") → progress ("N of M activities done") → plan cards.
+2. **Today first-open.** Verify focus order: "Today" title → greeting and date → SAMPLE DATA chip →
+   the hero (announces headline, "Recovery <zone>, NN percent", comparison, targets, freshness) →
+   the primary action ("Start today's plan with <title>") → progress → plan cards.
 3. **Expand a card.** Double-tap an activity card: verify the expand action is announced
    ("Expand <title>") and the why/steps content is readable in order.
 4. **Check off an activity.** Focus the checkbox: verify it announces the activity title +

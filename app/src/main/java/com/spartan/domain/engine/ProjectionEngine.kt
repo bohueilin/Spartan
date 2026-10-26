@@ -185,8 +185,11 @@ class ProjectionEngine(private val safetyEngine: SafetyEngine = SafetyEngine()) 
     private fun floorTo1(value: Double): Double = floor(value * 10.0) / 10.0
 
     companion object {
-        /** Shown wherever projections render. */
-        const val DISCLAIMER: String = "Illustrative estimates for consistent aerobic and strength training — not a prediction or a guarantee for you. Individual results vary. This is wellness guidance, not medical advice."
+        /**
+         * Shown wherever projections render: what the ranges are, never a general medical
+         * disclaimer — that lives in You → About, and Today keeps its one in-context line.
+         */
+        const val DISCLAIMER: String = "Illustrative estimates for consistent aerobic and strength training — not a prediction or a guarantee for you. Individual results vary."
 
         private const val ASSUMPTION_FULL = "If you complete your plan on 5+ days a week"
         private const val ASSUMPTION_INACTIVE =

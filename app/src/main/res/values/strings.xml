@@ -40,8 +40,6 @@
     <string name="checkin_good_evening">Good evening</string>
     <string name="checkin_consistency_label">Last 7 days</string>
     <string name="checkin_consistency_a11y">Active on %1$d of the last 7 days</string>
-    <string name="checkin_day_complete">Day complete.</string>
-    <string name="checkin_day_complete_sub">Recovery earned. See where this takes you in Review.</string>
 
     <!-- Coach hub -->
     <string name="coach_goal_section">YOUR GOAL</string>
@@ -60,13 +58,16 @@
     <string name="coach_goal_behind">Keep going</string>
     <!-- Pre-cased fallback label for an unnamed window (locale-safe: no runtime lowercase). -->
     <string name="coach_windows_section_lower">high-pressure windows</string>
-    <string name="coach_windows_intro">Tell Spartan when your week gets tense — recurring meetings, reviews. It schedules a five-minute breathing reset just before each one.</string>
+    <!-- %1$s = you_windows_lead ("5 minutes", from StressPatterns.PRE_WINDOW_LEAD_MINUTES). Only the
+         app arms these (MainViewModel on refresh or adding a window; DailyPlanRefreshWorker does not),
+         and ReminderScheduler skips past times, quiet hours and denied notifications. -->
+    <string name="coach_windows_intro">Tell Spartan when your week gets tense — recurring meetings, reviews. On days you open Spartan, a notification %1$s before each window starts suggests a short breathing reset. Spartan sets them up when you open it, so one whose time has already passed is skipped. It needs notifications on, and stays silent during overnight quiet hours.</string>
     <string name="coach_window_add">Add window</string>
     <string name="coach_window_label">Label (e.g. Standup)</string>
     <string name="coach_window_start">Start hour (0–23)</string>
     <string name="coach_window_end">End hour (1–24)</string>
     <string name="coach_window_remove">Remove</string>
-    <string name="coach_ranges_intro">Typical ranges for %1$s, next to your numbers. Your own baseline beats any table.</string>
+    <string name="coach_ranges_intro">General ranges for %1$s, next to your own numbers, for context. They are not targets and not a diagnosis. Your own baseline beats any table.</string>
     <string name="coach_ranges_profile_cta">Add age and sex for tighter ranges</string>
     <string name="coach_ranges_edit">Edit profile</string>
     <string name="coach_range_typical">Typical %1$s</string>
@@ -102,7 +103,7 @@
 
     <!-- Metric detail (redesign) -->
     <string name="detail_trend_title">Last %1$d readings</string>
-    <string name="detail_band_legend">The shaded band is your normal — the middle half of your recent days.</string>
+    <string name="detail_band_legend">The shaded band is your usual — the middle half of your recent days.</string>
     <string name="detail_meaning">What this means for you</string>
     <string name="detail_no_reading">No reading yet. Add one to see where it sits.</string>
     <string name="detail_improve">How to improve it</string>
@@ -114,11 +115,11 @@
     <!-- Progress (replaces Weekly review) -->
     <string name="progress_title">Progress</string>
     <string name="progress_subtitle">This week · %1$s</string>
-    <string name="progress_this_week">This week</string>
+    <string name="progress_at_a_glance">At a glance</string>
     <string name="progress_active_days">Active days</string>
     <string name="progress_of_seven">%1$d of 7</string>
     <string name="progress_avg_recovery">Avg recovery</string>
-    <string name="progress_avg_sleep">Avg sleep</string>
+    <string name="progress_avg_sleep">Avg sleep performance</string>
     <string name="progress_avg_hrv">Avg HRV</string>
     <string name="progress_next_week">NEXT WEEK\'S FOCUS</string>
     <string name="progress_review_empty">Check off a session on Today and your weekly review starts filling in here — what improved, what needs attention, and next week\'s focus.</string>
@@ -136,12 +137,14 @@
     <string name="you_section_data">Data and devices</string>
     <string name="you_section_privacy">Privacy</string>
     <string name="you_goal">Goal</string>
-    <string name="you_goal_none">Not set — pick one focused goal</string>
+    <string name="you_goal_none">Not set · pick one focused goal</string>
     <string name="you_windows">High-pressure windows</string>
-    <string name="you_windows_count">%1$d set · a breathing reset before each</string>
-    <string name="you_windows_none">None yet · get a breathing reset before tense moments</string>
+    <!-- %1$s = you_windows_lead ("5 minutes"). Says exactly what fires and when: a notification before
+         the start, on days the app is opened (only the app arms it, never the background worker). -->
+    <string name="you_windows_none">None set · on days you open Spartan, a breathing-reset nudge %1$s before a tense moment</string>
     <string name="you_ranges">Healthy ranges</string>
-    <string name="you_ranges_subtitle">Typical ranges for your age and sex, next to your numbers</string>
+    <!-- %1$s = ReferenceRanges.cohortPhrase, the cohort the Healthy ranges page shows ("adults" with no profile). -->
+    <string name="you_ranges_subtitle">General ranges for %1$s, shown beside your own numbers for context · not targets, not a diagnosis</string>
     <string name="you_training_subtitle">Your weekly template of Zone 2, strength, and recovery</string>
     <string name="you_licenses">Set in Inter, used under the SIL Open Font License.</string>
 
@@ -160,21 +163,21 @@
     <string name="insights_in_plan">In today\'s plan</string>
     <string name="insights_read_more">Read more</string>
     <string name="insights_show_less">Show less</string>
-    <string name="insights_footer">Your usual ranges come from your own recent history; general references are labelled. None of this is a diagnosis.</string>
-    <string name="signal_learning">Learning your normal</string>
-    <string name="signal_within">Your normal</string>
-    <string name="signal_better">Better than usual</string>
-    <string name="signal_higher">Higher than usual</string>
-    <string name="signal_lower">Lower than usual</string>
+    <string name="insights_usual_note">Your usual is the middle half of your own recent daily readings (up to 30), so one odd night barely moves it.</string>
+    <!-- A signal's position against the user's own usual: "In your usual range" only when inside it, else the direction -->
+    <string name="signal_learning">Learning your usual</string>
+    <string name="signal_within">In your usual range</string>
+    <string name="signal_above">Above your usual</string>
+    <string name="signal_below">Below your usual</string>
     <!-- Quantity: %2$d, the days behind the range -->
     <plurals name="signal_normal_range">
-        <item quantity="one">Your normal %1$s · %2$d day</item>
-        <item quantity="other">Your normal %1$s · %2$d days</item>
+        <item quantity="one">Your usual %1$s · %2$d day</item>
+        <item quantity="other">Your usual %1$s · %2$d days</item>
     </plurals>
-    <!-- Quantity: %2$d, the days needed to learn a normal -->
+    <!-- Quantity: %2$d, the days needed to learn a usual -->
     <plurals name="signal_learning_days">
-        <item quantity="one">%1$d of %2$d day to learn your normal</item>
-        <item quantity="other">%1$d of %2$d days to learn your normal</item>
+        <item quantity="one">%1$d of %2$d day to learn your usual</item>
+        <item quantity="other">%1$d of %2$d days to learn your usual</item>
     </plurals>
 
     <!-- Common -->
@@ -331,7 +334,7 @@
 
     <!-- Review -->
     <string name="review_needs_attention">Needs attention</string>
-    <string name="review_strength">Strength</string>
+    <string name="review_strength">Strength sessions</string>
     <string name="review_what_improved">What improved</string>
 
     <!-- Sample-data provenance -->
@@ -355,14 +358,14 @@
     <!-- Settings -->
     <string name="settings_about">About Spartan</string>
     <string name="settings_connections">Connections</string>
-    <string name="settings_connections_subtitle">Connect WHOOP and Google Calendar.</string>
+    <string name="settings_connections_subtitle">Connect WHOOP and Google Calendar</string>
     <string name="settings_diagnostics">Diagnostics</string>
-    <string name="settings_diagnostics_subtitle">Debug builds only: operational log.</string>
-    <string name="settings_disclaimer">Spartan offers wellness and fitness guidance, not medical advice, and is not a medical device. Your data stays on this device. See Privacy for export and deletion.</string>
+    <string name="settings_diagnostics_subtitle">Debug builds only: operational log</string>
     <string name="settings_privacy">Privacy</string>
-    <string name="settings_privacy_subtitle">Export or delete local data.</string>
+    <string name="settings_privacy_subtitle">Export or delete your data on this device</string>
     <string name="settings_reminders">Reminders</string>
-    <string name="settings_reminders_subtitle">Activity and logging notifications.</string>
+    <!-- The two editors on the Reminders page: exercise and health logging, each off until turned on. -->
+    <string name="settings_reminders_subtitle">A movement and a health-logging reminder, at times you pick</string>
     <string name="settings_version">Version %1$s</string>
 
     <!-- Trajectory -->

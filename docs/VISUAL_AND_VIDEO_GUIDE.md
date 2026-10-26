@@ -19,30 +19,37 @@ Everything here inherits three hard rules from `docs/AGENTS.md` and `docs/Sparta
 
 ## 1. The visual system
 
-The palette is already defined in code (`ui/theme/Theme.kt`, `Tokens.kt`) and duplicated in
-`ios/SpartanApp/Sources/SpartanApp.swift`. Use these exact values in every external asset.
+The palette is defined in code (`ui/theme/Theme.kt`, `Tokens.kt`); the 2026-10-25 redesign
+(`SPARTAN_WORLD_CLASS_SPEC.md`) changed it on Android. `ios/SpartanApp/Sources/SpartanApp.swift`
+still carries the previous values until the iOS redesign lands. Use the Android values in every
+external asset.
 
 | Token | Dark | Light | Use |
 |---|---|---|---|
-| Background | `#0A0F0E` | `#FFFFFF` | Canvas. Light is a pure-white canvas; cards separate by soft shadow. |
-| Surface | `#121817` | `#FFFFFF` | Cards |
-| Outline | `#3D4F48` | `#9BADAA` | Borders, ring track |
-| Accent (teal) | `#3FE0C8` | `#0B685C` | The one accent. Primary actions, brand. |
-| Primed (green) | `#38D07E` | `#0B6E3D` | High readiness |
-| Easy (amber) | `#E7B25A` | `#7C570E` | Medium readiness |
-| Rest (ember) | `#E67A5A` | `#A0381D` | Low readiness |
-| Ink | `#EAF1EF` | `#11201E` | Primary text |
-| Muted | `#9DB0AB` | `#4A5654` | Secondary text |
+| Background | `#0A0F0E` | `#F6F8F7` | Canvas. A barely-tinted light canvas so flat, outlined cards read without shadows. |
+| Surface | `#121817` | `#FFFFFF` | Cards (flat, 1dp `outlineVariant` hairline, no shadow) |
+| Hero | `#0B5B4F` | `#0B5B4F` | The one filled hero per screen (Calmer theme: `#2F4F4A`) |
+| Outline | `#6B7D77` | `#738581` | Switch and field boundaries (≥3:1) |
+| Accent (deep teal) | `#84D5C4` | `#0B5B4F` | The one accent. Primary actions, brand. |
+| Green zone / Primed | `#38D07E` | text `#15693C` · ring/line `#1B7A4D` | Green recovery, completed check |
+| Yellow zone / Easy | `#E7B25A` | text `#875200` · chart line `#A36500` | Yellow recovery (`#F7C948` on the hero only) |
+| Red zone / Rest | `#E67A5A` | `#B3261E` | Red recovery |
+| Ink | `#EAF1EF` | `#101A18` | Primary text |
+| Muted | `#9DB0AB` | `#46564F` | Secondary text (7.77:1 on white) |
+| Chart identity | HRV `#5FD4C4`, RHR `#C9B6F2`, sleep `#A9B8FF` | HRV `#0A7A6D`, RHR `#6A4C9C`, sleep `#2F4DA8` | Chart lines only, never zone meaning |
 
-**Geometry:** 20dp card radius, 12dp tile radius, 8dp chip radius, fully round buttons and pills,
-10dp skeleton radius. Spacing scale 4/8/12/16/20/24, 32 between sections, 24 page gutter.
+**Geometry:** 28dp hero radius, 20dp card radius, 12dp tile radius, 8dp chip radius, fully round
+buttons and pills, 10dp skeleton radius. Spacing scale 4/8/12/16/20/24, 32 between sections, 24
+page gutter. Every action row and icon button is at least 48×48dp.
 
 **Type:** the Android app ships **Inter** (variable, OFL) with a bold display scale; iOS still
 uses SF. Use Inter for marketing art too. Wordmark tracking is **3** everywhere (`SPARTAN`, all
 caps). Full component and type reference: [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md).
 
-**Motion:** 140ms micro, 220ms state change, 420ms reveal. Everything eases out. There is exactly
-one continuous animation in the whole product (the loading pulse) — do not invent more.
+**Motion:** spring-based and only on a state change — the verdict ring sweeps to the real score
+once a day, a chart draws in once per session, a checked action pops its green check. Nothing
+loops except the loading pulse. Reduce-motion and the Calmer theme show the final state at once.
+Opacity fades keep the 140 / 220 / 420ms tweens.
 
 ### The look in one sentence
 > Near-black canvas, one teal accent, generous negative space, a single confident number, and no

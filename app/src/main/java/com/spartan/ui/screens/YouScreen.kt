@@ -2,6 +2,7 @@ package com.spartan.ui.screens
 
 import android.os.Build
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,19 +19,22 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.EventNote
-import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.outlined.Contrast
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Flag
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.PrivacyTip
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Tune
-import androidx.compose.material.icons.outlined.Wallpaper
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -45,33 +49,41 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.spartan.BuildConfig
 import com.spartan.R
 import com.spartan.domain.engine.GoalPreset
 import com.spartan.domain.engine.GoalType
 import com.spartan.domain.engine.PlanConstraints
+import com.spartan.domain.engine.ReferenceRanges
 import com.spartan.domain.engine.SexAtBirth
+import com.spartan.domain.engine.StressPatterns
+import com.spartan.ui.components.DetailPage
 import com.spartan.ui.components.IconTile
 import com.spartan.ui.components.ListRow
 import com.spartan.ui.components.PageGutter
 import com.spartan.ui.components.ScreenTitle
-import com.spartan.ui.components.SectionHeader
 import com.spartan.ui.components.SpartanCard
 import com.spartan.ui.components.WellnessFooter
+import com.spartan.ui.theme.MinTouchTarget
+import com.spartan.ui.theme.Radius
 import com.spartan.ui.theme.Spacing
 import java.util.Locale
 
 /**
- * You: who Spartan is coaching, the plan settings you set once and revisit rarely, your data
- * connections, and every privacy control — the profile tab of a travel app, for your health.
- * With no goal yet, the goal row opens [GoalWizardSheet] (a custom goal still opens
- * [GoalSetupSheet]); with an active or paused goal it goes to Progress. Plan settings edit only
- * the plan's constraints, through the wizard's constraints step, and never touch the goal.
- * Display holds the calmer theme and, on Android 12+, wallpaper colours; About ends with the
- * wellness disclaimer and its clinician prompt.
+ * You: who Spartan is coaching, then five groups in a fixed order — Your plan, Data and devices,
+ * Display, Privacy, About. The goal is row one: with no goal yet it opens [GoalWizardSheet] (a
+ * custom goal still opens [GoalSetupSheet]); with an active or paused goal it goes to Progress.
+ * Plan settings edit only the plan's constraints and never touch the goal. High-pressure windows
+ * and Healthy ranges each say in their subtitle what they do, so no row is unexplained. About is
+ * one row: the version, the full disclaimer and licences live on [AboutScreen], not in this list.
  */
 @Composable
 fun YouScreen(
@@ -86,6 +98,7 @@ fun YouScreen(
     onOpenReminders: () -> Unit,
     onOpenPrivacy: () -> Unit,
     onOpenDiagnostics: (() -> Unit)?,
+    onOpenAbout: () -> Unit,
     onStartGoalPlan: (GoalPreset, Double, Int, PlanConstraints) -> Unit = { _, _, _, _ -> },
     onSavePlanConstraints: (PlanConstraints) -> Unit = {},
     onSetCalmerTheme: (Boolean) -> Unit = {},
@@ -104,9 +117,9 @@ fun YouScreen(
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
             item { ScreenTitle(stringResource(R.string.you_title)) }
-            item { ProfileCard(state) { showProfileSheet = true } }
+            item { ProfileHeader(state) { showProfileSheet = true } }
 
-            item { SectionHeader(stringResource(R.string.you_section_plan)) }
+            item { GroupHeader(stringResource(R.string.you_section_plan)) }
             item {
                 SpartanCard(contentPadding = rows) {
                     val activeGoal = state.activeGoal
@@ -128,26 +141,34 @@ fun YouScreen(
                         stringResource(R.string.wizard_plan_settings_subtitle),
                         onClick = { showPlanSettings = true },
                     )
+                    ListRow(Icons.Outlined.Notifications, stringResource(R.string.settings_reminders), stringResource(R.string.settings_reminders_subtitle), onOpenReminders)
+                    // The subtitle states exactly what fires and when: a notification a few minutes before
+                    // the window, on days the app is opened (MainViewModel arms it; the 04:00 worker does not).
+                    val leadMinutes = StressPatterns.PRE_WINDOW_LEAD_MINUTES
+                    val lead = pluralStringResource(R.plurals.you_windows_lead, leadMinutes, leadMinutes)
+                    val windows = state.pressureWindows.size
                     ListRow(
                         Icons.Outlined.Schedule,
                         stringResource(R.string.you_windows),
-                        if (state.pressureWindows.isEmpty()) stringResource(R.string.you_windows_none)
-                        else stringResource(R.string.you_windows_count, state.pressureWindows.size),
+                        if (windows == 0) stringResource(R.string.you_windows_none, lead)
+                        else pluralStringResource(R.plurals.you_windows_set, windows, windows, lead),
                         onOpenWindows,
+                        showDivider = false,
                     )
-                    ListRow(Icons.Outlined.Tune, stringResource(R.string.you_ranges), stringResource(R.string.you_ranges_subtitle), onOpenRanges, showDivider = false)
                 }
             }
 
-            item { SectionHeader(stringResource(R.string.you_section_data)) }
+            item { GroupHeader(stringResource(R.string.you_section_data)) }
             item {
                 SpartanCard(contentPadding = rows) {
                     ListRow(Icons.Outlined.Link, stringResource(R.string.settings_connections), stringResource(R.string.settings_connections_subtitle), onOpenConnections)
-                    ListRow(Icons.Outlined.Notifications, stringResource(R.string.settings_reminders), stringResource(R.string.settings_reminders_subtitle), onOpenReminders, showDivider = false)
+                    // The same cohort the page names, so the row is true with or without age and sex ("adults").
+                    val cohort = ReferenceRanges.cohortPhrase(state.userAgeYears, state.userSexAtBirth)
+                    ListRow(Icons.Outlined.Tune, stringResource(R.string.you_ranges), stringResource(R.string.you_ranges_subtitle, cohort), onOpenRanges, showDivider = false)
                 }
             }
 
-            item { SectionHeader(stringResource(R.string.more_section_display)) }
+            item { GroupHeader(stringResource(R.string.more_section_display)) }
             item {
                 // Dynamic colour needs Android 12 (API 31); below that the row would do nothing.
                 val wallpaperAvailable = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
@@ -162,7 +183,7 @@ fun YouScreen(
                     )
                     if (wallpaperAvailable) {
                         SwitchRow(
-                            Icons.Outlined.Wallpaper,
+                            Icons.Outlined.Palette,
                             stringResource(R.string.more_wallpaper_colours),
                             stringResource(R.string.more_wallpaper_colours_body),
                             checked = state.wallpaperColours,
@@ -173,9 +194,9 @@ fun YouScreen(
                 }
             }
 
-            item { SectionHeader(stringResource(R.string.you_section_privacy)) }
+            item { GroupHeader(stringResource(R.string.you_section_privacy)) }
             item {
-                SpartanCard(contentPadding = rows) {
+                SpartanCard(Modifier.testTag(YOU_PRIVACY_CARD_TAG), contentPadding = rows) {
                     ListRow(Icons.Outlined.PrivacyTip, stringResource(R.string.settings_privacy), stringResource(R.string.settings_privacy_subtitle), onOpenPrivacy, showDivider = onOpenDiagnostics != null)
                     onOpenDiagnostics?.let {
                         ListRow(Icons.Outlined.BugReport, stringResource(R.string.settings_diagnostics), stringResource(R.string.settings_diagnostics_subtitle), it, showDivider = false)
@@ -183,14 +204,16 @@ fun YouScreen(
                 }
             }
 
+            item { GroupHeader(stringResource(R.string.you_section_about)) }
             item {
-                Column(Modifier.padding(top = Spacing.section)) {
-                    Text(stringResource(R.string.settings_about), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
-                    Text(stringResource(R.string.settings_version, BuildConfig.VERSION_NAME), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(stringResource(R.string.settings_disclaimer), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = Spacing.sm))
-                    Text(stringResource(R.string.you_licenses), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = Spacing.sm))
-                    // What Spartan is and isn't, and when to talk to a qualified clinician.
-                    WellnessFooter()
+                SpartanCard(contentPadding = rows) {
+                    ListRow(
+                        Icons.Outlined.Info,
+                        stringResource(R.string.settings_about),
+                        stringResource(R.string.you_about_subtitle),
+                        onOpenAbout,
+                        showDivider = false,
+                    )
                 }
             }
         }
@@ -227,10 +250,18 @@ fun YouScreen(
     }
 }
 
-/** Avatar initial, name, and the two facts that tune Spartan's ranges and picks. */
+/** Tags the Privacy group's card, so a test can see that release builds leave no divider in it. */
+internal const val YOU_PRIVACY_CARD_TAG = "you-privacy-card"
+
+/**
+ * The profile header: avatar initial, name, and the two facts that tune Spartan's ranges and picks
+ * (or the hint to add whichever is missing). A header on the page, not another card, and the whole
+ * row edits. Before onboarding gave a name it reads "Your profile", never a second "You" under the
+ * title. The avatar is decorative: TalkBack reads the name, the details and the edit action only.
+ */
 @Composable
-private fun ProfileCard(state: MainUiState, onEdit: () -> Unit) {
-    val name = state.profile?.displayName?.takeIf { it.isNotBlank() && it != "You" } ?: stringResource(R.string.you_title)
+private fun ProfileHeader(state: MainUiState, onEdit: () -> Unit) {
+    val name = state.profile?.displayName?.takeIf { it.isNotBlank() && it != "You" }
     val sex = when (state.userSexAtBirth) {
         SexAtBirth.FEMALE -> stringResource(R.string.coach_sex_female)
         SexAtBirth.MALE -> stringResource(R.string.coach_sex_male)
@@ -239,21 +270,48 @@ private fun ProfileCard(state: MainUiState, onEdit: () -> Unit) {
     val details = when {
         state.userAgeYears != null && sex != null -> stringResource(R.string.you_profile_details, state.userAgeYears, sex)
         state.userAgeYears != null -> stringResource(R.string.you_profile_age_only, state.userAgeYears)
+        sex != null -> stringResource(R.string.you_profile_sex_only, sex)
         else -> stringResource(R.string.you_profile_hint)
     }
-    SpartanCard(onClick = onEdit, onClickLabel = stringResource(R.string.you_profile_a11y)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(56.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) {
-                Text(name.take(1).uppercase(Locale.getDefault()), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onPrimaryContainer)
+    val colors = MaterialTheme.colorScheme
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(Radius.card))
+            .clickable(onClickLabel = stringResource(R.string.you_profile_a11y), role = Role.Button, onClick = onEdit)
+            .heightIn(min = MinTouchTarget)
+            .padding(vertical = Spacing.md),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier.size(64.dp).clip(CircleShape).background(colors.primaryContainer).clearAndSetSemantics {},
+            contentAlignment = Alignment.Center,
+        ) {
+            if (name != null) {
+                Text(name.take(1).uppercase(Locale.getDefault()), style = MaterialTheme.typography.titleLarge, color = colors.onPrimaryContainer)
+            } else {
+                Icon(Icons.Outlined.Person, contentDescription = null, tint = colors.onPrimaryContainer)
             }
-            Spacer(Modifier.width(Spacing.lg))
-            Column(Modifier.weight(1f)) {
-                Text(name, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
-                Text(details, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
+        Spacer(Modifier.width(Spacing.lg))
+        Column(Modifier.weight(1f)) {
+            Text(name ?: stringResource(R.string.you_profile_unnamed), style = MaterialTheme.typography.titleLarge, color = colors.onSurface)
+            Text(details, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
+        }
+        Spacer(Modifier.width(Spacing.md))
+        Icon(Icons.Outlined.Edit, contentDescription = null, tint = colors.onSurfaceVariant)
     }
+}
+
+/** A group's label: quieter than the screen title and the rows under it, and a TalkBack heading. */
+@Composable
+private fun GroupHeader(title: String) {
+    Text(
+        title,
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(top = Spacing.xl, start = Spacing.xs).semantics { heading() },
+    )
 }
 
 /**
@@ -298,3 +356,26 @@ private fun SwitchRow(
  */
 internal fun calmerThemeBodyRes(wallpaperAvailable: Boolean, wallpaperColours: Boolean): Int =
     if (wallpaperAvailable && wallpaperColours) R.string.more_calmer_theme_body_wallpaper else R.string.more_calmer_theme_body
+
+/**
+ * About, pushed from You's single About row: the version (its only place in the app), the full
+ * wellness disclaimer — the one place it appears — then Today's in-context line, so About never says
+ * less than Today ("not medical advice", and when to stop and seek care), where your data lives,
+ * and the font licence.
+ */
+@Composable
+fun AboutScreen(onBack: () -> Unit) {
+    DetailPage(stringResource(R.string.settings_about), onBack) {
+        Text(stringResource(R.string.settings_version, BuildConfig.VERSION_NAME), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+        WellnessFooter()
+        Text(stringResource(R.string.today_in_context), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(stringResource(R.string.about_privacy_line), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            stringResource(R.string.about_licences_title),
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(top = Spacing.xl).semantics { heading() },
+        )
+        Text(stringResource(R.string.you_licenses), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}

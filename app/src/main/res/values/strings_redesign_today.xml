@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Today redesign (CheckInScreen): one hero, one primary action, a bedtime card that always acts. -->
+<resources>
+    <!-- Title block: the screen's one headline is the tab name; the greeting and date support it. -->
+    <string name="today_greeting_named">%1$s, %2$s</string>
+
+    <!-- Hero: one primary state. A finished plan is the headline; a pending verdict's note stays a
+         secondary line under it. Three small actions done is never "Recovery earned". -->
+    <string name="today_plan_complete">Today\'s plan complete</string>
+    <string name="today_holding_plan_complete">Today\'s holding plan complete</string>
+    <!-- A finished holding plan's secondary line: data only, from the real pending reason and the
+         newest day Spartan has, never "Plan pending" under "complete". %1$s is a day ("Fri, Oct 23"). -->
+    <string name="today_holding_note_stale">Waiting on newer WHOOP data</string>
+    <string name="today_holding_note_stale_yesterday">Waiting on newer WHOOP data · newest from yesterday</string>
+    <string name="today_holding_note_stale_date">Waiting on newer WHOOP data · newest from %1$s</string>
+    <string name="today_holding_note_cycle">Today\'s cycle is still being scored</string>
+    <string name="today_holding_note_sync_failed">Couldn\'t refresh your WHOOP data just now</string>
+    <string name="today_holding_note_no_data">No WHOOP data yet</string>
+    <!-- The number inside the ring; the percent sign is set smaller so the number fits the ring. -->
+    <string name="today_ring_value">%1$d%%</string>
+
+    <!-- The one primary action under the hero, shown only while an action is open; once every action
+         is resolved there is none, and the Tonight card owns the night. Each TalkBack label starts
+         with the visible text and says what the tap does. -->
+    <string name="today_primary_start">Start today\'s plan</string>
+    <string name="today_primary_start_a11y">Start today\'s plan with %1$s</string>
+    <string name="today_primary_next">Next: %1$s</string>
+    <string name="today_primary_next_a11y">Next: %1$s. Opens its steps</string>
+
+    <!-- "Why today?": a fixed subtitle, so the card never repeats the hero's zone, number and comparison. -->
+    <string name="today_why_subtitle">What shaped today\'s plan</string>
+
+    <!-- The Tonight card's button when there is no bedtime target. -->
+    <string name="today_set_bedtime">Set your usual bedtime</string>
+    <string name="today_set_bedtime_a11y">Set your usual bedtime in plan settings</string>
+
+    <!-- Tonight without a target: what to do, not just what is missing. -->
+    <string name="today_tonight_no_target_title">Plan tonight\'s sleep</string>
+    <string name="today_tonight_set_bedtime_body">Spartan plans tonight\'s wind-down and lights-out around the bedtime you give.</string>
+    <string name="today_tonight_no_sleep_body">There\'s no WHOOP sleep from last night to plan from. Import your latest WHOOP export, or set your usual bedtime, and Spartan plans tonight\'s wind-down around it.</string>
+
+    <!-- The one in-context line; the full disclaimer lives in You, About. -->
+    <string name="today_in_context">Wellness and fitness guidance, not medical advice. Stop and seek care for pain, illness, or unusual symptoms.</string>
+</resources>

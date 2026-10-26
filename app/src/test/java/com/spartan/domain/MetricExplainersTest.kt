@@ -98,7 +98,19 @@ class MetricExplainersTest {
                 assertFalse("predictive illness copy on ${explainer.metric}: \"$copy\"", predictive.containsMatchIn(copy))
             }
         }
-        assertTrue(MetricExplainers.forMetric(MetricType.RECOVERY_SCORE)!!.whatMovesIt.contains("Illness or feeling run down."))
+        assertTrue(MetricExplainers.forMetric(MetricType.RECOVERY_SCORE)!!.whatMovesIt.contains("Feeling unwell — rest comes first on those days."))
+    }
+
+    @Test
+    fun whatMovesIt_neverFramesAMetricAsAnIllnessSignal() {
+        // "Feeling unwell" is the wellness wording every explainer uses; "sick" and "illness" never appear.
+        val illness = Regex("""sick|illness""", RegexOption.IGNORE_CASE)
+        MetricExplainers.all.forEach { explainer ->
+            explainer.whatMovesIt.forEach { bullet ->
+                assertFalse("illness wording on ${explainer.metric}: \"$bullet\"", illness.containsMatchIn(bullet))
+            }
+        }
+        assertTrue(MetricExplainers.forMetric(MetricType.RESPIRATORY_RATE)!!.whatMovesIt.any { it.startsWith("Feeling unwell") })
     }
 
     @Test

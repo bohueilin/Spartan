@@ -73,6 +73,7 @@ import com.spartan.BuildConfig
 import com.spartan.R
 import com.spartan.domain.model.MetricType
 import com.spartan.domain.model.WorkoutType
+import com.spartan.ui.screens.AboutScreen
 import com.spartan.ui.screens.AddMetricScreen
 import com.spartan.ui.screens.CheckInScreen
 import com.spartan.ui.screens.ConnectionsScreen
@@ -280,6 +281,7 @@ fun SpartanRoot(
                                     bedtime = bedtime,
                                     onAddAction = viewModel::addAction,
                                     onMorningRevealPlayed = viewModel::markMorningRevealPlayed,
+                                    onSavePlanConstraints = viewModel::savePlanConstraints,
                                 )
                             }
                             composable("insights") {
@@ -316,6 +318,7 @@ fun SpartanRoot(
                                     onOpenReminders = { navController.navigate("reminders") },
                                     onOpenPrivacy = { navController.navigate("privacy") },
                                     onOpenDiagnostics = if (BuildConfig.DEBUG) { { navController.navigate("diagnostics") } } else null,
+                                    onOpenAbout = { navController.navigate("about") },
                                     onStartGoalPlan = viewModel::startGoalPlan,
                                     onSavePlanConstraints = viewModel::savePlanConstraints,
                                     onSetCalmerTheme = viewModel::setCalmerTheme,
@@ -384,6 +387,7 @@ fun SpartanRoot(
                                 ReminderSettingsScreen(onBack = back, state = state, onRequestNotifications = onRequestNotifications, onSave = viewModel::saveReminder)
                             }
                             composable("privacy") { PrivacyScreen(state, onShareExport, viewModel::deleteAllLocalData, back) }
+                            composable("about") { AboutScreen(onBack = back) }
                         }
                     }
                     // The hairline that separated the bar from the page, now on whichever edge the suite sits.

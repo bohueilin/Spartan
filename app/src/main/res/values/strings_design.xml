@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Shared design-system strings (components/Charts.kt). -->
+<resources>
+    <!-- A chart's day label for today's reading; other days are the locale's short weekday. -->
+    <string name="chart_today">Today</string>
+</resources>
