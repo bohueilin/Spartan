@@ -188,6 +188,28 @@ final class CoachEnginesTests: XCTestCase {
         XCTAssertTrue(p.summary.contains("3 of 5"))
     }
 
+    func testGoalSummariesSayWhatChangedSinceTheGoalStarted() {
+        func week(_ type: GoalMetric, _ value: Double, today: Int) -> [MetricReading] {
+            (0...6).map { MetricReading(type: type, value: value, recordedAtEpochDay: today - $0) }
+        }
+        // Weight up 1 kg from the start: the direction the data moved, against the goal's start.
+        let weight = GoalEngine.progress(goal(.weightLoss, target: 10.0, weeks: 6, baseline: 80.0),
+                                         readings: week(.weight, 81.0, today: 20014), todayEpochDay: 20014)
+        XCTAssertEqual("2.2 lb up since your goal started, 4 wk left", weight.summary)
+        let sleep = GoalEngine.progress(goal(.sleepRecovery, target: 10.0, weeks: 3, baseline: 80.0),
+                                        readings: week(.sleepPerformance, 76.0, today: 20007), todayEpochDay: 20007)
+        XCTAssertEqual("5.0% lower since your goal started, 2 wk left", sleep.summary)
+        let calm = GoalEngine.progress(goal(.stressResilience, target: 5.0, weeks: 3, baseline: 35.0),
+                                       readings: week(.hrvRmssd, 36.5, today: 20007), todayEpochDay: 20007,
+                                       breathworkThisWeek: 3)
+        XCTAssertEqual("3 of 5 calm sessions this week · HRV +1.5 ms since your goal started", calm.summary)
+        // "Baseline" is never said on screen, where "your usual" is the personal range.
+        for summary in [weight.summary, sleep.summary, calm.summary] {
+            XCTAssertFalse(summary.contains("baseline"), summary)
+            XCTAssertTrue(SafetyEngine().validateCopy(summary), summary)
+        }
+    }
+
     func testGoalModifiersBendThePlanTowardTheGoal() {
         let weight = GoalEngine.planModifiers(goal(.weightLoss, target: 10.0, weeks: 6), windows: [])
         XCTAssertEqual(60, weight.extraZone2MinutesPerWeek)

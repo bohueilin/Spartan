@@ -257,7 +257,9 @@ public enum GoalEngine {
                 let d: Double = hrvNow - baseline
                 let sign: String = d >= 0 ? "+" : ""
                 let deltaStr: String = roundTo1(d)
-                hrvNote = " · HRV \(sign)\(deltaStr) ms vs baseline"
+                // Against the value captured when the goal started — never called "baseline" on
+                // screen, where "your usual" is the personal range.
+                hrvNote = " · HRV \(sign)\(deltaStr) ms since your goal started"
             }
             let weeklyTargetInt: Int = Int(weeklyTarget)
             return GoalProgress(
@@ -293,13 +295,13 @@ public enum GoalEngine {
             // Report the direction the data actually moved: abs() here told a user who had gained
             // weight that they had lost it. A wrong-signed number is worse than a blunt one.
             if achieved < 0 {
-                summary = "\(roundTo1(-achieved)) lb up vs baseline, \(remainingWeeks) wk left"
+                summary = "\(roundTo1(-achieved)) lb up since your goal started, \(remainingWeeks) wk left"
             } else {
                 summary = "\(roundTo1(achieved)) of \(targetInt) lb down, \(remainingWeeks) wk left"
             }
         default:
             if achieved < 0 {
-                summary = "\(roundTo1(-achieved))% below baseline, \(remainingWeeks) wk left"
+                summary = "\(roundTo1(-achieved))% lower since your goal started, \(remainingWeeks) wk left"
             } else {
                 summary = "\(roundTo1(achieved))% of \(targetInt)% gained, \(remainingWeeks) wk left"
             }

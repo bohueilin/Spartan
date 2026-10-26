@@ -59,13 +59,13 @@ public struct MetricProjection: Codable, Equatable {
 /// - Values rounded to 1 decimal; numeric `low <= high` on every point.
 public final class ProjectionEngine {
 
-    /// Shown alongside every projection surface. Keep in sync with Android's
+    /// Shown alongside every projection surface: what the ranges are, never a general medical
+    /// disclaimer — that lives in Settings → About and Today's footer. Keep in sync with Android's
     /// `ProjectionEngine.DISCLAIMER`.
     // Kept byte-identical to the Android ProjectionEngine.DISCLAIMER for cross-platform parity.
     public static let disclaimer =
         "Illustrative estimates for consistent aerobic and strength training" +
-        " — not a prediction or a guarantee for you. Individual results vary." +
-        " This is wellness guidance, not medical advice."
+        " — not a prediction or a guarantee for you. Individual results vary."
 
     private static let weeks: [Int] = [0, 2, 4, 6, 8]
     private static let horizonWeeks = 8.0

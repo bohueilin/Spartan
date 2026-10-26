@@ -28,6 +28,7 @@ run("safety.sanitizeThrowsOnlyForBlocked") { safety.testSanitizeThrowsOnlyForBlo
 let engine = CoachingEngineTests()
 run("engine.bandThresholds") { engine.testBandThresholdsMatchSpec() }; testCount += 1
 run("engine.lowRecoveryRequiredNoHard") { engine.testLowRecoveryProducesRequiredRecoveryAndNoHardTraining() }; testCount += 1
+run("engine.safetyBannerOnlyLowRecovery") { try engine.testSafetyBannerOnlyCautionsALowRecoveryDayNeverRepeatsTheDisclaimer() }; testCount += 1
 run("engine.primedGreenlight") { engine.testPrimedGreenlightsAQualityStrengthSession() }; testCount += 1
 run("engine.poorSleepHygiene") { engine.testPoorSleepAddsSleepHygiene() }; testCount += 1
 run("engine.elevatedRhrCheckIn") { engine.testElevatedRhrTrendAddsCheckIn() }; testCount += 1
@@ -37,6 +38,7 @@ run("engine.referralNeverOnAbsoluteValue") { engine.testClinicianReferralNeverFi
 run("engine.referralWaitsForLearningPeriod") { try engine.testClinicianReferralWaitsForTheLearningPeriodBeforeABaselineIsTheUsersUsual() }; testCount += 1
 run("engine.referralLearningPeriodPerBaseline") { try engine.testClinicianReferralNeedsTheLearningPeriodBehindEachBaselineItReads() }; testCount += 1
 run("engine.readinessBaselineNightCounts") { try engine.testReadinessSnapshotFromCountsThePriorNightsBehindEachBaseline() }; testCount += 1
+run("engine.trendCheckInsSayYourUsual") { try engine.testTrendCheckInsSpeakOfYourUsualNeverAStressSign() }; testCount += 1
 run("engine.concerningVitalEasyWalk") { try engine.testConcerningVitalGoodRecoveryDayGetsAnEasyWalk() }; testCount += 1
 run("engine.headlineGentleOnPainAndCheckIn") { engine.testHeadlineFollowsTheBandAndStaysGentleOnPainAndCheckInDays() }; testCount += 1
 run("engine.maxActivitiesCap") { engine.testPlanRespectsMaxActivitiesButKeepsRequiredAndReferral() }; testCount += 1
@@ -79,6 +81,8 @@ run("proj.deterministic") { proj.testProjectionIsDeterministic() }; testCount +=
 run("proj.onlyProvidedMetrics") { proj.testOnlyProvidedMetricsAreProjected() }; testCount += 1
 run("explainers.coverAllNine") { proj.testExplainersCoverAllNineMetrics() }; testCount += 1
 run("explainers.respClinicianNote") { try proj.testRespiratoryRateExplainerCarriesClinicianNote() }; testCount += 1
+run("explainers.noIllnessWording") { try proj.testWhatMovesItNeverFramesAMetricAsAnIllnessSignal() }; testCount += 1
+run("proj.disclaimerNoMedicalLine") { proj.testDisclaimerSaysTheRangesAreIllustrativeWithoutAMedicalLine() }; testCount += 1
 run("explainers.allCopySafe") { proj.testEveryUserFacingStringPassesSafetyCheck() }; testCount += 1
 
 // --- CoachingGymTests (domain-specific reward eval over the scenario manifest) ---
@@ -141,6 +145,7 @@ run("coach.invalidGoalsRejected") { coach.testInvalidGoalsZeroTargetOrNoRunwayAr
 run("coach.weightProgressKgToLb") { coach.testWeightProgressConvertsKgReadingsToPounds() }; testCount += 1
 run("coach.sleepProgressPercentGain") { coach.testSleepProgressPercentGainVsBaseline() }; testCount += 1
 run("coach.stressGoalHabitCounting") { coach.testStressGoalIsAHabitGoalCountingCalmSessions() }; testCount += 1
+run("coach.goalSummariesSinceGoalStarted") { coach.testGoalSummariesSayWhatChangedSinceTheGoalStarted() }; testCount += 1
 run("coach.goalModifiersBendPlan") { coach.testGoalModifiersBendThePlanTowardTheGoal() }; testCount += 1
 run("coach.weekdayEffectFindsStressor") { try coach.testWeekdayEffectFindsTheStressorDayWithEnoughEvidence() }; testCount += 1
 run("coach.weekdayEffectSilentOnThinData") { coach.testWeekdayEffectStaysSilentOnThinOrFlatData() }; testCount += 1

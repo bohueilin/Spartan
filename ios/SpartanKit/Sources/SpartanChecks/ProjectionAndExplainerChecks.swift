@@ -164,6 +164,31 @@ final class ProjectionAndExplainerChecks: XCTestCase {
                       "respiratory-rate explainer must state that Spartan does not diagnose")
     }
 
+    func testWhatMovesItNeverFramesAMetricAsAnIllnessSignal() throws {
+        // "Feeling unwell" is the wellness wording every explainer uses; "sick" and "illness" never appear.
+        for explainer in MetricExplainers.all {
+            for bullet in explainer.whatMovesIt {
+                let lower = bullet.lowercased()
+                XCTAssertFalse(lower.contains("sick") || lower.contains("illness"),
+                               "illness wording on \(explainer.metric.rawValue): \"\(bullet)\"")
+            }
+        }
+        let resp = try XCTUnwrap(MetricExplainers.forMetric(.respiratoryRate))
+        XCTAssertTrue(resp.whatMovesIt.contains { $0.hasPrefix("Feeling unwell") })
+        let hrv = try XCTUnwrap(MetricExplainers.forMetric(.hrvRmssd))
+        XCTAssertFalse(hrv.whatItIs.contains("nervous system"))
+    }
+
+    func testDisclaimerSaysTheRangesAreIllustrativeWithoutAMedicalLine() {
+        // Byte-identical to Android's ProjectionEngine.DISCLAIMER.
+        XCTAssertEqual(
+            "Illustrative estimates for consistent aerobic and strength training — not a prediction or a guarantee for you. Individual results vary.",
+            ProjectionEngine.disclaimer
+        )
+        // The general disclaimer lives in Settings → About and Today's footer, never under the projections.
+        XCTAssertFalse(ProjectionEngine.disclaimer.lowercased().contains("medical"))
+    }
+
     func testEveryUserFacingStringPassesSafetyCheck() {
         XCTAssertTrue(safety.validateCopy(ProjectionEngine.disclaimer), "disclaimer failed safety check")
         for tier in tiers {

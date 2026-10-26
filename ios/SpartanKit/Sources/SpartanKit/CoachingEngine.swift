@@ -149,11 +149,14 @@ public final class CoachingEngine {
         }
     }
 
+    /// A banner only when the day itself calls for a caution — a low-recovery day. The general
+    /// "wellness guidance, not medical advice" line is not repeated here: Today already carries it
+    /// once as its footer, and the full disclaimer lives in Settings → About. Mirrors Android.
     private func safetyBannerFor(_ readiness: ReadinessSnapshot) -> String? {
         if readiness.band == .rest {
             return "Pushing hard on a low-recovery day rarely pays off. Keep intensity low and stop if anything hurts."
         }
-        return "This is wellness and fitness guidance, not medical advice. Stop and seek care for pain, illness, or unusual symptoms."
+        return nil
     }
 }
 
@@ -318,7 +321,7 @@ public final class RuleBasedRecommendationSource: RecommendationSource {
     private func breathwork(_ r: ReadinessSnapshot, day: Int) -> DailyActivity {
         activity(day, "breathing", "5-minute breathing protocol", .breathwork,
                  .recommended, RuleIds.lowHrvTrend, .hrvRmssd,
-                 why: "Your HRV is trending below baseline, a sign of accumulated stress. Slow breathing helps you downshift.",
+                 why: "Your HRV is below your usual. Slow breathing is an easy way to downshift tonight.",
                  steps: ["Sit comfortably.",
                          "Inhale 4 seconds, exhale 6 seconds.",
                          "Repeat for 5 minutes, relaxing the shoulders."],
@@ -328,7 +331,7 @@ public final class RuleBasedRecommendationSource: RecommendationSource {
     private func rhrCheckIn(_ r: ReadinessSnapshot, day: Int) -> DailyActivity {
         activity(day, "hydrate-rest", "Hydration and easy-day check-in", .hydration,
                  .recommended, RuleIds.elevatedRhrTrend, .restingHeartRate,
-                 why: "Resting heart rate is up versus your baseline — often a cue to hydrate, ease intensity, and check sleep.",
+                 why: "Resting heart rate is above your usual — a good cue to hydrate, ease intensity, and check how you slept.",
                  steps: ["Front-load water this morning.",
                          "Keep training easy today.",
                          "If you feel unwell, rest and monitor how you feel."],
@@ -402,7 +405,7 @@ public final class RuleBasedRecommendationSource: RecommendationSource {
         return activity(day, "clinician", "Check in with how you feel", .recovery,
                         .required, RuleIds.clinicianReferral, metric,
                         why: "One or more of today's readings is outside your usual range. This is not a diagnosis, and one reading is not a conclusion.",
-                        steps: ["Notice any symptoms like illness, unusual fatigue, or feeling unwell.",
+                        steps: ["Notice how you feel today — energy, sleep, anything unusual.",
                                 "Rest and take it easy today.",
                                 "If readings stay unusual or you have symptoms, consider consulting a qualified clinician."],
                         minutes: 2, intensity: .rest, time: .morning,
