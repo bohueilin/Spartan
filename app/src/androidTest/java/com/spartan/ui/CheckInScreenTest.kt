@@ -85,9 +85,12 @@ class CheckInScreenTest {
     @Test
     fun onboardingLeadsToDailyPlan_withSampleDataLabeled() {
         completeOnboardingIfShown()
+        // Honesty requirement: mock mode must be visibly labeled. The chip trails Today's title, the
+        // list's first item, so check it before scrolling to the plan (which can dispose the title).
+        composeRule.waitUntil(20_000) {
+            composeRule.onAllNodesWithText("SAMPLE DATA").fetchSemanticsNodes().isNotEmpty()
+        }
         awaitTodaysPlan()
-        // Honesty requirement: mock mode must be visibly labeled.
-        composeRule.onAllNodesWithText("SAMPLE DATA").onFirst().assertExists()
         // The plan is non-empty: at least one activity checkbox exists.
         firstActivityCheckbox().assertExists()
     }
